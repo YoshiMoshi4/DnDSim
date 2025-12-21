@@ -63,13 +63,9 @@ public class CharSheet {
         currentHP = totalHP;
         status = new ArrayList<Status>();
 
-        // what is the length of attributes ??? 
-        // what even is base attributes ? :sob:
-        // i guess whatever is passed in for now
         this.baseAttributes = new int[baseAttributes.length];
 
-        // and temp attributes ?
-        this.tempAttributes = new int[baseAttributes.length]; // ??
+        this.tempAttributes = new int[baseAttributes.length];
 
         if (baseAttributes.length == this.baseAttributes.length) {
             for (int i = 0; i < baseAttributes.length; i++) {
@@ -81,8 +77,20 @@ public class CharSheet {
             System.out.println("attributesLength Error");
         }
 
+        Weapon fist = new Weapon("Fist", "Unarmed", 1, new int[]{0, 0, 0, 0});
+
+        Armor bald = new Armor("Naked", "Armor", 0, 0, new int[]{0, 0, 0, 0});
+        Armor bareChest = new Armor("Bare Chest", "Armor", 1, 0, new int[]{0, 0, 0, 0});
+        Armor noPants = new Armor("No Pants", "Armor", 2, 0, new int[]{0, 0, 0, 0});
+
         weapons = new Weapon[2];
+        weapons[0] = fist;
+        weapons[1] = fist;
+
         armor = new Armor[3];
+        armor[0] = bald;
+        armor[1] = bareChest;
+        armor[2] = noPants;
         inventory = new ArrayList<Item>();
     }
 
@@ -406,9 +414,8 @@ public class CharSheet {
     }
 
     private int indexInInventory(Item item) {
-        Item[] arr = (Item[]) inventory.toArray();
-        for (int i = 0; i < arr.length; i++) {
-            if (arr[i].getName().equals(item.getName())) {
+        for (int i = 0; i < inventory.size(); i++) {
+            if (inventory.get(i).getName().equals(item.getName())) {
                 return i;
             }
         }

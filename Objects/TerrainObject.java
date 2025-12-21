@@ -10,6 +10,10 @@ public abstract class TerrainObject extends GridObject {
         this.health = health;
     }
 
+    public int getHealth() {
+        return health;
+    }
+
     public boolean blocksMovement() {
         return blocksMovement;
     }

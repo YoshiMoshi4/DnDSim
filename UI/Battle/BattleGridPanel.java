@@ -9,21 +9,28 @@ public class BattleGridPanel extends JPanel {
 
     private final BattleGrid grid;
     private final TurnManager turnManager;
+    private GridObject selectedObject;
 
     public BattleGridPanel(BattleGrid grid, TurnManager tm) {
+        selectedObject = null;
         this.grid = grid;
         this.turnManager = tm;
         setBackground(Color.WHITE);
 
         addMouseListener(new MouseAdapter() {
             @Override
-            public void mouseClicked(MouseEvent e) {
-                handleClick(e);
+            public void mousePressed(MouseEvent e) {
+                if (SwingUtilities.isRightMouseButton(e)) {
+                    handleRightClick(e);
+                } else if (SwingUtilities.isLeftMouseButton(e)) {
+                    handleLeftClick(e);
+                }
             }
         });
+
     }
 
-    private void handleClick(MouseEvent e) {
+    private void handleRightClick(MouseEvent e) {
         int cellW = getWidth() / grid.getCols();
         int cellH = getHeight() / grid.getRows();
 
@@ -34,29 +41,139 @@ public class BattleGridPanel extends JPanel {
             return;
         }
 
-        Entity current = turnManager.getCurrent();
+        GridObject obj = grid.getObjectAt(row, col);
+        if (obj == null) {
+            return;
+        }
 
-        // Attack terrain if present
-        TerrainObject terrain = grid.getTerrainAt(row, col);
-        if (terrain != null && current instanceof Player c) {
-            int damage = c.getAttackDamage();
-            terrain.takeDamage(damage);
-            grid.removeDestroyedTerrain();
+        showContextMenu(obj, e.getX(), e.getY());
+    }
+
+    private void showContextMenu(GridObject obj, int x, int y) {
+        JPopupMenu menu = new JPopupMenu();
+
+        addInfoSection(menu, obj);
+        menu.addSeparator();
+        addActionSection(menu, obj);
+
+        menu.show(this, x, y);
+    }
+
+    private void addInfoSection(JPopupMenu menu, GridObject obj) {
+
+        if (obj instanceof Entity e) {
+            menu.add(label("Name: " + e.getName()));
+            menu.add(label("HP: " + e.getHealth()));
+            menu.add(label("Move: " + e.getMovement()));
+        }
+
+        if (obj instanceof TerrainObject t) {
+            menu.add(label("Terrain"));
+            menu.add(label("HP: " + t.getHealth()));
+        }
+
+        if (obj instanceof Pickup p) {
+            menu.add(label("Item: " + p.getItem().getName()));
+        }
+    }
+
+    private JMenuItem label(String text) {
+        JMenuItem item = new JMenuItem(text);
+        item.setEnabled(false);
+        return item;
+    }
+
+    private void addActionSection(JPopupMenu menu, GridObject obj) {
+
+        if (obj instanceof Pickup p && selectedObject instanceof Player player) {
+            JMenuItem pickup = new JMenuItem("Pick Up");
+            pickup.addActionListener(ev -> {
+                player.pickup(p);
+                grid.removePickup(p);
+                repaint();
+            });
+            menu.add(pickup);
+        }
+
+        if (obj instanceof TerrainObject t && selectedObject instanceof Entity e) {
+            JMenuItem attack = new JMenuItem("Attack Terrain");
+            attack.addActionListener(ev -> {
+                t.takeDamage(e.getAttackPower());
+                if (t.isDestroyed()) {
+                    grid.removeDestroyedTerrain();
+                }
+                repaint();
+            });
+            menu.add(attack);
+        }
+
+        if (obj instanceof Entity target
+                && selectedObject instanceof Entity attacker
+                && target != attacker) {
+
+            JMenuItem attack = new JMenuItem("Attack");
+            attack.addActionListener(ev -> {
+                attacker.attack(target);
+                if (target.isDead()) {
+                    grid.removeEntity(target);
+                }
+                repaint();
+            });
+            menu.add(attack);
+        }
+    }
+
+    private void handleLeftClick(MouseEvent e) {
+        int cellW = getWidth() / grid.getCols();
+        int cellH = getHeight() / grid.getRows();
+
+        int col = e.getX() / cellW;
+        int row = e.getY() / cellH;
+
+        if (!grid.inBounds(row, col)) {
+            return;
+        }
+
+        GridObject clicked = grid.getObjectAt(row, col);
+
+        // 1. Selecting an object
+        if (clicked != null) {
+            selectedObject = clicked;
             repaint();
             return;
         }
 
-        // Movement
-        if (!grid.isBlocked(row, col)) {
-            int dist = Math.abs(current.getRow() - row)
-                    + Math.abs(current.getCol() - col);
+        // 2. Moving selected object
+        if (selectedObject != null) {
+            attemptMove(selectedObject, row, col);
+            repaint();
+        }
+    }
 
-            if (dist <= current.getMovement()) {
-                current.moveTo(row, col);
-                turnManager.nextTurn();
-                repaint();
+    private void attemptMove(GridObject obj, int row, int col) {
+
+        // Terrain objects usually shouldn't move
+        if (obj instanceof TerrainObject) {
+            return;
+        }
+
+        // Blocked destination
+        if (grid.isBlocked(row, col)) {
+            return;
+        }
+
+        // Movement rules apply only to entities
+        if (obj instanceof Entity e) {
+            int dist = Math.abs(e.getRow() - row)
+                    + Math.abs(e.getCol() - col);
+
+            if (dist > e.getMovement()) {
+                return;
             }
         }
+
+        obj.setRow(row);
+        obj.setCol(col);
     }
 
     public void pickupAction() {
@@ -100,6 +217,11 @@ public class BattleGridPanel extends JPanel {
             int y = t.getRow() * h;
             g2.setColor(Color.DARK_GRAY);
             g2.fillRect(x + 2, y + 2, w - 4, h - 4);
+
+            if (t == selectedObject) {
+                g2.setColor(Color.YELLOW);
+                g2.drawRect(x + 1, y + 1, w - 2, h - 2);
+            }
         }
 
         // Pickups
@@ -121,6 +243,12 @@ public class BattleGridPanel extends JPanel {
             int x = e.getCol() * w;
             int y = e.getRow() * h;
             g2.fillOval(x + 4, y + 4, w - 8, h - 8);
+
+            if (e == selectedObject) {
+                g2.setColor(Color.YELLOW);
+                g2.drawOval(x + 2, y + 2, w - 4, h - 4);
+            }
+
         }
     }
 }

@@ -1,22 +1,36 @@
 package Objects;
 
+import EntityRes.CharSheet;
+
 public abstract class Entity extends GridObject {
 
-    protected int movement;
-    protected int health;
+    protected CharSheet charSheet;
 
-    public Entity(int row, int col, int movement, int health) {
+    public Entity(int row, int col, CharSheet charSheet) {
         super(row, col);
-        this.movement = movement;
-        this.health = health;
+        this.charSheet = charSheet;
+    }
+
+    public abstract void attack(Entity target);
+
+    public int getAttackPower() {
+        return charSheet.getEquippedWeapon().getDamage();
     }
 
     public int getMovement() {
-        return movement;
+        return charSheet.getAttribute(3);
     }
 
     public int getHealth() {
-        return health;
+        return charSheet.getCurrentHP();
+    }
+
+    public String getName() {
+        return charSheet.getName();
+    }
+
+    public CharSheet getCharSheet() {
+        return charSheet;
     }
 
     public void moveTo(int r, int c) {
@@ -25,10 +39,10 @@ public abstract class Entity extends GridObject {
     }
 
     public void takeDamage(int dmg) {
-        health -= dmg;
+        charSheet.setCurrentHP(charSheet.getCurrentHP() - dmg);
     }
 
     public boolean isDead() {
-        return health <= 0;
+        return charSheet.getCurrentHP() <= 0;
     }
 }

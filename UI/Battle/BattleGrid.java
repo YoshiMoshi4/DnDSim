@@ -21,6 +21,28 @@ public class BattleGrid {
         this.pickups.addAll(pickups);
     }
 
+    public GridObject getObjectAt(int r, int c) {
+        for (Entity e : entities) {
+            if (e.getRow() == r && e.getCol() == c) {
+                return e;
+            }
+        }
+
+        for (TerrainObject t : terrainObjects) {
+            if (!t.isDestroyed() && t.getRow() == r && t.getCol() == c) {
+                return t;
+            }
+        }
+
+        for (Pickup p : pickups) {
+            if (p.getRow() == r && p.getCol() == c) {
+                return p;
+            }
+        }
+
+        return null;
+    }
+
     public boolean isBlocked(int r, int c) {
         for (TerrainObject t : terrainObjects) {
             if (t.getRow() == r && t.getCol() == c && !t.isDestroyed()) {
@@ -57,6 +79,10 @@ public class BattleGrid {
             }
         }
         return null;
+    }
+
+    public void removeEntity(Entity e) {
+        entities.remove(e);
     }
 
     public void removeDestroyedTerrain() {

@@ -22,9 +22,18 @@ public class BattleSystem extends JFrame implements ActionListener {
         setLocationRelativeTo(null);
 
         entities = List.of(
-                new Player(0, 0, 3, new CharSheet("Hero", true, 20, new int[]{5, 5, 5})),
-                new Enemy(5, 5, 2, 15)
+                new Player(0, 0, new CharSheet("Hero", true, 20, new int[]{5, 5, 5, 5})),
+                new Enemy(0, 1, new CharSheet("Goblin", false, 15, new int[]{3, 3, 3, 3}))
         );
+
+        Weapon dagger = new Weapon("Dagger", "Weapon", 2, new int[]{1, 0, 0, 0});
+        Weapon sword = new Weapon("Sword", "Weapon", 4, new int[]{1, 0, 0, 0});
+
+        entities.get(0).getCharSheet().pickupItem(sword);
+        entities.get(0).getCharSheet().equipPrimaryWeapon(sword);
+
+        entities.get(1).getCharSheet().pickupItem(dagger);
+        entities.get(1).getCharSheet().equipPrimaryWeapon(dagger);
 
         terrainObjects = List.of(
                 new Rock(2, 2, 10),
