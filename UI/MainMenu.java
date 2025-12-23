@@ -11,6 +11,7 @@ public class MainMenu extends JFrame implements ActionListener {
     private JButton battleButton;
     private JButton characterButton;
     private JPanel mainPanel;
+    private CharacterSheetMenu characterSheetMenu;
 
     public MainMenu() {
         setTitle("Main Menu");
@@ -41,11 +42,20 @@ public class MainMenu extends JFrame implements ActionListener {
         characterButton.addActionListener(this);
         mainPanel.add(characterButton);
 
+        characterSheetMenu = new CharacterSheetMenu();
+        characterSheetMenu.setVisible(false);
+
         pack();
         setSize(400, 300);
         mainPanel.revalidate();
         mainPanel.repaint();
         setVisible(true);
+    }
+
+    public MainMenu(CharacterSheetMenu c)
+    {
+        this();
+        this.characterSheetMenu = c;
     }
 
     @Override
@@ -100,6 +110,7 @@ public class MainMenu extends JFrame implements ActionListener {
             @Override
             public void actionPerformed(ActionEvent e) {
                 dialog.dispose();
+                new MainMenu(characterSheetMenu);
             }
         });
 
@@ -110,13 +121,12 @@ public class MainMenu extends JFrame implements ActionListener {
         dialog.setVisible(true);
 
         BattleSystem battleSystem = new BattleSystem(row[0], column[0]);
-        battleSystem.setVisible(true);
+        battleSystem.setVisible(false);
         this.dispose();
     }
 
     public void handleCharacterSheet() {
-        CharacterSheet characterSheet = new CharacterSheet();
-        characterSheet.setVisible(true);
+        characterSheetMenu.setVisible(true);
         this.dispose();
     }
 

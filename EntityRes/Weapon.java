@@ -8,7 +8,7 @@ public class Weapon extends Item {
 
     // Constructor
     public Weapon(String name, String type, int damage, int[] modifiedAttributes) {
-        super(name, "Weapon");
+        super(name, type);
         this.damage = damage;
         this.modifiedAttributes = modifiedAttributes;
     }

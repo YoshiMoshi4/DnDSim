@@ -12,7 +12,7 @@ public class Armor extends Item {
 
     // Constructor
     public Armor(String name, String type, int armorType, int defense, int[] modifiedAttributes) {
-        super(name, "Armor");
+        super(name, type);
         this.armorType = armorType;
         this.defense = defense;
         this.modifiedAttributes = modifiedAttributes;

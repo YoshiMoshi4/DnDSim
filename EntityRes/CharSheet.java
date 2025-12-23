@@ -29,10 +29,10 @@ public class CharSheet {
     private int totalHP;
     private int currentHP;
     private ArrayList<Status> status;
+    private final Status poison = new Status("Poison");
 
     // Attributes
     private int[] baseAttributes;
-    private int[] tempAttributes;
     private final int STRENGTH = 0;
     private final int DEXTERITY = 1;
     private final int INITIATIVE = 2;
@@ -64,13 +64,9 @@ public class CharSheet {
         status = new ArrayList<Status>();
 
         this.baseAttributes = new int[baseAttributes.length];
-
-        this.tempAttributes = new int[baseAttributes.length];
-
         if (baseAttributes.length == this.baseAttributes.length) {
             for (int i = 0; i < baseAttributes.length; i++) {
                 this.baseAttributes[i] = baseAttributes[i];
-                this.tempAttributes[i] = 0;
             }
         } else {
             // Temp exception
@@ -181,197 +177,203 @@ public class CharSheet {
 
     public void procStatus() // TBI
     {
-
+        
     }
 
-    public void setAttributes(int[] values, boolean isBase) {
+    public void setAttributes(int[] values) {
         if (values.length != baseAttributes.length) {
             // Temp exception
             System.out.println("attributeLength Error");
-        } else if (isBase) {
+        } else {
             for (int i = 0; i < baseAttributes.length; i++) {
                 baseAttributes[i] = values[i];
             }
-        } else {
-            for (int i = 0; i < tempAttributes.length; i++) {
-                tempAttributes[i] = values[i];
-            }
         }
     }
 
-    public void setAttribute(int attribute, int value, boolean isBase) {
-        if (isBase) {
-            baseAttributes[attribute] = value;
-        } else {
-            tempAttributes[attribute] = value;
-        }
-
+    public void setAttribute(int attribute, int value) {
+        baseAttributes[attribute] = value;
     }
 
-    public void incAttribute(int attribute, boolean isBase) {
-        if (isBase) {
-            baseAttributes[attribute] += 1;
-        } else {
-            tempAttributes[attribute] += 1;
-        }
-
+    public void incAttribute(int attribute) {
+        baseAttributes[attribute] += 1;
     }
 
-    public int[] getAttributes(boolean isBase) {
+    public int[] getAttributes() {
         int[] ans = new int[baseAttributes.length];
-        if (isBase) {
-            for (int i = 0; i < ans.length; i++) {
-                ans[i] = baseAttributes[i];
-            }
-        } else {
-            for (int i = 0; i < ans.length; i++) {
-                ans[i] = tempAttributes[i];
-            }
+        for (int i = 0; i < ans.length; i++) {
+            ans[i] = baseAttributes[i];
         }
         return ans;
     }
 
     public int getAttribute(int attribute) {
-        return (baseAttributes[attribute] + tempAttributes[attribute]);
+        return baseAttributes[attribute];
     }
 
-    public void updateTempAttributes() {
+    public void updateAttributes() {
         int[] headAttr = armor[0].getModifiedAttributes();
         int[] torsoAttr = armor[1].getModifiedAttributes();
         int[] legsAttr = armor[2].getModifiedAttributes();
         int[] weapAttr = weapons[0].getModifiedAttributes();
         for (int i = 0; i < headAttr.length; i++) {
-            tempAttributes[i] = (headAttr[i] + torsoAttr[i] + legsAttr[i] + weapAttr[i]);
+            baseAttributes[i] += (headAttr[i] + torsoAttr[i] + legsAttr[i] + weapAttr[i]);
         }
     }
 
     public void equipPrimaryWeapon(Weapon newWeapon) {
-        int temp = indexInInventory(newWeapon);
-        if (temp == -1) {
-            // Temp exception
-            System.out.println("notInInventory Error");
-        } else if (weapons[PRIMARY] == null) {
-            weapons[PRIMARY] = (Weapon) inventory.get(temp);
-            inventory.remove(temp);
-        } else {
-            inventory.add(weapons[PRIMARY]);
-            weapons[PRIMARY] = (Weapon) inventory.get(temp);
-            inventory.remove(temp);
-        }
-        updateTempAttributes();
+        weapons[PRIMARY] = newWeapon;
+        // For when inventory is properly implemented
+            // int temp = indexInInventory(newWeapon);
+            // if (temp == -1) {
+            //     // Temp exception
+            //     System.out.println("notInInventory Error");
+            // } else if (weapons[PRIMARY] == null) {
+            //     weapons[PRIMARY] = (Weapon) inventory.get(temp);
+            //     inventory.remove(temp);
+            // } else {
+            //     inventory.add(weapons[PRIMARY]);
+            //     weapons[PRIMARY] = (Weapon) inventory.get(temp);
+            //     inventory.remove(temp);
+            // }
+        updateAttributes();
+
     }
 
     public void equipSecondaryWeapon(Weapon newWeapon) {
-        int temp = indexInInventory(newWeapon);
-        if (temp == -1) {
-            // Temp exception
-            System.out.println("notInInventory Error");
-        } else if (weapons[SECONDARY] == null) {
-            weapons[SECONDARY] = (Weapon) inventory.get(temp);
-            inventory.remove(temp);
-        } else {
-            inventory.add(weapons[SECONDARY]);
-            weapons[SECONDARY] = (Weapon) inventory.get(temp);
-            inventory.remove(temp);
-        }
+        weapons[SECONDARY] = newWeapon;
+        // For when inventory is properly implemented
+            // int temp = indexInInventory(newWeapon);
+            // if (temp == -1) {
+            //     // Temp exception
+            //     System.out.println("notInInventory Error");
+            // } else if (weapons[SECONDARY] == null) {
+            //     weapons[SECONDARY] = (Weapon) inventory.get(temp);
+            //     inventory.remove(temp);
+            // } else {
+            //     inventory.add(weapons[SECONDARY]);
+            //     weapons[SECONDARY] = (Weapon) inventory.get(temp);
+            //     inventory.remove(temp);
+            // }
     }
 
     public Weapon getEquippedWeapon() {
         return weapons[PRIMARY];
     }
 
+    public Weapon getEquippedSecondary() {
+        return weapons[SECONDARY];
+    }
+
     public void unequipPrimaryWeapon() {
         inventory.add(weapons[PRIMARY]);
         weapons[PRIMARY] = null;
-        updateTempAttributes();
+        updateAttributes();
     }
 
     public void unequipSecondaryWeapon() {
         inventory.add(weapons[SECONDARY]);
         weapons[SECONDARY] = null;
-        updateTempAttributes();
     }
 
     public void swapWeapons() {
         Weapon temp = weapons[PRIMARY];
         weapons[PRIMARY] = weapons[SECONDARY];
         weapons[SECONDARY] = temp;
-        updateTempAttributes();
+        updateAttributes();
     }
 
     public void equipHead(Armor newArmor) {
-        int temp = indexInInventory(newArmor);
-        if (temp == -1) {
-            // Temp exception
-            System.out.println("notInInventory Error");
-        }
-        if (newArmor.getArmorType() == HEAD) {
-            if (armor[HEAD] == null) {
-                armor[HEAD] = (Armor) inventory.get(temp);
-                inventory.remove(temp);
-            } else {
-                inventory.add(armor[HEAD]);
-                armor[HEAD] = (Armor) inventory.get(temp);
-                inventory.remove(temp);
-            }
-            updateTempAttributes();
-        }
+        armor[HEAD] = newArmor;
+        // For when inventory is properly implemented
+            // int temp = indexInInventory(newArmor);
+            // if (temp == -1) {
+            //     // Temp exception
+            //     System.out.println("notInInventory Error");
+            // }
+            // if (newArmor.getArmorType() == HEAD) {
+            //     if (armor[HEAD] == null) {
+            //         armor[HEAD] = (Armor) inventory.get(temp);
+            //         inventory.remove(temp);
+            //     } else {
+            //         inventory.add(armor[HEAD]);
+            //         armor[HEAD] = (Armor) inventory.get(temp);
+            //         inventory.remove(temp);
+            //     }
+            // }
+        updateAttributes();
     }
 
     public void equipTorso(Armor newArmor) {
-        int temp = indexInInventory(newArmor);
-        if (temp == -1) {
-            // Temp exception
-            System.out.println("notInInventory Error");
-        }
-        if (newArmor.getArmorType() == TORSO) {
-            if (armor[TORSO] == null) {
-                armor[TORSO] = (Armor) inventory.get(temp);
-                inventory.remove(temp);
-            } else {
-                inventory.add(armor[TORSO]);
-                armor[TORSO] = (Armor) inventory.get(temp);
-                inventory.remove(temp);
-            }
-            updateTempAttributes();
-        }
+        armor[TORSO] = newArmor;
+        // For when inventory is properly implemented
+            // int temp = indexInInventory(newArmor);
+            // if (temp == -1) {
+            //     // Temp exception
+            //     System.out.println("notInInventory Error");
+            // }
+            // if (newArmor.getArmorType() == TORSO) {
+            //     if (armor[TORSO] == null) {
+            //         armor[TORSO] = (Armor) inventory.get(temp);
+            //         inventory.remove(temp);
+            //     } else {
+            //         inventory.add(armor[TORSO]);
+            //         armor[TORSO] = (Armor) inventory.get(temp);
+            //         inventory.remove(temp);
+            //     }
+            // }
+        updateAttributes();
     }
 
     public void equipLegs(Armor newArmor) {
-        int temp = indexInInventory(newArmor);
-        if (temp == -1) {
-            // Temp exception
-            System.out.println("notInInventory Error");
-        }
-        if (newArmor.getArmorType() == LEGS) {
-            if (armor[LEGS] == null) {
-                armor[LEGS] = (Armor) inventory.get(temp);
-                inventory.remove(temp);
-            } else {
-                inventory.add(armor[LEGS]);
-                armor[LEGS] = (Armor) inventory.get(temp);
-                inventory.remove(temp);
-            }
-            updateTempAttributes();
-        }
+        armor[LEGS] = newArmor;
+        // For when inventory is properly implemented
+            // int temp = indexInInventory(newArmor);
+            // if (temp == -1) {
+            //     // Temp exception
+            //     System.out.println("notInInventory Error");
+            // }
+            // if (newArmor.getArmorType() == LEGS) {
+            //     if (armor[LEGS] == null) {
+            //         armor[LEGS] = (Armor) inventory.get(temp);
+            //         inventory.remove(temp);
+            //     } else {
+            //         inventory.add(armor[LEGS]);
+            //         armor[LEGS] = (Armor) inventory.get(temp);
+            //         inventory.remove(temp);
+            //     }
+            // }
+        updateAttributes();
+    }
+
+    public Armor getHead(){
+        return armor[HEAD];
+    }
+
+    public Armor getTorso(){
+        return armor[TORSO];
+    }
+
+    public Armor getLegs(){
+        return armor[LEGS];
     }
 
     public void unequipHead() {
         inventory.add(armor[HEAD]);
         armor[HEAD] = null;
-        updateTempAttributes();
+        updateAttributes();
     }
 
     public void unequipTorso() {
         inventory.add(armor[TORSO]);
         armor[TORSO] = null;
-        updateTempAttributes();
+        updateAttributes();
     }
 
     public void unequipLegs() {
         inventory.add(armor[LEGS]);
         armor[LEGS] = null;
-        updateTempAttributes();
+        updateAttributes();
     }
 
     public void pickupItem(Item newItem) {
