@@ -25,4 +25,9 @@ public abstract class GridObject {
     public void setCol(int col) {
         this.col = col;
     }
+
+    public void moveTo(int r, int c) {
+        this.row = r;
+        this.col = c;
+    }
 }

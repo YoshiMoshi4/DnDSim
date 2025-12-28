@@ -1,0 +1,7 @@
+{
+  "healAmount": 5,
+  "name": "Small Potion",
+  "type": "Consumable",
+  "color": 7,
+  "quantity": 1
+}

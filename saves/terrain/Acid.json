@@ -1,0 +1,8 @@
+{
+  "type": "Acid",
+  "health": 999,
+  "color": 7,
+  "blocksMovement": true,
+  "row": 0,
+  "col": 0
+}

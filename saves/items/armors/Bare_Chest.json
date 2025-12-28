@@ -1,0 +1,12 @@
+{
+  "armorType": 1,
+  "HEAD": 0,
+  "TORSO": 1,
+  "LEGS": 2,
+  "defense": 0,
+  "modifiedAttributes": [0, 0, 0, 0],
+  "name": "Bare Chest",
+  "type": "Armor",
+  "color": 15,
+  "quantity": 1
+}

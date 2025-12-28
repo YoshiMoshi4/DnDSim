@@ -1,0 +1,8 @@
+{
+  "type": "Tree",
+  "health": 5,
+  "color": 8,
+  "blocksMovement": true,
+  "row": 0,
+  "col": 0
+}

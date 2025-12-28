@@ -1,0 +1,12 @@
+{
+  "armorType": 0,
+  "HEAD": 0,
+  "TORSO": 1,
+  "LEGS": 2,
+  "defense": 0,
+  "modifiedAttributes": [0, 0, 0, 0],
+  "name": "Bald",
+  "type": "Armor",
+  "color": 15,
+  "quantity": 1
+}

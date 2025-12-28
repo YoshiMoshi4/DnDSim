@@ -10,12 +10,14 @@ public class MainMenu extends JFrame implements ActionListener {
 
     private JButton battleButton;
     private JButton characterButton;
+    private JButton itemButton;
+    private JButton terrainButton;
     private JPanel mainPanel;
     private CharacterSheetMenu characterSheetMenu;
 
     public MainMenu() {
         setTitle("Main Menu");
-        setSize(400, 300);
+        setSize(800, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -23,7 +25,7 @@ public class MainMenu extends JFrame implements ActionListener {
         Border inner = BorderFactory.createEmptyBorder(5, 5, 5, 5);
         Border compound = BorderFactory.createCompoundBorder(outer, inner);
 
-        mainPanel = new JPanel(new GridLayout(2, 3, 10, 10));
+        mainPanel = new JPanel(new GridLayout(2, 2, 10, 10));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
         mainPanel.setPreferredSize(new Dimension(0, 120));
         add(mainPanel, BorderLayout.CENTER);
@@ -35,25 +37,38 @@ public class MainMenu extends JFrame implements ActionListener {
         battleButton.addActionListener(this);
         mainPanel.add(battleButton);
 
-        characterButton = new JButton("Open Character Sheet");
+        characterButton = new JButton("Character Sheets");
         characterButton.setFont(new Font("Arial", Font.BOLD, 30));
         characterButton.setBorder(compound);
         characterButton.setFocusPainted(false);
         characterButton.addActionListener(this);
         mainPanel.add(characterButton);
 
+        itemButton = new JButton("Item Manager");
+        itemButton.setFont(new Font("Arial", Font.BOLD, 30));
+        itemButton.setBorder(compound);
+        itemButton.setFocusPainted(false);
+        itemButton.addActionListener(this);
+        mainPanel.add(itemButton);
+
+        terrainButton = new JButton("Terrain Manager");
+        terrainButton.setFont(new Font("Arial", Font.BOLD, 30));
+        terrainButton.setBorder(compound);
+        terrainButton.setFocusPainted(false);
+        terrainButton.addActionListener(this);
+        mainPanel.add(terrainButton);
+
         characterSheetMenu = new CharacterSheetMenu();
         characterSheetMenu.setVisible(false);
 
         pack();
-        setSize(400, 300);
+        setSize(800, 700);
         mainPanel.revalidate();
         mainPanel.repaint();
         setVisible(true);
     }
 
-    public MainMenu(CharacterSheetMenu c)
-    {
+    public MainMenu(CharacterSheetMenu c) {
         this();
         this.characterSheetMenu = c;
     }
@@ -64,6 +79,10 @@ public class MainMenu extends JFrame implements ActionListener {
             handleBattleSystem();
         } else if (e.getSource() == characterButton) {
             handleCharacterSheet();
+        } else if (e.getSource() == itemButton) {
+            handleItemManager();
+        } else if (e.getSource() == terrainButton) {
+            handleTerrainManager();
         }
     }
 
@@ -110,7 +129,6 @@ public class MainMenu extends JFrame implements ActionListener {
             @Override
             public void actionPerformed(ActionEvent e) {
                 dialog.dispose();
-                new MainMenu(characterSheetMenu);
             }
         });
 
@@ -120,13 +138,25 @@ public class MainMenu extends JFrame implements ActionListener {
         dialog.add(panel);
         dialog.setVisible(true);
 
-        BattleSystem battleSystem = new BattleSystem(row[0], column[0]);
-        battleSystem.setVisible(false);
+        if(row[0] == 0 || column[0] == 0) {
+            return; // User cancelled or did not enter valid data
+        }
+        BattleSystem battleSystem = new BattleSystem(row[0], column[0], characterSheetMenu);
         this.dispose();
     }
 
     public void handleCharacterSheet() {
         characterSheetMenu.setVisible(true);
+        this.dispose();
+    }
+
+    public void handleItemManager() {
+        new ItemManager();
+        this.dispose();
+    }
+
+    public void handleTerrainManager() {
+        new TerrainManager();
         this.dispose();
     }
 

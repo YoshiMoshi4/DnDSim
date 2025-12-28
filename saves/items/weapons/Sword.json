@@ -1,0 +1,8 @@
+{
+  "damage": 5,
+  "modifiedAttributes": [1, 0, 0, 0],
+  "name": "Sword",
+  "type": "Weapon",
+  "color": 9,
+  "quantity": 1
+}

@@ -1,0 +1,7 @@
+{
+  "healAmount": 10,
+  "name": "Big Potion",
+  "type": "Consumable",
+  "color": 4,
+  "quantity": 1
+}

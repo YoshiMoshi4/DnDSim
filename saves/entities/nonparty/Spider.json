@@ -1,0 +1,78 @@
+{
+  "name": "Spider",
+  "color": 4,
+  "isParty": false,
+  "totalHP": 10,
+  "currentHP": 10,
+  "status": [],
+  "baseAttributes": [3, 5, 5, 4],
+  "tempAttributes": [0, 0, 0, 0],
+  "totalAttributes": [3, 5, 5, 4],
+  "STRENGTH": 0,
+  "DEXTERITY": 1,
+  "INITIATIVE": 2,
+  "MOBILITY": 3,
+  "weapons": [
+    {
+      "damage": 1,
+      "modifiedAttributes": [0, 0, 0, 0],
+      "name": "Fist",
+      "type": "Weapon",
+      "color": 15,
+      "quantity": 1
+    },
+    {
+      "damage": 1,
+      "modifiedAttributes": [0, 0, 0, 0],
+      "name": "Fist",
+      "type": "Weapon",
+      "color": 15,
+      "quantity": 1
+    }
+  ],
+  "PRIMARY": 0,
+  "SECONDARY": 1,
+  "armor": [
+    {
+      "armorType": 0,
+      "HEAD": 0,
+      "TORSO": 1,
+      "LEGS": 2,
+      "defense": 0,
+      "modifiedAttributes": [0, 0, 0, 0],
+      "name": "Bald",
+      "type": "Armor",
+      "color": 15,
+      "quantity": 1
+    },
+    {
+      "armorType": 1,
+      "HEAD": 0,
+      "TORSO": 1,
+      "LEGS": 2,
+      "defense": 0,
+      "modifiedAttributes": [0, 0, 0, 0],
+      "name": "Bare Chest",
+      "type": "Armor",
+      "color": 15,
+      "quantity": 1
+    },
+    {
+      "armorType": 2,
+      "HEAD": 0,
+      "TORSO": 1,
+      "LEGS": 2,
+      "defense": 0,
+      "modifiedAttributes": [0, 0, 0, 0],
+      "name": "No Pants",
+      "type": "Armor",
+      "color": 15,
+      "quantity": 1
+    }
+  ],
+  "HEAD": 0,
+  "TORSO": 1,
+  "LEGS": 2,
+  "inventory": [],
+  "wallet": 0
+}

@@ -113,4 +113,40 @@ public class BattleGrid {
         return cols;
     }
 
+    public void addEntityAtNextAvailable(Entity entity) {
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (getObjectAt(r, c) == null && !isBlocked(r, c)) {
+                    entity.moveTo(r, c);
+                    entities.add(entity);
+                    return;
+                }
+            }
+        }
+    }
+
+    public void addTerrainAtNextAvailable(TerrainObject terrain) {
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (getObjectAt(r, c) == null) {
+                    terrain.moveTo(r, c);
+                    terrainObjects.add(terrain);
+                    return;
+                }
+            }
+        }
+    }
+
+    public void addPickupAtNextAvailable(Pickup pickup) {
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (getObjectAt(r, c) == null) {
+                    pickup.moveTo(r, c);
+                    pickups.add(pickup);
+                    return;
+                }
+            }
+        }
+    }
+
 }

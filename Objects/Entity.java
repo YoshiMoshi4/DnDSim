@@ -1,20 +1,29 @@
 package Objects;
 
 import EntityRes.CharSheet;
+import EntityRes.Status;
 
-public abstract class Entity extends GridObject {
+public class Entity extends GridObject {
 
     protected CharSheet charSheet;
+    private int instanceNumber = 0;  // 0 = not set (party entity), >0 = non-party instance number
+    private String baseName;  // Original name without instance number
 
     public Entity(int row, int col, CharSheet charSheet) {
         super(row, col);
         this.charSheet = charSheet;
+        this.baseName = charSheet.getName();
     }
 
-    public abstract void attack(Entity target);
+    public void attack(Entity target) {
+        target.takeDamage(getAttackPower());
+    }
 
     public int getAttackPower() {
-        return charSheet.getEquippedWeapon().getDamage();
+        // Attack damage = weapon damage + strength attribute
+        int weaponDamage = charSheet.getEquippedWeapon().getDamage();
+        int strength = charSheet.getAttribute(0); // STRENGTH = 0
+        return weaponDamage + strength;
     }
 
     public int getMovement() {
@@ -26,11 +35,26 @@ public abstract class Entity extends GridObject {
     }
 
     public String getName() {
+        if (instanceNumber > 0) {
+            return baseName + " #" + instanceNumber;
+        }
         return charSheet.getName();
     }
 
     public CharSheet getCharSheet() {
         return charSheet;
+    }
+    
+    public void setInstanceNumber(int number) {
+        this.instanceNumber = number;
+    }
+    
+    public int getInstanceNumber() {
+        return instanceNumber;
+    }
+    
+    public String getBaseName() {
+        return baseName;
     }
 
     public void moveTo(int r, int c) {
@@ -40,9 +64,24 @@ public abstract class Entity extends GridObject {
 
     public void takeDamage(int dmg) {
         charSheet.setCurrentHP(charSheet.getCurrentHP() - dmg);
+        charSheet.save();
     }
 
     public boolean isDead() {
         return charSheet.getCurrentHP() <= 0;
+    }
+
+    public void pickup(Pickup p) {
+        charSheet.pickupItem(p.getItem());
+        charSheet.save();
+    }
+
+    public void addStatus(Status s) {
+        charSheet.addStatus(s);
+        charSheet.save();
+    }
+
+    public boolean isParty() {
+        return charSheet.getParty();
     }
 }
