@@ -14,6 +14,10 @@ public class SheetPanel extends JPanel implements ActionListener {
     private JTextField name;
     private final JButton updateNameBtn = new JButton("Update");
 
+    private final JLabel CLASS_LBL = new JLabel("Class:");
+    private JTextField characterClass;
+    private final JButton updateClassBtn = new JButton("Update");
+
     private final JLabel CURRENT_HP_LBL = new JLabel("Current HP:");
     private JLabel hpBar;
     private JTextField hpRatio;
@@ -46,7 +50,10 @@ public class SheetPanel extends JPanel implements ActionListener {
     private final JButton updateLegsBtn = new JButton("Update");
 
     private final JLabel INVENTORY_LBL = new JLabel("Inventory:");
-    private JTextArea inventory;
+    private JTabbedPane inventoryTabs;
+    private JTextArea consumablesAmmoTab;
+    private JTextArea craftingTab;
+    private JTextArea keyItemsTab;
 
     // Attribute display labels and fields
     private final JLabel STR_LBL = new JLabel("STR");
@@ -91,6 +98,15 @@ public class SheetPanel extends JPanel implements ActionListener {
         updateNameBtn.setBounds(210, 10, 80, 25);
         updateNameBtn.addActionListener(this);
         innerPanel.add(updateNameBtn);
+
+        CLASS_LBL.setBounds(310, 10, 80, 25);
+        innerPanel.add(CLASS_LBL);
+        characterClass = new JTextField();
+        characterClass.setBounds(380, 10, 100, 25);
+        innerPanel.add(characterClass);
+        updateClassBtn.setBounds(490, 10, 80, 25);
+        updateClassBtn.addActionListener(this);
+        innerPanel.add(updateClassBtn);
 
         CURRENT_HP_LBL.setBounds(10, 45, 80, 25);
         innerPanel.add(CURRENT_HP_LBL);
@@ -252,10 +268,30 @@ public class SheetPanel extends JPanel implements ActionListener {
         // ===== INVENTORY SECTION (bottom) =====
         INVENTORY_LBL.setBounds(10, 480, 80, 25);
         innerPanel.add(INVENTORY_LBL);
-        inventory = new JTextArea();
-        inventory.setBounds(10, 510, 650, 350);
-        inventory.setEditable(false);
-        innerPanel.add(inventory);
+        
+        // Create tabbed pane for inventory
+        inventoryTabs = new JTabbedPane();
+        inventoryTabs.setBounds(10, 510, 650, 350);
+        
+        // Tab 1: Consumables & Ammo
+        consumablesAmmoTab = new JTextArea();
+        consumablesAmmoTab.setEditable(false);
+        JScrollPane consumablesScroll = new JScrollPane(consumablesAmmoTab);
+        inventoryTabs.addTab("Consumables/Ammo", consumablesScroll);
+        
+        // Tab 2: Crafting Items
+        craftingTab = new JTextArea();
+        craftingTab.setEditable(false);
+        JScrollPane craftingScroll = new JScrollPane(craftingTab);
+        inventoryTabs.addTab("Crafting", craftingScroll);
+        
+        // Tab 3: Key/Story Items
+        keyItemsTab = new JTextArea();
+        keyItemsTab.setEditable(false);
+        JScrollPane keyItemsScroll = new JScrollPane(keyItemsTab);
+        inventoryTabs.addTab("Key Items", keyItemsScroll);
+        
+        innerPanel.add(inventoryTabs);
 
         // Add inner panel to scroll pane
         JScrollPane scrollPane = new JScrollPane(innerPanel);
@@ -268,6 +304,8 @@ public class SheetPanel extends JPanel implements ActionListener {
         // Handle action events for the Character Sheet here
         if (e.getSource() == updateNameBtn) {
             updateName();
+        } else if (e.getSource() == updateClassBtn) {
+            updateClass();
         } else if (e.getSource() == updateHPBtn) {
             updateHP();
         } else if (e.getSource() == updateStatusBtn) {
@@ -295,6 +333,7 @@ public class SheetPanel extends JPanel implements ActionListener {
 
     public void updateSheet() {
         name.setText(sheet.getName());
+        characterClass.setText(sheet.getCharacterClass());
         colorDropdown.setSelectedIndex(sheet.getColor());
 
         hpRatio.setText(sheet.getCurrentHP() + "/" + sheet.getTotalHP());
@@ -308,6 +347,19 @@ public class SheetPanel extends JPanel implements ActionListener {
             }
         }
         hpBar.setText(temp);
+
+        // Update status display with duration info
+        Status[] statuses = sheet.getStatus();
+        if (statuses.length == 0) {
+            status.setText("Neutral");
+        } else {
+            StringBuilder statusText = new StringBuilder();
+            for (int i = 0; i < statuses.length; i++) {
+                if (i > 0) statusText.append(", ");
+                statusText.append(statuses[i].toString());
+            }
+            status.setText(statusText.toString());
+        }
 
         // Populate weapon combo boxes with weapons in inventory
         primary.removeAllItems();
@@ -367,16 +419,37 @@ public class SheetPanel extends JPanel implements ActionListener {
         mobTemp.setText(sheet.getTempAttribute(3) + "");
         mobTotal.setText(sheet.getTotalAttribute(3) + "");
 
-        // Update inventory display
-        StringBuilder invText = new StringBuilder();
+        // Update tabbed inventory display
+        StringBuilder consumablesText = new StringBuilder();
+        StringBuilder craftingText = new StringBuilder();
+        StringBuilder keyItemsText = new StringBuilder();
+        
         for (Item item : sheet.getInventory()) {
-            invText.append(item.getName()).append(" (").append(item.getQuantity()).append(")\n");
+            String entry = item.getName() + " (" + item.getQuantity() + ")\n";
+            
+            if (item instanceof Consumable || item instanceof Ammunition) {
+                consumablesText.append(entry);
+            } else if (item instanceof CraftingItem) {
+                craftingText.append(entry);
+            } else if (item instanceof KeyItem) {
+                keyItemsText.append(entry);
+            } else {
+                // Generic items go to consumables tab by default
+                consumablesText.append(entry);
+            }
         }
-        inventory.setText(invText.toString());
+        
+        consumablesAmmoTab.setText(consumablesText.toString());
+        craftingTab.setText(craftingText.toString());
+        keyItemsTab.setText(keyItemsText.toString());
     }
 
     public void updateName() {
         sheet.setName(name.getText());
+    }
+
+    public void updateClass() {
+        sheet.setCharacterClass(characterClass.getText());
     }
 
     public void updateHP() {
@@ -484,6 +557,7 @@ public class SheetPanel extends JPanel implements ActionListener {
 
     public void updateAll() {
         updateName();
+        updateClass();
         updateHP();
         updateStatus();
         updateColor();

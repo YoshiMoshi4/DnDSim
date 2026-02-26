@@ -4,6 +4,7 @@ import EntityRes.*;
 import Objects.*;
 import UI.CharacterSheetMenu;
 import UI.SheetButton;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
@@ -175,127 +176,320 @@ public class BattleSystem extends JFrame implements ActionListener {
     }
 
     private void handleAddObjects() {
-        JDialog addObjDialog = new JDialog(this, "Add Objects to Battle");
-        addObjDialog.setSize(400, 300);
-        addObjDialog.setLocationRelativeTo(this);
-        addObjDialog.setLayout(new java.awt.BorderLayout());
+        JDialog addObjDialog = new JDialog(this, "Add Objects to Battle", false); // Non-modal to see grid
+        addObjDialog.setSize(400, 500);
+        
+        // Position dialog to the right side of the main window
+        Point mainLoc = this.getLocation();
+        int dialogX = mainLoc.x + this.getWidth() - 10; // Slight overlap
+        int dialogY = mainLoc.y;
+        // Keep dialog on screen
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        if (dialogX + 400 > screenSize.width) {
+            dialogX = mainLoc.x - 400 + 10; // Put on left side instead
+        }
+        addObjDialog.setLocation(dialogX, dialogY);
+        addObjDialog.setLayout(new BorderLayout(10, 10));
+        addObjDialog.setAlwaysOnTop(true);
+        
+        // Style constants
+        Color bgColor = new Color(45, 45, 48);
+        Color tabBgColor = new Color(60, 60, 65);
+        Color buttonBgColor = new Color(70, 70, 75);
+        Color buttonHoverColor = new Color(90, 90, 95);
+        Color textColor = new Color(220, 220, 220);
+        Color accentColor = new Color(86, 156, 214);
+        Font buttonFont = new Font("Segoe UI", Font.PLAIN, 13);
+        Font headerFont = new Font("Segoe UI", Font.BOLD, 14);
+        
+        addObjDialog.getContentPane().setBackground(bgColor);
+        
+        // Counter label for feedback
+        JLabel statusLabel = new JLabel("Click items to add them to the battlefield");
+        statusLabel.setForeground(textColor);
+        statusLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        statusLabel.setBorder(BorderFactory.createEmptyBorder(8, 10, 5, 10));
+        addObjDialog.add(statusLabel, BorderLayout.NORTH);
 
         JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane.setBackground(bgColor);
+        tabbedPane.setForeground(textColor);
+        tabbedPane.setFont(buttonFont);
+
+        // Helper method to create styled buttons
+        java.util.function.Function<String, JButton> createStyledButton = (text) -> {
+            JButton btn = new JButton(text);
+            btn.setFont(buttonFont);
+            btn.setBackground(buttonBgColor);
+            btn.setForeground(textColor);
+            btn.setFocusPainted(false);
+            btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(80, 80, 85), 1),
+                BorderFactory.createEmptyBorder(8, 12, 8, 12)
+            ));
+            btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            btn.addMouseListener(new java.awt.event.MouseAdapter() {
+                public void mouseEntered(java.awt.event.MouseEvent e) {
+                    btn.setBackground(buttonHoverColor);
+                }
+                public void mouseExited(java.awt.event.MouseEvent e) {
+                    btn.setBackground(buttonBgColor);
+                }
+            });
+            return btn;
+        };
+        
+        // Helper to create section headers
+        java.util.function.Function<String, JLabel> createHeader = (text) -> {
+            JLabel header = new JLabel(text);
+            header.setFont(headerFont);
+            header.setForeground(accentColor);
+            header.setBorder(BorderFactory.createEmptyBorder(10, 5, 5, 5));
+            return header;
+        };
 
         // Party Character Sheets Tab
         JPanel partyPanel = new JPanel();
         partyPanel.setLayout(new BoxLayout(partyPanel, BoxLayout.Y_AXIS));
+        partyPanel.setBackground(tabBgColor);
+        partyPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
+        
         ArrayList<SheetButton> sheets = sheetMenu.getSheets();
+        int partyCount = 0;
         for (SheetButton sheetBtn : sheets) {
             if (sheetBtn.getSheet().getCharSheet().getParty()) {
-                JButton btn = new JButton(sheetBtn.getText());
-                btn.addActionListener(e -> {
-                    CharSheet charSheet = sheetBtn.getSheet().getCharSheet();
-                    Entity newEntity = new Entity(0, 0, charSheet);
-                    grid.addEntityAtNextAvailable(newEntity);
-                    addEntity(newEntity);
-                    gridPanel.repaint();
-                });
-                partyPanel.add(btn);
+                partyCount++;
+            }
+        }
+        
+        if (partyCount == 0) {
+            JLabel emptyLabel = new JLabel("No party characters available");
+            emptyLabel.setForeground(new Color(150, 150, 150));
+            emptyLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            partyPanel.add(emptyLabel);
+        } else {
+            for (SheetButton sheetBtn : sheets) {
+                if (sheetBtn.getSheet().getCharSheet().getParty()) {
+                    CharSheet cs = sheetBtn.getSheet().getCharSheet();
+                    String btnText = String.format("%s  |  HP: %d/%d  |  Class: %s", 
+                        sheetBtn.getText(), cs.getCurrentHP(), cs.getTotalHP(),
+                        cs.getCharacterClass() != null ? cs.getCharacterClass() : "None");
+                    JButton btn = createStyledButton.apply(btnText);
+                    btn.setAlignmentX(Component.LEFT_ALIGNMENT);
+                    btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+                    btn.addActionListener(e -> {
+                        CharSheet charSheet = sheetBtn.getSheet().getCharSheet();
+                        Entity newEntity = new Entity(0, 0, charSheet);
+                        grid.addEntityAtNextAvailable(newEntity);
+                        addEntity(newEntity);
+                        gridPanel.repaint();
+                        statusLabel.setText("Added: " + sheetBtn.getText());
+                    });
+                    partyPanel.add(Box.createVerticalStrut(5));
+                    partyPanel.add(btn);
+                }
             }
         }
         JScrollPane partyScroll = new JScrollPane(partyPanel);
-        tabbedPane.addTab("Party Characters", partyScroll);
+        partyScroll.setBorder(null);
+        partyScroll.getViewport().setBackground(tabBgColor);
+        tabbedPane.addTab("Party", partyScroll);
         
         // Non-Party Character Sheets Tab (enemies)
         JPanel nonpartyPanel = new JPanel();
         nonpartyPanel.setLayout(new BoxLayout(nonpartyPanel, BoxLayout.Y_AXIS));
+        nonpartyPanel.setBackground(tabBgColor);
+        nonpartyPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
+        
+        int enemyCount = 0;
         for (SheetButton sheetBtn : sheets) {
             if (!sheetBtn.getSheet().getCharSheet().getParty()) {
-                JButton btn = new JButton(sheetBtn.getText());
-                String baseName = sheetBtn.getText();
-                btn.addActionListener(e -> {
-                    // Deep copy the CharSheet for this instance
-                    CharSheet blueprintSheet = CharSheet.load(baseName, false);
-                    if (blueprintSheet != null) {
-                        CharSheet instanceSheet = blueprintSheet.deepCopy();
-                        
-                        // Assign instance number
-                        int instanceNum = nonpartyInstanceCounts.getOrDefault(baseName, 0) + 1;
-                        nonpartyInstanceCounts.put(baseName, instanceNum);
-                        
-                        Entity newEntity = new Entity(0, 0, instanceSheet);
-                        newEntity.setInstanceNumber(instanceNum);
-                        grid.addEntityAtNextAvailable(newEntity);
-                        addEntity(newEntity);
-                        gridPanel.repaint();
-                    }
-                });
-                nonpartyPanel.add(btn);
+                enemyCount++;
+            }
+        }
+        
+        if (enemyCount == 0) {
+            JLabel emptyLabel = new JLabel("No enemies available");
+            emptyLabel.setForeground(new Color(150, 150, 150));
+            emptyLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            nonpartyPanel.add(emptyLabel);
+        } else {
+            for (SheetButton sheetBtn : sheets) {
+                if (!sheetBtn.getSheet().getCharSheet().getParty()) {
+                    CharSheet cs = sheetBtn.getSheet().getCharSheet();
+                    String baseName = sheetBtn.getText();
+                    Weapon equipped = cs.getEquippedWeapon();
+                    String btnText = String.format("%s  |  HP: %d  |  ATK: %d", 
+                        baseName, cs.getTotalHP(), equipped != null ? equipped.getDamage() : 0);
+                    JButton btn = createStyledButton.apply(btnText);
+                    btn.setAlignmentX(Component.LEFT_ALIGNMENT);
+                    btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+                    btn.addActionListener(e -> {
+                        CharSheet blueprintSheet = CharSheet.load(baseName, false);
+                        if (blueprintSheet != null) {
+                            CharSheet instanceSheet = blueprintSheet.deepCopy();
+                            int instanceNum = nonpartyInstanceCounts.getOrDefault(baseName, 0) + 1;
+                            nonpartyInstanceCounts.put(baseName, instanceNum);
+                            Entity newEntity = new Entity(0, 0, instanceSheet);
+                            newEntity.setInstanceNumber(instanceNum);
+                            grid.addEntityAtNextAvailable(newEntity);
+                            addEntity(newEntity);
+                            gridPanel.repaint();
+                            statusLabel.setText("Added: " + baseName + " #" + instanceNum);
+                        }
+                    });
+                    nonpartyPanel.add(Box.createVerticalStrut(5));
+                    nonpartyPanel.add(btn);
+                }
             }
         }
         JScrollPane nonpartyScroll = new JScrollPane(nonpartyPanel);
-        tabbedPane.addTab("Non-Party Characters", nonpartyScroll);
+        nonpartyScroll.setBorder(null);
+        nonpartyScroll.getViewport().setBackground(tabBgColor);
+        tabbedPane.addTab("Enemies", nonpartyScroll);
 
         // Terrain Tab
         JPanel terrainPanel = new JPanel();
         terrainPanel.setLayout(new BoxLayout(terrainPanel, BoxLayout.Y_AXIS));
+        terrainPanel.setBackground(tabBgColor);
+        terrainPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
+        
         List<TerrainObject> availableTerrains = UI.TerrainDatabase.getInstance().getAllTerrains();
-        for (TerrainObject terrain : availableTerrains) {
-            JButton terrainBtn = new JButton(terrain.getType() + " (" + terrain.getHealth() + " HP)");
-            terrainBtn.addActionListener(e -> {
-                TerrainObject newTerrain = new TerrainObject(0, 0, terrain.getType(), terrain.getHealth());
-                grid.addTerrainAtNextAvailable(newTerrain);
-                gridPanel.repaint();
-            });
-            terrainPanel.add(terrainBtn);
+        if (availableTerrains.isEmpty()) {
+            JLabel emptyLabel = new JLabel("No terrain objects available");
+            emptyLabel.setForeground(new Color(150, 150, 150));
+            emptyLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            terrainPanel.add(emptyLabel);
+        } else {
+            for (TerrainObject terrain : availableTerrains) {
+                String btnText = String.format("%s  |  HP: %d", terrain.getType(), terrain.getHealth());
+                JButton terrainBtn = createStyledButton.apply(btnText);
+                terrainBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+                terrainBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+                terrainBtn.addActionListener(e -> {
+                    TerrainObject newTerrain = new TerrainObject(0, 0, terrain.getType(), terrain.getHealth());
+                    grid.addTerrainAtNextAvailable(newTerrain);
+                    gridPanel.repaint();
+                    statusLabel.setText("Added terrain: " + terrain.getType());
+                });
+                terrainPanel.add(Box.createVerticalStrut(5));
+                terrainPanel.add(terrainBtn);
+            }
         }
         JScrollPane terrainScroll = new JScrollPane(terrainPanel);
+        terrainScroll.setBorder(null);
+        terrainScroll.getViewport().setBackground(tabBgColor);
         tabbedPane.addTab("Terrain", terrainScroll);
 
         // Pickups Tab
         JPanel pickupPanel = new JPanel();
         pickupPanel.setLayout(new BoxLayout(pickupPanel, BoxLayout.Y_AXIS));
+        pickupPanel.setBackground(tabBgColor);
+        pickupPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
         
-        // Add all weapons
+        // Weapons section
         Map<String, Weapon> availableWeapons = ItemDatabase.getInstance().getAllWeapons();
-        for (Weapon weapon : availableWeapons.values()) {
-            JButton itemBtn = new JButton(weapon.getName() + " (Weapon)");
-            itemBtn.addActionListener(e -> {
-                Pickup itemPickup = new Pickup(0, 0, weapon);
-                grid.addPickupAtNextAvailable(itemPickup);
-                gridPanel.repaint();
-            });
-            pickupPanel.add(itemBtn);
+        if (!availableWeapons.isEmpty()) {
+            JLabel weaponHeader = createHeader.apply("Weapons");
+            weaponHeader.setAlignmentX(Component.LEFT_ALIGNMENT);
+            pickupPanel.add(weaponHeader);
+            for (Weapon weapon : availableWeapons.values()) {
+                String btnText = String.format("%s  |  DMG: %d", 
+                    weapon.getName(), weapon.getDamage());
+                JButton itemBtn = createStyledButton.apply(btnText);
+                itemBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+                itemBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+                itemBtn.addActionListener(e -> {
+                    Pickup itemPickup = new Pickup(0, 0, weapon);
+                    grid.addPickupAtNextAvailable(itemPickup);
+                    gridPanel.repaint();
+                    statusLabel.setText("Added pickup: " + weapon.getName());
+                });
+                pickupPanel.add(Box.createVerticalStrut(3));
+                pickupPanel.add(itemBtn);
+            }
         }
         
-        // Add all armors
+        // Armors section
         Map<String, Armor> availableArmors = ItemDatabase.getInstance().getAllArmors();
-        for (Armor armor : availableArmors.values()) {
-            JButton itemBtn = new JButton(armor.getName() + " (Armor)");
-            itemBtn.addActionListener(e -> {
-                Pickup itemPickup = new Pickup(0, 0, armor);
-                grid.addPickupAtNextAvailable(itemPickup);
-                gridPanel.repaint();
-            });
-            pickupPanel.add(itemBtn);
+        if (!availableArmors.isEmpty()) {
+            JLabel armorHeader = createHeader.apply("Armor");
+            armorHeader.setAlignmentX(Component.LEFT_ALIGNMENT);
+            pickupPanel.add(armorHeader);
+            String[] armorSlotNames = {"Head", "Torso", "Legs"};
+            for (Armor armor : availableArmors.values()) {
+                int slotIndex = armor.getArmorType();
+                String slotName = (slotIndex >= 0 && slotIndex < armorSlotNames.length) ? armorSlotNames[slotIndex] : "?";
+                String btnText = String.format("%s  |  DEF: %d  |  Slot: %s", 
+                    armor.getName(), armor.getDefense(), slotName);
+                JButton itemBtn = createStyledButton.apply(btnText);
+                itemBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+                itemBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+                itemBtn.addActionListener(e -> {
+                    Pickup itemPickup = new Pickup(0, 0, armor);
+                    grid.addPickupAtNextAvailable(itemPickup);
+                    gridPanel.repaint();
+                    statusLabel.setText("Added pickup: " + armor.getName());
+                });
+                pickupPanel.add(Box.createVerticalStrut(3));
+                pickupPanel.add(itemBtn);
+            }
         }
         
-        // Add all consumables
+        // Consumables section
         Map<String, Consumable> availableConsumables = ItemDatabase.getInstance().getAllConsumables();
-        for (Consumable consumable : availableConsumables.values()) {
-            JButton itemBtn = new JButton(consumable.getName() + " (Consumable)");
-            itemBtn.addActionListener(e -> {
-                Pickup itemPickup = new Pickup(0, 0, consumable);
-                grid.addPickupAtNextAvailable(itemPickup);
-                gridPanel.repaint();
-            });
-            pickupPanel.add(itemBtn);
+        if (!availableConsumables.isEmpty()) {
+            JLabel consumableHeader = createHeader.apply("Consumables");
+            consumableHeader.setAlignmentX(Component.LEFT_ALIGNMENT);
+            pickupPanel.add(consumableHeader);
+            for (Consumable consumable : availableConsumables.values()) {
+                Status effect = consumable.getEffect();
+                String effectName = (effect != null) ? effect.getName() : "Heal";
+                String btnText = String.format("%s  |  %s: %d", 
+                    consumable.getName(), effectName, consumable.getHealAmount());
+                JButton itemBtn = createStyledButton.apply(btnText);
+                itemBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+                itemBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+                itemBtn.addActionListener(e -> {
+                    Pickup itemPickup = new Pickup(0, 0, consumable);
+                    grid.addPickupAtNextAvailable(itemPickup);
+                    gridPanel.repaint();
+                    statusLabel.setText("Added pickup: " + consumable.getName());
+                });
+                pickupPanel.add(Box.createVerticalStrut(3));
+                pickupPanel.add(itemBtn);
+            }
         }
+        
+        if (availableWeapons.isEmpty() && availableArmors.isEmpty() && availableConsumables.isEmpty()) {
+            JLabel emptyLabel = new JLabel("No pickup items available");
+            emptyLabel.setForeground(new Color(150, 150, 150));
+            emptyLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            pickupPanel.add(emptyLabel);
+        }
+        
         JScrollPane pickupScroll = new JScrollPane(pickupPanel);
+        pickupScroll.setBorder(null);
+        pickupScroll.getViewport().setBackground(tabBgColor);
         tabbedPane.addTab("Pickups", pickupScroll);
 
-        addObjDialog.add(tabbedPane, java.awt.BorderLayout.CENTER);
+        addObjDialog.add(tabbedPane, BorderLayout.CENTER);
 
-        // Cancel button
-        JButton cancelBtn = new JButton("Cancel");
-        cancelBtn.addActionListener(e -> addObjDialog.dispose());
-        addObjDialog.add(cancelBtn, java.awt.BorderLayout.SOUTH);
+        // Bottom panel with Done button
+        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
+        bottomPanel.setBackground(bgColor);
+        
+        JButton doneBtn = new JButton("Done");
+        doneBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        doneBtn.setBackground(accentColor);
+        doneBtn.setForeground(Color.WHITE);
+        doneBtn.setFocusPainted(false);
+        doneBtn.setBorder(BorderFactory.createEmptyBorder(10, 30, 10, 30));
+        doneBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        doneBtn.addActionListener(e -> addObjDialog.dispose());
+        bottomPanel.add(doneBtn);
+        
+        addObjDialog.add(bottomPanel, BorderLayout.SOUTH);
 
         addObjDialog.setVisible(true);
     }

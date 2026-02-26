@@ -12,12 +12,19 @@ public class ItemManager extends JFrame implements ActionListener {
     private JButton addWeaponBtn;
     private JButton addArmorBtn;
     private JButton addConsumableBtn;
+    private JButton addAmmoBtn;
+    private JButton addCraftingBtn;
+    private JButton addKeyItemBtn;
     private JTabbedPane tabbedPane;
     private ArrayList<Weapon> weapons;
     private ArrayList<Armor> armors;
     private ArrayList<Consumable> consumables;
+    private ArrayList<Ammunition> ammunition;
+    private ArrayList<CraftingItem> craftingItems;
+    private ArrayList<KeyItem> keyItems;
     private static final String[] ATTRIBUTE_NAMES = {"STR", "DEX", "ITV", "MOB"};
     private static final String[] ARMOR_TYPES = {"Head", "Torso", "Legs"};
+    private static final String[] CRAFTING_CATEGORIES = {"Material", "Component", "Reagent", "Miscellaneous"};
 
     public ItemManager() {
         setTitle("Item Manager");
@@ -28,6 +35,9 @@ public class ItemManager extends JFrame implements ActionListener {
         weapons = new ArrayList<>();
         armors = new ArrayList<>();
         consumables = new ArrayList<>();
+        ammunition = new ArrayList<>();
+        craftingItems = new ArrayList<>();
+        keyItems = new ArrayList<>();
         loadItems();
 
         JPanel mainPanel = new JPanel(new BorderLayout());
@@ -50,6 +60,18 @@ public class ItemManager extends JFrame implements ActionListener {
         addConsumableBtn.addActionListener(this);
         topPanel.add(addConsumableBtn);
 
+        addAmmoBtn = new JButton("Add Ammo");
+        addAmmoBtn.addActionListener(this);
+        topPanel.add(addAmmoBtn);
+
+        addCraftingBtn = new JButton("Add Crafting");
+        addCraftingBtn.addActionListener(this);
+        topPanel.add(addCraftingBtn);
+
+        addKeyItemBtn = new JButton("Add Key Item");
+        addKeyItemBtn.addActionListener(this);
+        topPanel.add(addKeyItemBtn);
+
         mainPanel.add(topPanel, BorderLayout.NORTH);
 
         // Create tabbed pane
@@ -57,6 +79,9 @@ public class ItemManager extends JFrame implements ActionListener {
         tabbedPane.addTab("Weapons", createWeaponsPanel());
         tabbedPane.addTab("Armor", createArmorsPanel());
         tabbedPane.addTab("Consumables", createConsumablesPanel());
+        tabbedPane.addTab("Ammunition", createAmmunitionPanel());
+        tabbedPane.addTab("Crafting", createCraftingPanel());
+        tabbedPane.addTab("Key Items", createKeyItemsPanel());
 
         mainPanel.add(tabbedPane, BorderLayout.CENTER);
 
@@ -69,6 +94,9 @@ public class ItemManager extends JFrame implements ActionListener {
         weapons.addAll(db.getAllWeapons().values());
         armors.addAll(db.getAllArmors().values());
         consumables.addAll(db.getAllConsumables().values());
+        ammunition.addAll(db.getAllAmmunition().values());
+        craftingItems.addAll(db.getAllCraftingItems().values());
+        keyItems.addAll(db.getAllKeyItems().values());
     }
 
     private JPanel createWeaponsPanel() {
@@ -92,6 +120,30 @@ public class ItemManager extends JFrame implements ActionListener {
         JPanel panel = new JPanel(new GridLayout(0, 3, 10, 10));
         for (Consumable item : consumables) {
             panel.add(createConsumableCard(item));
+        }
+        return panel;
+    }
+
+    private JPanel createAmmunitionPanel() {
+        JPanel panel = new JPanel(new GridLayout(0, 3, 10, 10));
+        for (Ammunition item : ammunition) {
+            panel.add(createAmmunitionCard(item));
+        }
+        return panel;
+    }
+
+    private JPanel createCraftingPanel() {
+        JPanel panel = new JPanel(new GridLayout(0, 3, 10, 10));
+        for (CraftingItem item : craftingItems) {
+            panel.add(createCraftingCard(item));
+        }
+        return panel;
+    }
+
+    private JPanel createKeyItemsPanel() {
+        JPanel panel = new JPanel(new GridLayout(0, 3, 10, 10));
+        for (KeyItem item : keyItems) {
+            panel.add(createKeyItemCard(item));
         }
         return panel;
     }
@@ -163,6 +215,73 @@ public class ItemManager extends JFrame implements ActionListener {
 
         JButton deleteBtn = new JButton("Delete");
         deleteBtn.addActionListener(e -> deleteItem(item, consumables));
+        btnPanel.add(deleteBtn);
+
+        card.add(btnPanel);
+        return card;
+    }
+
+    private JPanel createAmmunitionCard(Ammunition item) {
+        JPanel card = new JPanel();
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBorder(BorderFactory.createTitledBorder(item.getName()));
+        card.setBackground(item.getDisplayColor());
+
+        card.add(new JLabel("Type: Ammunition"));
+        card.add(new JLabel("Damage Bonus: " + item.getDamageBonus()));
+        card.add(new JLabel("Compatible: " + item.getCompatibleWeaponType()));
+
+        JPanel btnPanel = new JPanel(new FlowLayout());
+        JButton editBtn = new JButton("Edit");
+        editBtn.addActionListener(e -> editAmmunition(item));
+        btnPanel.add(editBtn);
+
+        JButton deleteBtn = new JButton("Delete");
+        deleteBtn.addActionListener(e -> deleteItem(item, ammunition));
+        btnPanel.add(deleteBtn);
+
+        card.add(btnPanel);
+        return card;
+    }
+
+    private JPanel createCraftingCard(CraftingItem item) {
+        JPanel card = new JPanel();
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBorder(BorderFactory.createTitledBorder(item.getName()));
+        card.setBackground(item.getDisplayColor());
+
+        card.add(new JLabel("Category: " + item.getCraftingCategory()));
+        card.add(new JLabel("Desc: " + (item.getDescription() != null ? item.getDescription() : "")));
+
+        JPanel btnPanel = new JPanel(new FlowLayout());
+        JButton editBtn = new JButton("Edit");
+        editBtn.addActionListener(e -> editCraftingItem(item));
+        btnPanel.add(editBtn);
+
+        JButton deleteBtn = new JButton("Delete");
+        deleteBtn.addActionListener(e -> deleteItem(item, craftingItems));
+        btnPanel.add(deleteBtn);
+
+        card.add(btnPanel);
+        return card;
+    }
+
+    private JPanel createKeyItemCard(KeyItem item) {
+        JPanel card = new JPanel();
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBorder(BorderFactory.createTitledBorder(item.getName()));
+        card.setBackground(item.getDisplayColor());
+
+        card.add(new JLabel("Quest: " + (item.isQuestRelated() ? "Yes" : "No")));
+        card.add(new JLabel("Desc: " + (item.getDescription() != null ? item.getDescription() : "")));
+
+        JPanel btnPanel = new JPanel(new FlowLayout());
+        JButton editBtn = new JButton("Edit");
+        editBtn.addActionListener(e -> editKeyItem(item));
+        btnPanel.add(editBtn);
+
+        JButton deleteBtn = new JButton("Delete");
+        deleteBtn.addActionListener(e -> deleteItem(item, keyItems));
         btnPanel.add(deleteBtn);
 
         card.add(btnPanel);
@@ -342,6 +461,137 @@ public class ItemManager extends JFrame implements ActionListener {
         dialog.setVisible(true);
     }
 
+    private void addNewAmmunition() {
+        JDialog dialog = new JDialog(this, "Add New Ammunition", true);
+        dialog.setSize(400, 300);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new GridLayout(5, 2, 10, 10));
+
+        JTextField nameField = new JTextField();
+        JTextField damageBonusField = new JTextField("0");
+        JTextField compatibleField = new JTextField("Any");
+        JComboBox<String> colorDropdown = new JComboBox<>(CharSheet.getColorNames());
+        colorDropdown.setSelectedIndex(5); // Default orange
+
+        dialog.add(new JLabel("Name:"));
+        dialog.add(nameField);
+        dialog.add(new JLabel("Damage Bonus:"));
+        dialog.add(damageBonusField);
+        dialog.add(new JLabel("Compatible Weapon:"));
+        dialog.add(compatibleField);
+        dialog.add(new JLabel("Color:"));
+        dialog.add(colorDropdown);
+
+        JButton okBtn = new JButton("OK");
+        JButton cancelBtn = new JButton("Cancel");
+
+        okBtn.addActionListener(e -> {
+            try {
+                String name = nameField.getText();
+                int damageBonus = Integer.parseInt(damageBonusField.getText());
+                String compatible = compatibleField.getText();
+                if (!name.isEmpty()) {
+                    Ammunition item = new Ammunition(name, "Ammunition", colorDropdown.getSelectedIndex(), damageBonus, compatible);
+                    ItemDatabase.getInstance().saveItem(item);
+                    dialog.dispose();
+                    refreshDisplay();
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(dialog, "Please enter valid numbers.");
+            }
+        });
+
+        cancelBtn.addActionListener(e -> dialog.dispose());
+
+        dialog.add(okBtn);
+        dialog.add(cancelBtn);
+        dialog.setVisible(true);
+    }
+
+    private void addNewCraftingItem() {
+        JDialog dialog = new JDialog(this, "Add New Crafting Item", true);
+        dialog.setSize(400, 300);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new GridLayout(5, 2, 10, 10));
+
+        JTextField nameField = new JTextField();
+        JComboBox<String> categoryBox = new JComboBox<>(CRAFTING_CATEGORIES);
+        JTextField descField = new JTextField();
+        JComboBox<String> colorDropdown = new JComboBox<>(CharSheet.getColorNames());
+        colorDropdown.setSelectedIndex(14); // Default beige
+
+        dialog.add(new JLabel("Name:"));
+        dialog.add(nameField);
+        dialog.add(new JLabel("Category:"));
+        dialog.add(categoryBox);
+        dialog.add(new JLabel("Description:"));
+        dialog.add(descField);
+        dialog.add(new JLabel("Color:"));
+        dialog.add(colorDropdown);
+
+        JButton okBtn = new JButton("OK");
+        JButton cancelBtn = new JButton("Cancel");
+
+        okBtn.addActionListener(e -> {
+            String name = nameField.getText();
+            if (!name.isEmpty()) {
+                CraftingItem item = new CraftingItem(name, "Crafting", colorDropdown.getSelectedIndex(), 
+                        (String) categoryBox.getSelectedItem(), descField.getText());
+                ItemDatabase.getInstance().saveItem(item);
+                dialog.dispose();
+                refreshDisplay();
+            }
+        });
+
+        cancelBtn.addActionListener(e -> dialog.dispose());
+
+        dialog.add(okBtn);
+        dialog.add(cancelBtn);
+        dialog.setVisible(true);
+    }
+
+    private void addNewKeyItem() {
+        JDialog dialog = new JDialog(this, "Add New Key Item", true);
+        dialog.setSize(400, 300);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new GridLayout(5, 2, 10, 10));
+
+        JTextField nameField = new JTextField();
+        JTextField descField = new JTextField();
+        JCheckBox questCheck = new JCheckBox("Quest Related");
+        JComboBox<String> colorDropdown = new JComboBox<>(CharSheet.getColorNames());
+        colorDropdown.setSelectedIndex(6); // Default yellow
+
+        dialog.add(new JLabel("Name:"));
+        dialog.add(nameField);
+        dialog.add(new JLabel("Description:"));
+        dialog.add(descField);
+        dialog.add(new JLabel(""));
+        dialog.add(questCheck);
+        dialog.add(new JLabel("Color:"));
+        dialog.add(colorDropdown);
+
+        JButton okBtn = new JButton("OK");
+        JButton cancelBtn = new JButton("Cancel");
+
+        okBtn.addActionListener(e -> {
+            String name = nameField.getText();
+            if (!name.isEmpty()) {
+                KeyItem item = new KeyItem(name, "Key Item", colorDropdown.getSelectedIndex(), 
+                        descField.getText(), questCheck.isSelected());
+                ItemDatabase.getInstance().saveItem(item);
+                dialog.dispose();
+                refreshDisplay();
+            }
+        });
+
+        cancelBtn.addActionListener(e -> dialog.dispose());
+
+        dialog.add(okBtn);
+        dialog.add(cancelBtn);
+        dialog.setVisible(true);
+    }
+
     private void editWeapon(Weapon weapon) {
         JDialog dialog = new JDialog(this, "Edit Weapon", true);
         dialog.setSize(400, 400);
@@ -508,6 +758,134 @@ public class ItemManager extends JFrame implements ActionListener {
         dialog.setVisible(true);
     }
 
+    private void editAmmunition(Ammunition item) {
+        JDialog dialog = new JDialog(this, "Edit Ammunition", true);
+        dialog.setSize(400, 300);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new GridLayout(5, 2, 10, 10));
+
+        JTextField nameField = new JTextField(item.getName());
+        JTextField damageBonusField = new JTextField(String.valueOf(item.getDamageBonus()));
+        JTextField compatibleField = new JTextField(item.getCompatibleWeaponType());
+        JComboBox<String> colorDropdown = new JComboBox<>(CharSheet.getColorNames());
+        colorDropdown.setSelectedIndex(item.getColor());
+
+        dialog.add(new JLabel("Name:"));
+        dialog.add(nameField);
+        dialog.add(new JLabel("Damage Bonus:"));
+        dialog.add(damageBonusField);
+        dialog.add(new JLabel("Compatible Weapon:"));
+        dialog.add(compatibleField);
+        dialog.add(new JLabel("Color:"));
+        dialog.add(colorDropdown);
+
+        JButton okBtn = new JButton("OK");
+        JButton cancelBtn = new JButton("Cancel");
+
+        okBtn.addActionListener(e -> {
+            try {
+                item.setName(nameField.getText());
+                item.setDamageBonus(Integer.parseInt(damageBonusField.getText()));
+                item.setCompatibleWeaponType(compatibleField.getText());
+                item.setColor(colorDropdown.getSelectedIndex());
+                ItemDatabase.getInstance().saveItem(item);
+                dialog.dispose();
+                refreshDisplay();
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(dialog, "Please enter valid numbers.");
+            }
+        });
+
+        cancelBtn.addActionListener(e -> dialog.dispose());
+
+        dialog.add(okBtn);
+        dialog.add(cancelBtn);
+        dialog.setVisible(true);
+    }
+
+    private void editCraftingItem(CraftingItem item) {
+        JDialog dialog = new JDialog(this, "Edit Crafting Item", true);
+        dialog.setSize(400, 300);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new GridLayout(5, 2, 10, 10));
+
+        JTextField nameField = new JTextField(item.getName());
+        JComboBox<String> categoryBox = new JComboBox<>(CRAFTING_CATEGORIES);
+        categoryBox.setSelectedItem(item.getCraftingCategory());
+        JTextField descField = new JTextField(item.getDescription() != null ? item.getDescription() : "");
+        JComboBox<String> colorDropdown = new JComboBox<>(CharSheet.getColorNames());
+        colorDropdown.setSelectedIndex(item.getColor());
+
+        dialog.add(new JLabel("Name:"));
+        dialog.add(nameField);
+        dialog.add(new JLabel("Category:"));
+        dialog.add(categoryBox);
+        dialog.add(new JLabel("Description:"));
+        dialog.add(descField);
+        dialog.add(new JLabel("Color:"));
+        dialog.add(colorDropdown);
+
+        JButton okBtn = new JButton("OK");
+        JButton cancelBtn = new JButton("Cancel");
+
+        okBtn.addActionListener(e -> {
+            item.setName(nameField.getText());
+            item.setCraftingCategory((String) categoryBox.getSelectedItem());
+            item.setDescription(descField.getText());
+            item.setColor(colorDropdown.getSelectedIndex());
+            ItemDatabase.getInstance().saveItem(item);
+            dialog.dispose();
+            refreshDisplay();
+        });
+
+        cancelBtn.addActionListener(e -> dialog.dispose());
+
+        dialog.add(okBtn);
+        dialog.add(cancelBtn);
+        dialog.setVisible(true);
+    }
+
+    private void editKeyItem(KeyItem item) {
+        JDialog dialog = new JDialog(this, "Edit Key Item", true);
+        dialog.setSize(400, 300);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new GridLayout(5, 2, 10, 10));
+
+        JTextField nameField = new JTextField(item.getName());
+        JTextField descField = new JTextField(item.getDescription() != null ? item.getDescription() : "");
+        JCheckBox questCheck = new JCheckBox("Quest Related", item.isQuestRelated());
+        JComboBox<String> colorDropdown = new JComboBox<>(CharSheet.getColorNames());
+        colorDropdown.setSelectedIndex(item.getColor());
+
+        dialog.add(new JLabel("Name:"));
+        dialog.add(nameField);
+        dialog.add(new JLabel("Description:"));
+        dialog.add(descField);
+        dialog.add(new JLabel(""));
+        dialog.add(questCheck);
+        dialog.add(new JLabel("Color:"));
+        dialog.add(colorDropdown);
+
+        JButton okBtn = new JButton("OK");
+        JButton cancelBtn = new JButton("Cancel");
+
+        okBtn.addActionListener(e -> {
+            item.setName(nameField.getText());
+            item.setDescription(descField.getText());
+            item.setQuestRelated(questCheck.isSelected());
+            item.setColor(colorDropdown.getSelectedIndex());
+            ItemDatabase.getInstance().saveItem(item);
+            dialog.dispose();
+            refreshDisplay();
+        });
+
+        cancelBtn.addActionListener(e -> dialog.dispose());
+
+        dialog.add(okBtn);
+        dialog.add(cancelBtn);
+        dialog.setVisible(true);
+    }
+
     private void deleteItem(Item item, ArrayList<?> list) {
         int result = JOptionPane.showConfirmDialog(this, "Delete " + item.getName() + "?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
         if (result == JOptionPane.YES_OPTION) {
@@ -532,6 +910,12 @@ public class ItemManager extends JFrame implements ActionListener {
             addNewArmor();
         } else if (e.getSource() == addConsumableBtn) {
             addNewConsumable();
+        } else if (e.getSource() == addAmmoBtn) {
+            addNewAmmunition();
+        } else if (e.getSource() == addCraftingBtn) {
+            addNewCraftingItem();
+        } else if (e.getSource() == addKeyItemBtn) {
+            addNewKeyItem();
         }
     }
 }

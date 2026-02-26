@@ -16,7 +16,8 @@ public class Entity extends GridObject {
     }
 
     public void attack(Entity target) {
-        target.takeDamage(getAttackPower());
+        int damage = getAttackPower() - target.getDefense();
+        target.takeDamage(Math.max(0, damage));  // Minimum 0 damage
     }
 
     public int getAttackPower() {
@@ -24,6 +25,10 @@ public class Entity extends GridObject {
         int weaponDamage = charSheet.getEquippedWeapon().getDamage();
         int strength = charSheet.getAttribute(0); // STRENGTH = 0
         return weaponDamage + strength;
+    }
+
+    public int getDefense() {
+        return charSheet.getTotalDefense();
     }
 
     public int getMovement() {

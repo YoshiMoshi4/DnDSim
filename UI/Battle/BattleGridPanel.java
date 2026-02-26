@@ -13,6 +13,10 @@ public class BattleGridPanel extends JPanel {
     private final BattleSystem battleSystem;
     private GridObject selectedObject;
     private boolean battleStarted;
+    private boolean attackMode;  // When true, next left-click attacks target
+    private Entity attackingEntity;  // Entity that will perform the attack
+    private boolean moveMode;  // When true, next left-click moves entity
+    private Entity movingEntity;  // Entity that will move
 
     public BattleGridPanel(BattleGrid grid, TurnManager tm, BattleSystem battleSystem) {
         selectedObject = null;
@@ -20,6 +24,10 @@ public class BattleGridPanel extends JPanel {
         this.turnManager = tm;
         this.battleSystem = battleSystem;
         this.battleStarted = false;
+        this.attackMode = false;
+        this.attackingEntity = null;
+        this.moveMode = false;
+        this.movingEntity = null;
         setBackground(Color.WHITE);
 
         addMouseListener(new MouseAdapter() {
@@ -156,6 +164,7 @@ public class BattleGridPanel extends JPanel {
 
     private void addActionSection(JPopupMenu menu, GridObject obj) {
 
+        // === PICKUP ACTIONS ===
         if (obj instanceof Pickup p && selectedObject instanceof Entity entity && entity.isParty()) {
             JMenuItem pickup = new JMenuItem("Pick Up");
             pickup.addActionListener(ev -> {
@@ -166,6 +175,7 @@ public class BattleGridPanel extends JPanel {
             menu.add(pickup);
         }
 
+        // === TERRAIN ACTIONS ===
         if (obj instanceof TerrainObject t && selectedObject instanceof Entity e) {
             JMenuItem attack = new JMenuItem("Attack Terrain");
             attack.addActionListener(ev -> {
@@ -178,6 +188,7 @@ public class BattleGridPanel extends JPanel {
             menu.add(attack);
         }
 
+        // === ENTITY ACTIONS (when right-clicking another entity while one is selected) ===
         if (obj instanceof Entity target
                 && selectedObject instanceof Entity attacker
                 && target != attacker) {
@@ -187,44 +198,99 @@ public class BattleGridPanel extends JPanel {
                 attacker.attack(target);
                 if (target.isDead()) {
                     grid.removeEntity(target);
+                    turnManager.removeEntity(target);
                 }
                 repaint();
             });
             menu.add(attack);
         }
 
-        if (obj instanceof Entity e && selectedObject == e) {
-            // Actions for the selected entity itself
+        // === DIRECT ENTITY COMMANDS (when right-clicking an entity) ===
+        if (obj instanceof Entity e) {
             menu.addSeparator();
-
-            JMenuItem swapWeapons = new JMenuItem("Swap Primary/Secondary Weapons");
-            swapWeapons.addActionListener(ev -> {
-                e.getCharSheet().swapWeapons();
+            menu.add(label("=== Commands ==="));
+            
+            // MOVE command - selects entity and enables movement
+            JMenuItem moveCmd = new JMenuItem("Move");
+            moveCmd.addActionListener(ev -> {
+                selectedObject = e;
+                attackMode = false;
+                attackingEntity = null;
+                moveMode = true;
+                movingEntity = e;
+                repaint();  // This will highlight valid movement cells
+            });
+            menu.add(moveCmd);
+            
+            // ATTACK command - sets attack mode
+            JMenuItem attackCmd = new JMenuItem("Attack");
+            attackCmd.addActionListener(ev -> {
+                selectedObject = e;
+                attackMode = true;
+                attackingEntity = e;
+                JOptionPane.showMessageDialog(this, 
+                    "Left-click an enemy or terrain to attack with " + e.getName() + 
+                    "\nAttack Power: " + e.getAttackPower(),
+                    "Attack Mode", JOptionPane.INFORMATION_MESSAGE);
                 repaint();
             });
-            menu.add(swapWeapons);
-
-            // Use item submenu
+            menu.add(attackCmd);
+            
+            // USE ITEM submenu
             if (!e.getCharSheet().getInventory().isEmpty()) {
                 JMenu useItemMenu = new JMenu("Use Item");
+                boolean hasConsumables = false;
                 for (Item item : e.getCharSheet().getInventory()) {
-                    if (item.getType().equals("Consumable")) {
+                    if (item instanceof Consumable) {
+                        hasConsumables = true;
+                        Consumable consumable = (Consumable) item;
                         JMenuItem useItem = new JMenuItem(item.getName() + " (x" + item.getQuantity() + ")");
                         useItem.addActionListener(ev -> {
-                            // For now, just remove one quantity. In a real game, you'd check what the item does
-                            if (item.getName().equals("Health Potion")) {
-                                e.getCharSheet().addCurrentHP(10); // Heal 10 HP
-                                Consumable potion = new Consumable("Health Potion", "Consumable", 10, null);
-                                e.getCharSheet().dropItem(potion);
+                            // Apply consumable effects
+                            if (consumable.getHealAmount() > 0) {
+                                e.getCharSheet().addCurrentHP(consumable.getHealAmount());
+                                JOptionPane.showMessageDialog(this, 
+                                    e.getName() + " healed " + consumable.getHealAmount() + " HP!",
+                                    "Item Used", JOptionPane.INFORMATION_MESSAGE);
                             }
+                            if (consumable.getEffect() != null) {
+                                e.getCharSheet().addStatus(consumable.getEffect());
+                            }
+                            // Remove one from inventory
+                            if (item.getQuantity() > 1) {
+                                item.decQuantity();
+                            } else {
+                                e.getCharSheet().getInventory().remove(item);
+                            }
+                            e.getCharSheet().save();
                             repaint();
                         });
                         useItemMenu.add(useItem);
                     }
                 }
-                if (useItemMenu.getItemCount() > 0) {
+                if (hasConsumables) {
                     menu.add(useItemMenu);
                 }
+            }
+            
+            // SWAP WEAPONS command
+            JMenuItem swapWeapons = new JMenuItem("Swap Weapons");
+            swapWeapons.addActionListener(ev -> {
+                e.getCharSheet().swapWeapons();
+                repaint();
+            });
+            menu.add(swapWeapons);
+            
+            // PICKUP (if standing on item)
+            Pickup standingOn = grid.getPickupAt(e.getRow(), e.getCol());
+            if (standingOn != null && e.isParty()) {
+                JMenuItem pickupCmd = new JMenuItem("Pick Up " + standingOn.getItem().getName());
+                pickupCmd.addActionListener(ev -> {
+                    e.pickup(standingOn);
+                    grid.removePickup(standingOn);
+                    repaint();
+                });
+                menu.add(pickupCmd);
             }
             
             // Remove entity option (only in pre-battle setup)
@@ -257,15 +323,88 @@ public class BattleGridPanel extends JPanel {
 
         GridObject clicked = grid.getObjectAt(row, col);
 
+        // Handle move mode
+        if (moveMode && movingEntity != null) {
+            if (clicked == null && !grid.isBlocked(row, col)) {
+                int dist = Math.abs(movingEntity.getRow() - row) + Math.abs(movingEntity.getCol() - col);
+                int mobilityLimit = movingEntity.getCharSheet().getTotalAttribute(3);
+                
+                if (!battleStarted || dist <= mobilityLimit) {
+                    movingEntity.setRow(row);
+                    movingEntity.setCol(col);
+                    // End move mode after moving
+                    moveMode = false;
+                    movingEntity = null;
+                    selectedObject = null;
+                    repaint();
+                    return;
+                }
+            }
+            // Clicking on an object or out of range cancels move mode
+            if (clicked != null) {
+                moveMode = false;
+                movingEntity = null;
+                selectedObject = clicked;
+                repaint();
+                return;
+            }
+        }
+
+        // Handle attack mode
+        if (attackMode && attackingEntity != null) {
+            if (clicked instanceof Entity target && target != attackingEntity) {
+                // Attack the entity
+                attackingEntity.attack(target);
+                JOptionPane.showMessageDialog(this, 
+                    attackingEntity.getName() + " attacks " + target.getName() + "!" +
+                    "\nDamage dealt: " + Math.max(0, attackingEntity.getAttackPower() - target.getDefense()) +
+                    "\n" + target.getName() + " HP: " + target.getHealth() + "/" + target.getCharSheet().getTotalHP(),
+                    "Attack", JOptionPane.INFORMATION_MESSAGE);
+                if (target.isDead()) {
+                    grid.removeEntity(target);
+                    turnManager.removeEntity(target);
+                    JOptionPane.showMessageDialog(this, target.getName() + " has been defeated!", "Defeated", JOptionPane.WARNING_MESSAGE);
+                }
+                attackMode = false;
+                attackingEntity = null;
+                repaint();
+                return;
+            } else if (clicked instanceof TerrainObject terrain) {
+                // Attack terrain
+                terrain.takeDamage(attackingEntity.getAttackPower());
+                JOptionPane.showMessageDialog(this, 
+                    attackingEntity.getName() + " attacks the terrain!" +
+                    "\nTerrain HP: " + terrain.getHealth(),
+                    "Attack", JOptionPane.INFORMATION_MESSAGE);
+                if (terrain.isDestroyed()) {
+                    grid.removeDestroyedTerrain();
+                }
+                attackMode = false;
+                attackingEntity = null;
+                repaint();
+                return;
+            } else if (clicked == null) {
+                // Clicked empty space, cancel attack mode
+                attackMode = false;
+                attackingEntity = null;
+                repaint();
+                return;
+            }
+        }
+
         // 1. Selecting an object
         if (clicked != null) {
             selectedObject = clicked;
+            attackMode = false;
+            attackingEntity = null;
+            moveMode = false;
+            movingEntity = null;
             repaint();
             return;
         }
 
-        // 2. Moving selected object
-        if (selectedObject != null) {
+        // 2. Moving selected object (non-move-mode click, used in setup)
+        if (selectedObject != null && !battleStarted) {
             attemptMove(selectedObject, row, col);
             repaint();
         }
@@ -348,6 +487,67 @@ public class BattleGridPanel extends JPanel {
         }
         for (int c = 0; c <= cols; c++) {
             g2.drawLine(offsetX + c * cellSize, offsetY, offsetX + c * cellSize, offsetY + gridHeight);
+        }
+
+        // Highlight valid movement cells when in move mode
+        if (moveMode && movingEntity != null) {
+            int mobilityLimit = movingEntity.getCharSheet().getTotalAttribute(3);
+            int entityRow = movingEntity.getRow();
+            int entityCol = movingEntity.getCol();
+            
+            g2.setColor(new Color(0, 255, 0, 80));  // Semi-transparent green
+            for (int r = 0; r < rows; r++) {
+                for (int c = 0; c < cols; c++) {
+                    int dist = Math.abs(entityRow - r) + Math.abs(entityCol - c);
+                    if (dist > 0 && (dist <= mobilityLimit || !battleStarted) && !grid.isBlocked(r, c)) {
+                        int x = offsetX + c * cellSize;
+                        int y = offsetY + r * cellSize;
+                        g2.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+                    }
+                }
+            }
+            
+            // Draw border around movement range
+            g2.setColor(new Color(0, 200, 0));
+            g2.setStroke(new BasicStroke(2));
+            for (int r = 0; r < rows; r++) {
+                for (int c = 0; c < cols; c++) {
+                    int dist = Math.abs(entityRow - r) + Math.abs(entityCol - c);
+                    if (dist > 0 && (dist <= mobilityLimit || !battleStarted) && !grid.isBlocked(r, c)) {
+                        int x = offsetX + c * cellSize;
+                        int y = offsetY + r * cellSize;
+                        g2.drawRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+                    }
+                }
+            }
+            g2.setStroke(new BasicStroke(1));
+        }
+
+        // Highlight attack targets when in attack mode
+        if (attackMode && attackingEntity != null) {
+            g2.setColor(new Color(255, 0, 0, 80));  // Semi-transparent red
+            g2.setStroke(new BasicStroke(2));
+            
+            // Highlight all entities and terrain (potential targets)
+            for (Entity e : grid.getEntities()) {
+                if (e != attackingEntity) {
+                    int x = offsetX + e.getCol() * cellSize;
+                    int y = offsetY + e.getRow() * cellSize;
+                    g2.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+                    g2.setColor(new Color(255, 0, 0));
+                    g2.drawRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+                    g2.setColor(new Color(255, 0, 0, 80));
+                }
+            }
+            for (TerrainObject t : grid.getTerrainObjects()) {
+                int x = offsetX + t.getCol() * cellSize;
+                int y = offsetY + t.getRow() * cellSize;
+                g2.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+                g2.setColor(new Color(255, 0, 0));
+                g2.drawRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+                g2.setColor(new Color(255, 0, 0, 80));
+            }
+            g2.setStroke(new BasicStroke(1));
         }
 
         // Terrain objects

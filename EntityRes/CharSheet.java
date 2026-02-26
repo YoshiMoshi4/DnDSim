@@ -8,6 +8,7 @@ public class CharSheet {
 
     // Meta
     private String name;
+    private String characterClass;
     private int color; // 0-15 representing different colors
     private boolean isParty;
 
@@ -43,6 +44,7 @@ public class CharSheet {
     //Constructor
     public CharSheet(String name, boolean isParty, int totalHP, int[] baseAttributes, int color) {
         this.name = name;
+        this.characterClass = "None";
         this.color = color;
         this.isParty = isParty;
 
@@ -107,6 +109,15 @@ public class CharSheet {
 
     public String getName() {
         return name;
+    }
+
+    public void setCharacterClass(String characterClass) {
+        this.characterClass = characterClass;
+        this.save();
+    }
+
+    public String getCharacterClass() {
+        return characterClass != null ? characterClass : "None";
     }
 
     public void setParty(boolean isParty) {
@@ -247,9 +258,62 @@ public class CharSheet {
         return ans;
     }
 
-    public void procStatus() // TBI
-    {
+    /**
+     * Process all status effects at the start of a turn.
+     * Applies DOT/HOT, ticks down durations, and removes expired effects.
+     */
+    public void procStatus() {
+        if (status.isEmpty()) {
+            return;
+        }
 
+        java.util.Iterator<Status> iterator = status.iterator();
+        while (iterator.hasNext()) {
+            Status s = iterator.next();
+            
+            // Apply effect based on type
+            switch (s.getEffectType()) {
+                case Status.DAMAGE_OVER_TIME:
+                    // Apply damage (minimum HP is 1 to avoid instant death from DOT)
+                    int newHP = Math.max(1, currentHP - s.getMagnitude());
+                    currentHP = newHP;
+                    break;
+                    
+                case Status.HEAL_OVER_TIME:
+                    // Apply healing (capped at totalHP)
+                    currentHP = Math.min(totalHP, currentHP + s.getMagnitude());
+                    break;
+                    
+                case Status.STAT_MODIFIER:
+                case Status.MOVEMENT_MODIFIER:
+                    // Stat modifiers are applied during updateAttributes()
+                    // They affect the temp attributes while the status is active
+                    break;
+            }
+            
+            // Tick duration and remove if expired
+            if (s.tick()) {
+                iterator.remove();
+            }
+        }
+        
+        // Recalculate attributes (in case stat modifiers were removed)
+        updateAttributes();
+        this.save();
+    }
+
+    /**
+     * Get total stat modifiers from active status effects
+     */
+    public int getStatusAttributeModifier(int attribute) {
+        int modifier = 0;
+        for (Status s : status) {
+            if ((s.getEffectType() == Status.STAT_MODIFIER || s.getEffectType() == Status.MOVEMENT_MODIFIER)
+                    && s.getTargetAttribute() == attribute) {
+                modifier += s.getMagnitude();
+            }
+        }
+        return modifier;
     }
 
     public void updateAttributes() {
@@ -269,9 +333,9 @@ public class CharSheet {
             tempAttributes[i] = headAttr[i] + torsoAttr[i] + legsAttr[i] + weapAttr[i];
         }
         
-        // Calculate total attributes = base + equipment modifications
+        // Calculate total attributes = base + equipment modifications + status modifiers
         for (int i = 0; i < totalAttributes.length; i++) {
-            totalAttributes[i] = baseAttributes[i] + tempAttributes[i];
+            totalAttributes[i] = baseAttributes[i] + tempAttributes[i] + getStatusAttributeModifier(i);
         }
     }
 
@@ -475,6 +539,14 @@ public class CharSheet {
 
     public Armor getLegs() {
         return armor[LEGS];
+    }
+
+    public int getTotalDefense() {
+        int totalDefense = 0;
+        if (armor[HEAD] != null) totalDefense += armor[HEAD].getDefense();
+        if (armor[TORSO] != null) totalDefense += armor[TORSO].getDefense();
+        if (armor[LEGS] != null) totalDefense += armor[LEGS].getDefense();
+        return totalDefense;
     }
 
     public void unequipHead() {

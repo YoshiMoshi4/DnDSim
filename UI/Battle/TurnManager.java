@@ -54,6 +54,12 @@ public class TurnManager {
             currentIndex = 0;
             round++;
         }
+        
+        // Process status effects for the entity whose turn is starting
+        Entity current = getCurrent();
+        if (current != null) {
+            current.getCharSheet().procStatus();
+        }
     }
 
     public void removeDeadEntities() {

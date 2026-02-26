@@ -12,11 +12,17 @@ public class ItemDatabase {
     private Map<String, Weapon> weapons;
     private Map<String, Armor> armors;
     private Map<String, Consumable> consumables;
+    private Map<String, Ammunition> ammunition;
+    private Map<String, CraftingItem> craftingItems;
+    private Map<String, KeyItem> keyItems;
 
     private ItemDatabase() {
         weapons = new HashMap<>();
         armors = new HashMap<>();
         consumables = new HashMap<>();
+        ammunition = new HashMap<>();
+        craftingItems = new HashMap<>();
+        keyItems = new HashMap<>();
         loadItems();
     }
 
@@ -78,6 +84,54 @@ public class ItemDatabase {
             }
         }
 
+        // Load ammunition from saves/items/ammunition/
+        File ammoDir = new File("saves/items/ammunition");
+        if (ammoDir.exists() && ammoDir.isDirectory()) {
+            File[] files = ammoDir.listFiles((dir, name) -> name.endsWith(".json"));
+            if (files != null) {
+                for (File file : files) {
+                    try (FileReader reader = new FileReader(file)) {
+                        Ammunition ammo = gson.fromJson(reader, Ammunition.class);
+                        ammunition.put(ammo.getName(), ammo);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        // Load crafting items from saves/items/crafting/
+        File craftingDir = new File("saves/items/crafting");
+        if (craftingDir.exists() && craftingDir.isDirectory()) {
+            File[] files = craftingDir.listFiles((dir, name) -> name.endsWith(".json"));
+            if (files != null) {
+                for (File file : files) {
+                    try (FileReader reader = new FileReader(file)) {
+                        CraftingItem item = gson.fromJson(reader, CraftingItem.class);
+                        craftingItems.put(item.getName(), item);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        // Load key items from saves/items/keyitems/
+        File keyItemsDir = new File("saves/items/keyitems");
+        if (keyItemsDir.exists() && keyItemsDir.isDirectory()) {
+            File[] files = keyItemsDir.listFiles((dir, name) -> name.endsWith(".json"));
+            if (files != null) {
+                for (File file : files) {
+                    try (FileReader reader = new FileReader(file)) {
+                        KeyItem item = gson.fromJson(reader, KeyItem.class);
+                        keyItems.put(item.getName(), item);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
         // If no items loaded, add some defaults
         if (weapons.isEmpty() && armors.isEmpty() && consumables.isEmpty()) {
             addDefaultItems();
@@ -104,6 +158,15 @@ public class ItemDatabase {
         } else if (item instanceof Armor) {
             dir = "saves/items/armors";
             armors.put(item.getName(), (Armor) item);
+        } else if (item instanceof Ammunition) {
+            dir = "saves/items/ammunition";
+            ammunition.put(item.getName(), (Ammunition) item);
+        } else if (item instanceof CraftingItem) {
+            dir = "saves/items/crafting";
+            craftingItems.put(item.getName(), (CraftingItem) item);
+        } else if (item instanceof KeyItem) {
+            dir = "saves/items/keyitems";
+            keyItems.put(item.getName(), (KeyItem) item);
         } else {
             dir = "saves/items/consumables";
             consumables.put(item.getName(), (Consumable) item);
@@ -127,6 +190,15 @@ public class ItemDatabase {
         } else if (item instanceof Armor) {
             dir = "saves/items/armors";
             armors.remove(item.getName());
+        } else if (item instanceof Ammunition) {
+            dir = "saves/items/ammunition";
+            ammunition.remove(item.getName());
+        } else if (item instanceof CraftingItem) {
+            dir = "saves/items/crafting";
+            craftingItems.remove(item.getName());
+        } else if (item instanceof KeyItem) {
+            dir = "saves/items/keyitems";
+            keyItems.remove(item.getName());
         } else {
             dir = "saves/items/consumables";
             consumables.remove(item.getName());
@@ -151,6 +223,18 @@ public class ItemDatabase {
         return consumables.get(name);
     }
 
+    public Ammunition getAmmunition(String name) {
+        return ammunition.get(name);
+    }
+
+    public CraftingItem getCraftingItem(String name) {
+        return craftingItems.get(name);
+    }
+
+    public KeyItem getKeyItem(String name) {
+        return keyItems.get(name);
+    }
+
     public Map<String, Weapon> getAllWeapons() {
         return weapons;
     }
@@ -161,5 +245,17 @@ public class ItemDatabase {
 
     public Map<String, Consumable> getAllConsumables() {
         return consumables;
+    }
+
+    public Map<String, Ammunition> getAllAmmunition() {
+        return ammunition;
+    }
+
+    public Map<String, CraftingItem> getAllCraftingItems() {
+        return craftingItems;
+    }
+
+    public Map<String, KeyItem> getAllKeyItems() {
+        return keyItems;
     }
 }
