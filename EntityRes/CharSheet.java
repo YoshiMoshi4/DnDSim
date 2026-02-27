@@ -164,6 +164,28 @@ public class CharSheet {
         };
     }
 
+    public static String getColorHex(int colorId) {
+        switch (colorId) {
+            case 0:  return "#000000"; // Black
+            case 1:  return "#808080"; // Gray
+            case 2:  return "#FFFFFF"; // White
+            case 3:  return "#8B0000"; // Maroon
+            case 4:  return "#FF0000"; // Red
+            case 5:  return "#FFA500"; // Orange
+            case 6:  return "#FFFF00"; // Yellow
+            case 7:  return "#00FF00"; // Lime
+            case 8:  return "#008000"; // Green
+            case 9:  return "#0000FF"; // Blue
+            case 10: return "#4B0082"; // Indigo
+            case 11: return "#C8A2C8"; // Lilac
+            case 12: return "#800080"; // Purple
+            case 13: return "#FFC0CB"; // Pink
+            case 14: return "#F5F5DC"; // Beige
+            case 15: return "#8B4513"; // Brown
+            default: return "#808080"; // Gray
+        }
+    }
+
     public String getColorName() {
         String[] names = getColorNames();
         if (color >= 0 && color < names.length) {
@@ -654,12 +676,18 @@ public class CharSheet {
         Gson gson = new Gson();
         try (FileReader reader = new FileReader(filePath)) {
             CharSheet sheet = gson.fromJson(reader, CharSheet.class);
+            if (sheet == null) {
+                return null;
+            }
             // Initialize missing arrays for older save files
             if (sheet.tempAttributes == null) {
-                sheet.tempAttributes = new int[sheet.baseAttributes.length];
+                sheet.tempAttributes = new int[sheet.baseAttributes != null ? sheet.baseAttributes.length : 4];
             }
             if (sheet.totalAttributes == null) {
-                sheet.totalAttributes = new int[sheet.baseAttributes.length];
+                sheet.totalAttributes = new int[sheet.baseAttributes != null ? sheet.baseAttributes.length : 4];
+            }
+            if (sheet.baseAttributes == null) {
+                sheet.baseAttributes = new int[4];
             }
             // Recalculate attributes in case they were corrupted
             sheet.updateAttributes();

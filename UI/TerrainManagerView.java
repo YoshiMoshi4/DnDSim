@@ -247,8 +247,7 @@ public class TerrainManagerView {
 
     private void handleBack() {
         stage.hide();
-        Stage mainStage = new Stage();
-        new MainMenuView(mainStage).show();
+        AppController.getInstance().navigateToMainMenu();
     }
 
     public void show() {

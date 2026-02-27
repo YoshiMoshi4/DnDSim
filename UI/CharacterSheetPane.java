@@ -8,6 +8,7 @@ import javafx.scene.layout.*;
 public class CharacterSheetPane extends BorderPane {
 
     private CharSheet sheet;
+    private boolean updatingDisplay = false;
     
     private TextField nameField;
     private TextField classField;
@@ -191,7 +192,7 @@ public class CharacterSheetPane extends BorderPane {
     }
 
     private TitledPane createEquipmentSection() {
-        GridPane grid = FormUtils.createFormGrid(3);
+        GridPane grid = FormUtils.createFormGrid(2);
         
         int row = 0;
         
@@ -200,69 +201,47 @@ public class CharacterSheetPane extends BorderPane {
         primaryLabel.getStyleClass().add("form-label");
         grid.add(primaryLabel, 0, row);
         primaryWeapon = new ComboBox<>();
-        primaryWeapon.setPrefWidth(150);
+        primaryWeapon.setPrefWidth(180);
         primaryWeapon.getStyleClass().add("styled-combo-box");
-        grid.add(primaryWeapon, 1, row);
-        Button primaryBtn = new Button("Equip");
-        primaryBtn.getStyleClass().add("button");
-        primaryBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.SHIELD, 12, "#fff"));
-        primaryBtn.setOnAction(e -> updatePrimary());
-        AnimationUtils.addButtonHoverAnimation(primaryBtn);
-        grid.add(primaryBtn, 2, row++);
+        primaryWeapon.setOnAction(e -> updatePrimary());
+        grid.add(primaryWeapon, 1, row++);
         
         Label secondaryLabel = new Label("Secondary:");
         secondaryLabel.getStyleClass().add("form-label");
         grid.add(secondaryLabel, 0, row);
         secondaryWeapon = new ComboBox<>();
-        secondaryWeapon.setPrefWidth(150);
+        secondaryWeapon.setPrefWidth(180);
         secondaryWeapon.getStyleClass().add("styled-combo-box");
-        grid.add(secondaryWeapon, 1, row);
-        Button secondaryBtn = new Button("Equip");
-        secondaryBtn.getStyleClass().add("button");
-        secondaryBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.SHIELD, 12, "#fff"));
-        secondaryBtn.setOnAction(e -> updateSecondary());
-        AnimationUtils.addButtonHoverAnimation(secondaryBtn);
-        grid.add(secondaryBtn, 2, row++);
+        secondaryWeapon.setOnAction(e -> updateSecondary());
+        grid.add(secondaryWeapon, 1, row++);
         
         // Armor
         Label headLabel = new Label("Head:");
         headLabel.getStyleClass().add("form-label");
-        grid.add(headLabel, 3, 0);
+        grid.add(headLabel, 2, 0);
         headArmor = new ComboBox<>();
-        headArmor.setPrefWidth(150);
+        headArmor.setPrefWidth(180);
         headArmor.getStyleClass().add("styled-combo-box");
-        grid.add(headArmor, 4, 0);
-        Button headBtn = new Button("Equip");
-        headBtn.getStyleClass().add("button");
-        headBtn.setOnAction(e -> updateHead());
-        AnimationUtils.addButtonHoverAnimation(headBtn);
-        grid.add(headBtn, 5, 0);
+        headArmor.setOnAction(e -> updateHead());
+        grid.add(headArmor, 3, 0);
         
         Label torsoLabel = new Label("Torso:");
         torsoLabel.getStyleClass().add("form-label");
-        grid.add(torsoLabel, 3, 1);
+        grid.add(torsoLabel, 2, 1);
         torsoArmor = new ComboBox<>();
-        torsoArmor.setPrefWidth(150);
+        torsoArmor.setPrefWidth(180);
         torsoArmor.getStyleClass().add("styled-combo-box");
-        grid.add(torsoArmor, 4, 1);
-        Button torsoBtn = new Button("Equip");
-        torsoBtn.getStyleClass().add("button");
-        torsoBtn.setOnAction(e -> updateTorso());
-        AnimationUtils.addButtonHoverAnimation(torsoBtn);
-        grid.add(torsoBtn, 5, 1);
+        torsoArmor.setOnAction(e -> updateTorso());
+        grid.add(torsoArmor, 3, 1);
         
         Label legsLabel = new Label("Legs:");
         legsLabel.getStyleClass().add("form-label");
-        grid.add(legsLabel, 3, 2);
+        grid.add(legsLabel, 2, 2);
         legsArmor = new ComboBox<>();
-        legsArmor.setPrefWidth(150);
+        legsArmor.setPrefWidth(180);
         legsArmor.getStyleClass().add("styled-combo-box");
-        grid.add(legsArmor, 4, 2);
-        Button legsBtn = new Button("Equip");
-        legsBtn.getStyleClass().add("button");
-        legsBtn.setOnAction(e -> updateLegs());
-        AnimationUtils.addButtonHoverAnimation(legsBtn);
-        grid.add(legsBtn, 5, 2);
+        legsArmor.setOnAction(e -> updateLegs());
+        grid.add(legsArmor, 3, 2);
         
         TitledPane pane = new TitledPane("Equipment", grid);
         pane.getStyleClass().add("form-section");
@@ -360,9 +339,12 @@ public class CharacterSheetPane extends BorderPane {
     }
 
     public void updateDisplay() {
-        nameField.setText(sheet.getName());
-        classField.setText(sheet.getCharacterClass() != null ? sheet.getCharacterClass() : "");
-        colorCombo.getSelectionModel().select(sheet.getColor());
+        if (updatingDisplay) return;
+        updatingDisplay = true;
+        try {
+            nameField.setText(sheet.getName());
+            classField.setText(sheet.getCharacterClass() != null ? sheet.getCharacterClass() : "");
+            colorCombo.getSelectionModel().select(sheet.getColor());
         
         // Update HP spinners without triggering listeners
         currentHpSpinner.getValueFactory().setValue(sheet.getCurrentHP());
@@ -463,6 +445,9 @@ public class CharacterSheetPane extends BorderPane {
         consumablesTab.setText(consumables.toString());
         craftingTab.setText(crafting.toString());
         keyItemsTab.setText(keyItems.toString());
+        } finally {
+            updatingDisplay = false;
+        }
     }
 
     private void updatePrimary() {

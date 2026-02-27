@@ -1,5 +1,5 @@
 
-import UI.MainMenuView;
+import UI.AppController;
 import javafx.application.Application;
 import javafx.stage.Stage;
 
@@ -7,8 +7,8 @@ public class Main extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        MainMenuView mainMenu = new MainMenuView(primaryStage);
-        mainMenu.show();
+        AppController.initialize(primaryStage);
+        AppController.getInstance().show();
     }
 
     public static void main(String[] args) {

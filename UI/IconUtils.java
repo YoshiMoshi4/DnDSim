@@ -18,8 +18,13 @@ public class IconUtils {
 
     // ===== SVG PATH DATA =====
     
-    // Crossed swords - Battle/Combat
-    private static final String SWORDS_PATH = "M6.92 5H5L14 14L15 13L6.92 5M19.96 19.12L19.12 19.96L16 16.84L15.09 17.75L16.17 18.83L15.07 19.93L13.97 18.83L12.87 19.93L11.75 18.81L11.77 18.8L10.67 17.7L9.57 18.8L8.47 17.7L9.57 16.6L6.04 13.07L4.04 15.07L2.93 13.96L4.93 11.96L5.64 12.67L9.17 9.14L8.11 8.08L9.17 7L10.23 8.06V8.07L11.35 9.19L11.36 9.18L12.46 10.28L13.57 9.18L14.67 10.28L13.59 11.36L16.12 13.89L17.23 12.78L18.33 13.89L17.25 14.97L20 17.72L21.07 16.65L18.33 13.91L17.29 12.87L19.93 10.23L21.03 11.33L19.53 12.83L19.96 19.12M14.97 17.25L15.07 17.15L14.05 16.13L13.96 16.22L14.97 17.25Z";
+    // Crossed swords - Battle/Combat (two swords forming an X)
+    private static final String SWORDS_PATH = 
+        // Sword 1: top-left to bottom-right
+        "M3 2L5 2L13 10L14 9L14 7L16 7L16 9L14 11L22 19L22 21L20 21L12 13L11 14L11 16L9 16L9 14L11 12L3 4L3 2Z " +
+        // Sword 2: top-right to bottom-left  
+        "M21 2L21 4L13 12L15 14L15 16L13 16L13 14L12 13L4 21L2 21L2 19L10 11L8 9L8 7L10 7L10 9L11 10L19 2L21 2Z";
+    
     
     // Person silhouette - Character
     private static final String PERSON_PATH = "M12 4C14.21 4 16 5.79 16 8C16 10.21 14.21 12 12 12C9.79 12 8 10.21 8 8C8 5.79 9.79 4 12 4M12 14C16.42 14 20 15.79 20 18V20H4V18C4 15.79 7.58 14 12 14Z";
@@ -108,12 +113,15 @@ public class IconUtils {
     // Menu hamburger
     private static final String MENU_PATH = "M3 6H21V8H3V6M3 11H21V13H3V11M3 16H21V18H3V16Z";
 
+    // Fast forward - Next Turn
+    private static final String FAST_FORWARD_PATH = "M4 4L10 12L4 20V4ZM14 4L20 12L14 20V4Z";
+
     // ===== ICON FACTORY METHODS =====
 
     public enum Icon {
         SWORDS, PERSON, GEAR, PLUS, TARGET, MOVE, FLAG, HEART, SHIELD, SKULL,
         DICE, PLAY, STOP, UNDO, SAVE, DELETE, EDIT, VIEW, LIGHTNING, POTION,
-        CHEST, MAP, PARTY, CLOCK, INFO, WARNING, CHECK, CLOSE, BACK, MENU
+        CHEST, MAP, PARTY, CLOCK, INFO, WARNING, CHECK, CLOSE, BACK, MENU, FAST_FORWARD
     }
 
     /**
@@ -213,6 +221,7 @@ public class IconUtils {
             case CLOSE -> CLOSE_PATH;
             case BACK -> BACK_PATH;
             case MENU -> MENU_PATH;
+            case FAST_FORWARD -> FAST_FORWARD_PATH;
         };
     }
 

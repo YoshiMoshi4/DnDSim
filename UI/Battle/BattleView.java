@@ -3,25 +3,24 @@ package UI.Battle;
 import EntityRes.*;
 import Objects.*;
 import UI.AnimationUtils;
+import UI.AppController;
 import UI.CardUtils;
 import UI.CharacterSheetView;
 import UI.IconUtils;
 import UI.NotificationPane;
-import UI.ResponsiveUtils;
 import UI.SheetButton;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.stage.Stage;
 
 import java.util.*;
 
 public class BattleView {
 
-    private final Stage stage;
+    private final AppController appController;
+    private final StackPane root;
     private final BattleGrid grid;
     private final TurnManager turnManager;
     private final CharacterSheetView sheetView;
@@ -32,9 +31,8 @@ public class BattleView {
     private final PartyHealthPane partyHealthPane;
     private final BattleState battleState;
     private Button nextTurnBtn;
-    private Button beginBattleBtn;
+    private Button battleToggleBtn;
     private Button addObjBtn;
-    private Button endBattleBtn;
     private final Map<String, Integer> enemyInstanceCounts = new HashMap<>();
     
     // Pull-up panel
@@ -42,8 +40,8 @@ public class BattleView {
     private boolean panelExpanded = false;
     private Label addStatusLabel;
 
-    public BattleView(int rows, int cols, CharacterSheetView sheetView) {
-        this.stage = new Stage();
+    public BattleView(int rows, int cols, CharacterSheetView sheetView, AppController appController) {
+        this.appController = appController;
         this.sheetView = sheetView;
         this.battleState = new BattleState();
 
@@ -63,13 +61,13 @@ public class BattleView {
         gridCanvas = new BattleGridCanvas(grid, turnManager, this, notificationPane, combatLogPane);
         timelinePane = new TimelinePane(turnManager);
 
-        BorderPane root = new BorderPane();
-        root.setPadding(new Insets(10));
-        root.getStyleClass().add("panel-dark");
+        BorderPane mainPane = new BorderPane();
+        mainPane.setPadding(new Insets(10));
+        mainPane.getStyleClass().add("panel-dark");
 
         // Timeline at top (hidden initially)
         timelinePane.setVisible(false);
-        root.setTop(timelinePane);
+        mainPane.setTop(timelinePane);
 
         // Grid in center with party health on left and combat log on right
         BorderPane centerArea = new BorderPane();
@@ -78,7 +76,7 @@ public class BattleView {
         centerArea.setRight(combatLogPane);
         BorderPane.setMargin(partyHealthPane, new Insets(0, 10, 0, 0));
         BorderPane.setMargin(combatLogPane, new Insets(0, 0, 0, 10));
-        root.setCenter(centerArea);
+        mainPane.setCenter(centerArea);
 
         // Bottom area with controls and pull-up panel
         VBox bottomArea = new VBox(0);
@@ -94,23 +92,17 @@ public class BattleView {
         addObjectsPanel.setVisible(false);
         
         bottomArea.getChildren().addAll(addObjectsPanel, controlPanel);
-        root.setBottom(bottomArea);
+        mainPane.setBottom(bottomArea);
 
         // Wrap in StackPane to overlay notifications
-        StackPane rootStack = new StackPane(root, notificationPane);
+        root = new StackPane(mainPane, notificationPane);
         StackPane.setAlignment(notificationPane, Pos.TOP_CENTER);
 
-        Scene scene = new Scene(rootStack, 1100, 750);
-        scene.getStylesheets().add(new java.io.File("resources/styles/dark-theme.css").toURI().toString());
-
-        stage.setTitle("Battle System");
-        stage.setScene(scene);
-        stage.setOnCloseRequest(e -> {
-            e.consume();
-            handleBack();
-        });
-
         sheetView.setBattleView(this);
+    }
+
+    public StackPane getRoot() {
+        return root;
     }
 
     private VBox createAddObjectsPanel() {
@@ -190,10 +182,10 @@ public class BattleView {
         panel.setPadding(new Insets(15, 10, 10, 10));
         panel.setStyle("-fx-border-color: #505052; -fx-border-width: 1 0 0 0;");
 
-        Button backBtn = new Button("Back");
-        backBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.BACK));
+        Button backBtn = new Button("Character Sheets");
+        backBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.PERSON));
         backBtn.getStyleClass().add("button");
-        backBtn.setPrefSize(120, 40);
+        backBtn.setPrefSize(160, 40);
         backBtn.setOnAction(e -> handleBack());
 
         addObjBtn = new Button("Add Objects");
@@ -204,31 +196,37 @@ public class BattleView {
         // Disable add objects during battle
         addObjBtn.disableProperty().bind(battleState.battleStartedProperty());
 
-        beginBattleBtn = new Button("Begin Battle");
-        beginBattleBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.PLAY));
-        beginBattleBtn.getStyleClass().add("button-primary");
-        beginBattleBtn.setPrefSize(150, 40);
-        beginBattleBtn.setOnAction(e -> handleBeginBattle());
-        // Disable begin battle when already started
-        beginBattleBtn.disableProperty().bind(battleState.battleStartedProperty());
+        battleToggleBtn = new Button();
+        battleToggleBtn.setPrefSize(150, 40);
+        battleToggleBtn.getStyleClass().clear();
+        battleToggleBtn.getStyleClass().add(battleState.isBattleStarted() ? "button-danger" : "button-primary");
+        battleState.battleStartedProperty().addListener((obs, oldVal, newVal) -> {
+            battleToggleBtn.getStyleClass().clear();
+            battleToggleBtn.getStyleClass().add(newVal ? "button-danger" : "button-primary");
+        });
+        battleToggleBtn.textProperty().bind(
+            battleState.battleStartedProperty().map(started -> started ? "End Battle" : "Begin Battle")
+        );
+        battleToggleBtn.graphicProperty().bind(
+            battleState.battleStartedProperty().map(started -> started ? IconUtils.smallIcon(IconUtils.Icon.STOP) : IconUtils.smallIcon(IconUtils.Icon.PLAY))
+        );
+        battleToggleBtn.setOnAction(e -> {
+            if (battleState.isBattleStarted()) {
+                handleEndBattle();
+            } else {
+                handleBeginBattle();
+            }
+        });
 
         nextTurnBtn = new Button("Next Turn");
-        nextTurnBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.FLAG));
+        nextTurnBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.FAST_FORWARD));
         nextTurnBtn.getStyleClass().add("button");
         nextTurnBtn.setPrefSize(140, 40);
         nextTurnBtn.setOnAction(e -> handleNextTurn());
         // Enable next turn only when battle is active
         nextTurnBtn.disableProperty().bind(battleState.battleStartedProperty().not());
 
-        endBattleBtn = new Button("End Battle");
-        endBattleBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.STOP));
-        endBattleBtn.getStyleClass().add("button-danger");
-        endBattleBtn.setPrefSize(140, 40);
-        endBattleBtn.setOnAction(e -> handleEndBattle());
-        // Enable end battle only when battle is active
-        endBattleBtn.disableProperty().bind(battleState.battleStartedProperty().not());
-
-        panel.getChildren().addAll(backBtn, addObjBtn, beginBattleBtn, nextTurnBtn, endBattleBtn);
+        panel.getChildren().addAll(backBtn, addObjBtn, battleToggleBtn, nextTurnBtn);
         return panel;
     }
 
@@ -255,7 +253,6 @@ public class BattleView {
             combatLogPane.logTurnStart(firstName);
         }
         
-        beginBattleBtn.setDisable(true);
         nextTurnBtn.setDisable(false);
 
         gridCanvas.setBattleStarted(true);
@@ -334,8 +331,7 @@ public class BattleView {
     }
 
     private void handleBack() {
-        stage.hide();
-        sheetView.show();
+        appController.navigateToCharacterSheets();
     }
 
     private void handleEndBattle() {
@@ -355,8 +351,7 @@ public class BattleView {
                 }
             }
             sheetView.endBattle();
-            stage.close();
-            sheetView.show();
+            appController.returnFromBattle();
         }
     }
 
@@ -693,19 +688,6 @@ public class BattleView {
         ScrollPane scroll = new ScrollPane(content);
         scroll.setFitToWidth(true);
         return scroll;
-    }
-
-    public void show() {
-        stage.show();
-    }
-
-    public void setBattleVisible(boolean visible) {
-        if (visible) {
-            stage.show();
-            gridCanvas.redraw();
-        } else {
-            stage.hide();
-        }
     }
 
     private void showAlert(Alert.AlertType type, String title, String content) {

@@ -1,6 +1,5 @@
 package UI;
 
-import UI.Battle.BattleView;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -16,19 +15,16 @@ import javafx.stage.Stage;
 
 public class MainMenuView {
 
-    private final Stage stage;
-    private CharacterSheetView characterSheetView;
+    private final AppController appController;
+    private final VBox root;
 
-    public MainMenuView(Stage primaryStage) {
-        this.stage = primaryStage;
-        stage.setTitle("Cassandralis Combat Simulator");
+    public MainMenuView(AppController appController) {
+        this.appController = appController;
 
-        characterSheetView = new CharacterSheetView();
-
-        VBox mainLayout = new VBox(30);
-        mainLayout.setAlignment(Pos.CENTER);
-        mainLayout.setPadding(new Insets(40));
-        mainLayout.getStyleClass().add("panel-dark");
+        root = new VBox(30);
+        root.setAlignment(Pos.CENTER);
+        root.setPadding(new Insets(40));
+        root.getStyleClass().add("panel-dark");
         
         // Title with glow effect
         Label titleLabel = new Label("Cassandralis Combat Simulator");
@@ -53,25 +49,20 @@ public class MainMenuView {
         grid.setHgap(20);
         grid.setVgap(20);
 
-        Button battleBtn = createMenuButton("Start Battle System", IconUtils.Icon.SWORDS, "#b8860b");
+        Button battleBtn = createMenuButton("Start Battle System", IconUtils.Icon.PLAY, "#b8860b");
         battleBtn.setOnAction(e -> handleBattleSystem());
         grid.add(battleBtn, 0, 0);
 
         Button characterBtn = createMenuButton("Character Sheets", IconUtils.Icon.PERSON, "#569cd6");
-        characterBtn.setOnAction(e -> handleCharacterSheet());
+        characterBtn.setOnAction(e -> appController.navigateToCharacterSheets());
         grid.add(characterBtn, 1, 0);
 
         Button assetBtn = createMenuButton("Asset Editor", IconUtils.Icon.GEAR, "#4ec9b0");
-        assetBtn.setOnAction(e -> handleAssetEditor());
+        assetBtn.setOnAction(e -> appController.navigateToAssetEditor());
         grid.add(assetBtn, 0, 1);
         GridPane.setColumnSpan(assetBtn, 2);
 
-        mainLayout.getChildren().addAll(titleBox, grid);
-
-        Scene scene = new Scene(mainLayout, 800, 700);
-        scene.getStylesheets().add(new java.io.File("resources/styles/dark-theme.css").toURI().toString());
-
-        stage.setScene(scene);
+        root.getChildren().addAll(titleBox, grid);
     }
 
     private Button createMenuButton(String text, IconUtils.Icon icon, String iconColor) {
@@ -94,23 +85,23 @@ public class MainMenuView {
         return btn;
     }
 
-    public void show() {
-        stage.show();
+    public VBox getRoot() {
+        return root;
     }
 
     private void handleBattleSystem() {
         Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
-        dialog.initOwner(stage);
+        dialog.initOwner(appController.getPrimaryStage());
         dialog.setTitle("Select Grid Size");
         dialog.setResizable(false);
 
         final int[] selectedRows = {0};
         final int[] selectedCols = {0};
 
-        BorderPane root = new BorderPane();
-        root.getStyleClass().add("panel-dark");
-        root.setPadding(new Insets(10));
+        BorderPane dialogRoot = new BorderPane();
+        dialogRoot.getStyleClass().add("panel-dark");
+        dialogRoot.setPadding(new Insets(10));
 
         // Title
         Label titleLabel = new Label("Hover to select grid size, click to confirm");
@@ -118,7 +109,7 @@ public class MainMenuView {
         titleLabel.setAlignment(Pos.CENTER);
         titleLabel.setMaxWidth(Double.MAX_VALUE);
         titleLabel.setPadding(new Insets(10));
-        root.setTop(titleLabel);
+        dialogRoot.setTop(titleLabel);
 
         // Size label
         Label sizeLabel = new Label("0 x 0");
@@ -187,7 +178,7 @@ public class MainMenuView {
 
         StackPane canvasWrapper = new StackPane(canvas);
         canvasWrapper.setPadding(new Insets(10));
-        root.setCenter(canvasWrapper);
+        dialogRoot.setCenter(canvasWrapper);
 
         // Bottom panel
         VBox bottomPanel = new VBox(10);
@@ -205,42 +196,16 @@ public class MainMenuView {
         });
         bottomPanel.getChildren().add(cancelBtn);
 
-        root.setBottom(bottomPanel);
+        dialogRoot.setBottom(bottomPanel);
 
-        Scene scene = new Scene(root, 320, 450);
+        Scene scene = new Scene(dialogRoot, 320, 450);
         scene.getStylesheets().add(new java.io.File("resources/styles/dark-theme.css").toURI().toString());
 
         dialog.setScene(scene);
         dialog.showAndWait();
 
-        System.out.println("Dialog closed. Confirmed: " + confirmed[0] + ", Selected: " + selectedRows[0] + " x " + selectedCols[0]);
         if (confirmed[0] && selectedRows[0] > 0 && selectedCols[0] > 0) {
-            try {
-                System.out.println("Creating BattleView...");
-                BattleView battleView = new BattleView(selectedRows[0], selectedCols[0], characterSheetView);
-                System.out.println("BattleView created, hiding main stage...");
-                stage.hide();
-                System.out.println("Showing BattleView...");
-                battleView.show();
-                System.out.println("BattleView shown.");
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
+            appController.navigateToBattle(selectedRows[0], selectedCols[0]);
         }
-    }
-
-    private void handleCharacterSheet() {
-        characterSheetView.show();
-        stage.hide();
-    }
-
-    private void handleAssetEditor() {
-        AssetEditorView assetEditor = new AssetEditorView();
-        assetEditor.show();
-        stage.hide();
-    }
-
-    public CharacterSheetView getCharacterSheetView() {
-        return characterSheetView;
     }
 }

@@ -15,7 +15,8 @@ import java.util.List;
 
 public class AssetEditorView {
 
-    private final Stage stage;
+    private final AppController appController;
+    private final BorderPane root;
     private TabPane mainTabs;
     private TabPane itemTabs;
     private HBox itemButtonPanel;
@@ -34,11 +35,10 @@ public class AssetEditorView {
     private static final String[] ARMOR_TYPES = {"Head", "Torso", "Legs"};
     private static final String[] CRAFTING_CATEGORIES = {"Material", "Component", "Reagent", "Miscellaneous"};
 
-    public AssetEditorView() {
-        stage = new Stage();
-        stage.setTitle("Asset Editor");
+    public AssetEditorView(AppController appController) {
+        this.appController = appController;
         
-        BorderPane root = new BorderPane();
+        root = new BorderPane();
         root.getStyleClass().add("panel-dark");
         root.setPadding(new Insets(10));
         
@@ -90,13 +90,6 @@ public class AssetEditorView {
         terrainButtonPanel.setManaged(false);
         
         root.setCenter(mainTabs);
-        
-        Scene scene = new Scene(root, 950, 700);
-        scene.getStylesheets().add(new java.io.File("resources/styles/dark-theme.css").toURI().toString());
-        
-        stage.setScene(scene);
-        stage.setMinWidth(750);
-        stage.setMinHeight(500);
     }
 
     private HBox createItemButtonPanel() {
@@ -950,7 +943,7 @@ public class AssetEditorView {
     private Stage createDialog(String title, int width, int height) {
         Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
-        dialog.initOwner(stage);
+        dialog.initOwner(appController.getPrimaryStage());
         dialog.setTitle(title);
         dialog.setResizable(false);
         return dialog;
@@ -1005,13 +998,11 @@ public class AssetEditorView {
     }
 
     private void handleBack() {
-        stage.hide();
-        Stage mainStage = new Stage();
-        new MainMenuView(mainStage).show();
+        appController.navigateToMainMenu();
     }
 
-    public void show() {
-        stage.show();
+    public BorderPane getRoot() {
+        return root;
     }
 
     private void showAlert(Alert.AlertType type, String title, String content) {

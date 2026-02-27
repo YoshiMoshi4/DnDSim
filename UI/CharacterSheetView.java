@@ -17,19 +17,18 @@ import java.util.ArrayList;
 
 public class CharacterSheetView {
 
-    private final Stage stage;
+    private final AppController appController;
+    private final BorderPane root;
     private final ArrayList<SheetButton> sheets = new ArrayList<>();
     private final ArrayList<Enemy> enemies = new ArrayList<>();
     private BattleView battleView;
-    private Button returnToBattleBtn;
     private TabPane listTabs;
     private StackPane displayPane;
 
-    public CharacterSheetView() {
-        stage = new Stage();
-        stage.setTitle("Character Sheets");
+    public CharacterSheetView(AppController appController) {
+        this.appController = appController;
         
-        BorderPane root = new BorderPane();
+        root = new BorderPane();
         root.getStyleClass().add("panel-dark");
         root.setPadding(new Insets(10));
         
@@ -54,18 +53,22 @@ public class CharacterSheetView {
         
         root.setCenter(splitPane);
         
-        Scene scene = new Scene(root, 1000, 600);
-        scene.getStylesheets().add(new java.io.File("resources/styles/dark-theme.css").toURI().toString());
-        
-        stage.setScene(scene);
-        stage.setMinWidth(800);
-        stage.setMinHeight(400);
-        
         autoLoadSheets();
     }
 
+    public BorderPane getRoot() {
+        return root;
+    }
+
+    public void refresh() {
+        // Reload sheets and enemies when navigating back to this view
+        if (!sheets.isEmpty()) {
+            showSheet(sheets.get(0));
+        }
+    }
+
     private HBox createButtonPanel() {
-        HBox panel = new HBox(10);
+        HBox panel = new HBox(20);
         panel.setPadding(new Insets(10));
         panel.setAlignment(Pos.CENTER_LEFT);
         panel.setStyle("-fx-border-color: #505052; -fx-border-width: 0 0 1 0;");
@@ -75,33 +78,19 @@ public class CharacterSheetView {
         backBtn.setPrefSize(100, 35);
         backBtn.setOnAction(e -> handleBack());
         
-        Button saveBtn = new Button("Save All");
-        saveBtn.getStyleClass().add("button");
-        saveBtn.setPrefSize(100, 35);
-        saveBtn.setOnAction(e -> handleSave());
-        
-        Button loadBtn = new Button("Load");
-        loadBtn.getStyleClass().add("button");
-        loadBtn.setPrefSize(100, 35);
-        loadBtn.setOnAction(e -> handleLoad());
-        
         Button newCharBtn = new Button("+ Character");
         newCharBtn.getStyleClass().add("button-primary");
-        newCharBtn.setPrefSize(110, 35);
+        newCharBtn.setMinWidth(140);
+        newCharBtn.setPrefHeight(35);
         newCharBtn.setOnAction(e -> handleNew());
         
         Button newEnemyBtn = new Button("+ Enemy");
         newEnemyBtn.getStyleClass().add("button-primary");
-        newEnemyBtn.setPrefSize(100, 35);
+        newEnemyBtn.setMinWidth(120);
+        newEnemyBtn.setPrefHeight(35);
         newEnemyBtn.setOnAction(e -> handleNewEnemy());
         
-        returnToBattleBtn = new Button("Return to Battle");
-        returnToBattleBtn.getStyleClass().add("button");
-        returnToBattleBtn.setPrefSize(140, 35);
-        returnToBattleBtn.setDisable(true);
-        returnToBattleBtn.setOnAction(e -> handleReturnToBattle());
-        
-        panel.getChildren().addAll(backBtn, saveBtn, loadBtn, newCharBtn, newEnemyBtn, returnToBattleBtn);
+        panel.getChildren().addAll(backBtn, newCharBtn, newEnemyBtn);
         return panel;
     }
 
@@ -200,97 +189,80 @@ public class CharacterSheetView {
         displayPane.getChildren().add(createEnemyDisplayPane(enemy));
     }
 
-    private VBox createEnemyDisplayPane(Enemy enemy) {
-        CardUtils.CardStyle style = CardUtils.CardStyle.ENEMY;
-        
+    private Node createEnemyDisplayPane(Enemy enemy) {
         VBox pane = new VBox(15);
         pane.setPadding(new Insets(20));
-        pane.setStyle(String.format(
-            "-fx-background-color: linear-gradient(to bottom right, %s, %s); " +
-            "-fx-background-radius: 8;",
-            style.bgColor, adjustBrightness(style.bgColor, -15)
-        ));
+        pane.getStyleClass().add("card");
         
-        // Header with icon and name
+        // Header with color indicator
         HBox header = new HBox(15);
         header.setAlignment(Pos.CENTER_LEFT);
-        header.setPadding(new Insets(0, 0, 15, 0));
-        header.setStyle(String.format("-fx-border-color: transparent transparent %s transparent; -fx-border-width: 0 0 1 0;", style.borderColor));
         
-        Node avatar = IconUtils.createIcon(IconUtils.Icon.SKULL, 36, style.accentColor);
+        // Color swatch
+        javafx.scene.shape.Rectangle colorSwatch = new javafx.scene.shape.Rectangle(30, 30);
+        String colorHex = CharSheet.getColorHex(enemy.getColor());
+        colorSwatch.setFill(javafx.scene.paint.Color.web(colorHex));
+        colorSwatch.setArcWidth(6);
+        colorSwatch.setArcHeight(6);
+        colorSwatch.setStroke(javafx.scene.paint.Color.web(brightenColor(colorHex, 30)));
+        colorSwatch.setStrokeWidth(2);
         
-        Label titleLabel = new Label(enemy.getName());
-        titleLabel.setStyle(String.format("-fx-text-fill: %s; -fx-font-size: 24px; -fx-font-weight: bold;", style.accentColor));
+        Label nameLabel = new Label(enemy.getName());
+        nameLabel.getStyleClass().add("label-title");
+        nameLabel.setStyle("-fx-font-size: 28px;");
         
-        header.getChildren().addAll(avatar, titleLabel);
+        header.getChildren().addAll(colorSwatch, nameLabel);
         
-        // Stats cards in a grid
-        HBox statsRow = new HBox(15);
-        statsRow.setAlignment(Pos.CENTER);
+        // Stats grid
+        GridPane statsGrid = new GridPane();
+        statsGrid.setHgap(30);
+        statsGrid.setVgap(12);
+        statsGrid.setPadding(new Insets(15, 0, 15, 0));
         
-        statsRow.getChildren().addAll(
-            createStatCard("Health", String.valueOf(enemy.getMaxHealth()), IconUtils.Icon.HEART, "#F44336"),
-            createStatCard("Attack", String.valueOf(enemy.getAttackPower()), IconUtils.Icon.SWORDS, "#FF9800"),
-            createStatCard("Mobility", String.valueOf(enemy.getMovement()), IconUtils.Icon.FLAG, "#4CAF50"),
-            createStatCard("Initiative", String.valueOf(enemy.getInitiative()), IconUtils.Icon.CLOCK, "#9C27B0")
-        );
-        
-        // Color indicator
-        HBox colorRow = new HBox(10);
-        colorRow.setAlignment(Pos.CENTER_LEFT);
-        colorRow.setPadding(new Insets(10, 0, 0, 0));
-        
-        Label colorLabel = new Label("Display Color:");
-        colorLabel.setStyle("-fx-text-fill: #888;");
-        
-        Label colorName = CardUtils.createBadge(CharSheet.getColorNames()[enemy.getColor()], style.accentColor);
-        
-        colorRow.getChildren().addAll(colorLabel, colorName);
+        addStatRow(statsGrid, 0, "Health", enemy.getMaxHealth() + " HP", IconUtils.Icon.HEART, "#e74c3c");
+        addStatRow(statsGrid, 1, "Mobility", String.valueOf(enemy.getMovement()), IconUtils.Icon.MOVE, "#3498db");
+        addStatRow(statsGrid, 2, "Attack", String.valueOf(enemy.getAttackPower()), IconUtils.Icon.TARGET, "#e67e22");
+        addStatRow(statsGrid, 3, "Initiative", String.valueOf(enemy.getInitiative()), IconUtils.Icon.LIGHTNING, "#9b59b6");
         
         // Action buttons
-        HBox buttons = new HBox(10);
-        buttons.setPadding(new Insets(15, 0, 0, 0));
+        HBox btnBox = new HBox(10);
+        btnBox.setPadding(new Insets(15, 0, 0, 0));
         
         Button editBtn = new Button("Edit");
-        editBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.EDIT, 14, "#fff"));
-        editBtn.getStyleClass().add("button-primary");
+        editBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.EDIT));
+        editBtn.getStyleClass().add("button");
         editBtn.setOnAction(e -> showEnemyDialog(enemy));
         
         Button deleteBtn = new Button("Delete");
-        deleteBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.CLOSE, 14, "#fff"));
+        deleteBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.DELETE));
         deleteBtn.getStyleClass().add("button-danger");
         deleteBtn.setOnAction(e -> deleteEnemy(enemy));
         
-        buttons.getChildren().addAll(editBtn, deleteBtn);
+        btnBox.getChildren().addAll(editBtn, deleteBtn);
         
-        pane.getChildren().addAll(header, statsRow, colorRow, buttons);
+        pane.getChildren().addAll(header, new Separator(), statsGrid, btnBox);
         return pane;
     }
-    
-    private VBox createStatCard(String label, String value, IconUtils.Icon icon, String color) {
-        VBox card = new VBox(6);
-        card.setAlignment(Pos.CENTER);
-        card.setPadding(new Insets(12));
-        card.setMinWidth(90);
-        card.setStyle(
-            "-fx-background-color: linear-gradient(to bottom, #2d2d30, #252528); " +
-            "-fx-background-radius: 8; -fx-border-color: #3c3c3e; -fx-border-radius: 8; -fx-border-width: 1;"
+
+    private void addStatRow(GridPane grid, int row, String label, String value, IconUtils.Icon icon, String iconColor) {
+        HBox labelBox = new HBox(8);
+        labelBox.setAlignment(Pos.CENTER_LEFT);
+        labelBox.getChildren().addAll(
+            IconUtils.createIcon(icon, 18, iconColor),
+            new Label(label + ":")
         );
-        
-        Node iconNode = IconUtils.createIcon(icon, 24, color);
+        labelBox.getChildren().get(1).getStyleClass().add("form-label");
         
         Label valueLabel = new Label(value);
-        valueLabel.setStyle(String.format("-fx-text-fill: %s; -fx-font-size: 18px; -fx-font-weight: bold;", color));
+        valueLabel.getStyleClass().add("label");
+        valueLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
         
-        Label labelNode = new Label(label);
-        labelNode.setStyle("-fx-text-fill: #888; -fx-font-size: 10px;");
-        
-        card.getChildren().addAll(iconNode, valueLabel, labelNode);
-        return card;
+        grid.add(labelBox, 0, row);
+        grid.add(valueLabel, 1, row);
     }
-    
-    private String adjustBrightness(String hexColor, int amount) {
-        String hex = hexColor.replace("#", "");
+
+    private String brightenColor(String hex, int amount) {
+        hex = hex.replace("#", "");
         int r = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(0, 2), 16) + amount));
         int g = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(2, 4), 16) + amount));
         int b = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(4, 6), 16) + amount));
@@ -315,49 +287,19 @@ public class CharacterSheetView {
     }
 
     private void handleBack() {
-        stage.hide();
-        // Return to main menu - MainMenuView needs to handle this
-        Stage mainStage = new Stage();
-        new MainMenuView(mainStage).show();
-    }
-
-    private void handleSave() {
-        for (SheetButton sheetBtn : sheets) {
-            sheetBtn.getSheet().getCharSheet().save();
+        if (battleView != null) {
+            // Return to active battle - use stored battle view
+            appController.navigateToCurrentBattle();
+        } else {
+            // Return to main menu
+            appController.navigateToMainMenu();
         }
-        showAlert(Alert.AlertType.INFORMATION, "Saved", "All character sheets saved!");
-    }
-
-    private void handleLoad() {
-        TextInputDialog dialog = new TextInputDialog();
-        dialog.setTitle("Load Character");
-        dialog.setHeaderText(null);
-        dialog.setContentText("Enter character name:");
-        
-        dialog.showAndWait().ifPresent(name -> {
-            if (!name.trim().isEmpty()) {
-                CharSheet loaded = CharSheet.load(name.trim(), true);
-                if (loaded == null) {
-                    loaded = CharSheet.load(name.trim(), false);
-                }
-                if (loaded != null) {
-                    CharacterSheetPane pane = new CharacterSheetPane(loaded);
-                    SheetButton sheetBtn = new SheetButton(pane, loaded.getName());
-                    sheets.add(sheetBtn);
-                    updateSheetLists();
-                    showSheet(sheetBtn);
-                    showAlert(Alert.AlertType.INFORMATION, "Loaded", "Character sheet loaded!");
-                } else {
-                    showAlert(Alert.AlertType.ERROR, "Error", "Failed to load character sheet.");
-                }
-            }
-        });
     }
 
     private void handleNew() {
         Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
-        dialog.initOwner(stage);
+        dialog.initOwner(appController.getPrimaryStage());
         dialog.setTitle("New Character");
         dialog.setResizable(false);
         
@@ -531,7 +473,7 @@ public class CharacterSheetView {
     private void showEnemyDialog(Enemy existing) {
         Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
-        dialog.initOwner(stage);
+        dialog.initOwner(appController.getPrimaryStage());
         dialog.setTitle(existing == null ? "New Enemy" : "Edit Enemy");
         dialog.setResizable(false);
         
@@ -603,29 +545,16 @@ public class CharacterSheetView {
         dialog.showAndWait();
     }
 
-    private void handleReturnToBattle() {
-        if (battleView != null) {
-            stage.hide();
-            battleView.setBattleVisible(true);
-        }
-    }
-
     public void setBattleView(BattleView battleView) {
         this.battleView = battleView;
-        returnToBattleBtn.setDisable(false);
     }
 
     public void endBattle() {
         battleView = null;
-        returnToBattleBtn.setDisable(true);
     }
 
     public ArrayList<SheetButton> getSheets() {
         return sheets;
-    }
-
-    public void show() {
-        stage.show();
     }
 
     private void showAlert(Alert.AlertType type, String title, String content) {
