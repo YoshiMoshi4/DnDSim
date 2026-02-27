@@ -5,6 +5,7 @@ import Objects.Enemy;
 import UI.Battle.BattleView;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -200,47 +201,100 @@ public class CharacterSheetView {
     }
 
     private VBox createEnemyDisplayPane(Enemy enemy) {
+        CardUtils.CardStyle style = CardUtils.CardStyle.ENEMY;
+        
         VBox pane = new VBox(15);
         pane.setPadding(new Insets(20));
-        pane.getStyleClass().add("panel");
+        pane.setStyle(String.format(
+            "-fx-background-color: linear-gradient(to bottom right, %s, %s); " +
+            "-fx-background-radius: 8;",
+            style.bgColor, adjustBrightness(style.bgColor, -15)
+        ));
+        
+        // Header with icon and name
+        HBox header = new HBox(15);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.setPadding(new Insets(0, 0, 15, 0));
+        header.setStyle(String.format("-fx-border-color: transparent transparent %s transparent; -fx-border-width: 0 0 1 0;", style.borderColor));
+        
+        Node avatar = IconUtils.createIcon(IconUtils.Icon.SKULL, 36, style.accentColor);
         
         Label titleLabel = new Label(enemy.getName());
-        titleLabel.getStyleClass().add("label-title");
-        titleLabel.setStyle("-fx-font-size: 24px;");
+        titleLabel.setStyle(String.format("-fx-text-fill: %s; -fx-font-size: 24px; -fx-font-weight: bold;", style.accentColor));
         
-        GridPane stats = new GridPane();
-        stats.setHgap(20);
-        stats.setVgap(10);
+        header.getChildren().addAll(avatar, titleLabel);
         
-        int row = 0;
-        stats.add(new Label("Health:"), 0, row);
-        stats.add(new Label(String.valueOf(enemy.getMaxHealth())), 1, row++);
+        // Stats cards in a grid
+        HBox statsRow = new HBox(15);
+        statsRow.setAlignment(Pos.CENTER);
         
-        stats.add(new Label("Mobility:"), 0, row);
-        stats.add(new Label(String.valueOf(enemy.getMovement())), 1, row++);
+        statsRow.getChildren().addAll(
+            createStatCard("Health", String.valueOf(enemy.getMaxHealth()), IconUtils.Icon.HEART, "#F44336"),
+            createStatCard("Attack", String.valueOf(enemy.getAttackPower()), IconUtils.Icon.SWORDS, "#FF9800"),
+            createStatCard("Mobility", String.valueOf(enemy.getMovement()), IconUtils.Icon.FLAG, "#4CAF50"),
+            createStatCard("Initiative", String.valueOf(enemy.getInitiative()), IconUtils.Icon.CLOCK, "#9C27B0")
+        );
         
-        stats.add(new Label("Attack:"), 0, row);
-        stats.add(new Label(String.valueOf(enemy.getAttackPower())), 1, row++);
+        // Color indicator
+        HBox colorRow = new HBox(10);
+        colorRow.setAlignment(Pos.CENTER_LEFT);
+        colorRow.setPadding(new Insets(10, 0, 0, 0));
         
-        stats.add(new Label("Initiative:"), 0, row);
-        stats.add(new Label(String.valueOf(enemy.getInitiative())), 1, row++);
+        Label colorLabel = new Label("Display Color:");
+        colorLabel.setStyle("-fx-text-fill: #888;");
         
-        stats.add(new Label("Color:"), 0, row);
-        stats.add(new Label(CharSheet.getColorNames()[enemy.getColor()]), 1, row++);
+        Label colorName = CardUtils.createBadge(CharSheet.getColorNames()[enemy.getColor()], style.accentColor);
         
+        colorRow.getChildren().addAll(colorLabel, colorName);
+        
+        // Action buttons
         HBox buttons = new HBox(10);
+        buttons.setPadding(new Insets(15, 0, 0, 0));
+        
         Button editBtn = new Button("Edit");
+        editBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.EDIT, 14, "#fff"));
         editBtn.getStyleClass().add("button-primary");
         editBtn.setOnAction(e -> showEnemyDialog(enemy));
         
         Button deleteBtn = new Button("Delete");
+        deleteBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.CLOSE, 14, "#fff"));
         deleteBtn.getStyleClass().add("button-danger");
         deleteBtn.setOnAction(e -> deleteEnemy(enemy));
         
         buttons.getChildren().addAll(editBtn, deleteBtn);
         
-        pane.getChildren().addAll(titleLabel, stats, buttons);
+        pane.getChildren().addAll(header, statsRow, colorRow, buttons);
         return pane;
+    }
+    
+    private VBox createStatCard(String label, String value, IconUtils.Icon icon, String color) {
+        VBox card = new VBox(6);
+        card.setAlignment(Pos.CENTER);
+        card.setPadding(new Insets(12));
+        card.setMinWidth(90);
+        card.setStyle(
+            "-fx-background-color: linear-gradient(to bottom, #2d2d30, #252528); " +
+            "-fx-background-radius: 8; -fx-border-color: #3c3c3e; -fx-border-radius: 8; -fx-border-width: 1;"
+        );
+        
+        Node iconNode = IconUtils.createIcon(icon, 24, color);
+        
+        Label valueLabel = new Label(value);
+        valueLabel.setStyle(String.format("-fx-text-fill: %s; -fx-font-size: 18px; -fx-font-weight: bold;", color));
+        
+        Label labelNode = new Label(label);
+        labelNode.setStyle("-fx-text-fill: #888; -fx-font-size: 10px;");
+        
+        card.getChildren().addAll(iconNode, valueLabel, labelNode);
+        return card;
+    }
+    
+    private String adjustBrightness(String hexColor, int amount) {
+        String hex = hexColor.replace("#", "");
+        int r = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(0, 2), 16) + amount));
+        int g = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(2, 4), 16) + amount));
+        int b = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(4, 6), 16) + amount));
+        return String.format("#%02x%02x%02x", r, g, b);
     }
 
     private void deleteEnemy(Enemy enemy) {

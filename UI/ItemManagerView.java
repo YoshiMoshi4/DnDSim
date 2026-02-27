@@ -12,6 +12,8 @@ import javafx.stage.Stage;
 
 import java.util.ArrayList;
 
+import static UI.CardUtils.*;
+
 public class ItemManagerView {
 
     private final Stage stage;
@@ -134,8 +136,7 @@ public class ItemManagerView {
     }
 
     private <T> ScrollPane createItemPanel(ArrayList<T> items, CardCreator<T> cardCreator) {
-        FlowPane flowPane = new FlowPane(10, 10);
-        flowPane.setPadding(new Insets(10));
+        FlowPane flowPane = ResponsiveUtils.createResponsiveFlowPane();
         flowPane.getStyleClass().add("panel");
         
         for (T item : items) {
@@ -144,174 +145,33 @@ public class ItemManagerView {
         
         ScrollPane scroll = new ScrollPane(flowPane);
         scroll.setFitToWidth(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.getStyleClass().add("panel");
         return scroll;
     }
 
     private VBox createWeaponCard(Weapon weapon) {
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(10));
-        card.setPrefWidth(180);
-        card.setStyle(getCardStyle(weapon.getDisplayColor()));
-        
-        Label nameLabel = new Label(weapon.getName());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
-        card.getChildren().add(nameLabel);
-        
-        card.getChildren().add(new Label("Damage: " + weapon.getDamage()));
-        int[] attrs = weapon.getModifiedAttributes();
-        for (int i = 0; i < attrs.length && i < ATTRIBUTE_NAMES.length; i++) {
-            if (attrs[i] != 0) card.getChildren().add(new Label(ATTRIBUTE_NAMES[i] + ": " + (attrs[i] > 0 ? "+" : "") + attrs[i]));
-        }
-        
-        HBox btnBox = new HBox(5);
-        Button editBtn = new Button("Edit");
-        editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> editWeapon(weapon));
-        Button deleteBtn = new Button("Delete");
-        deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteItem(weapon));
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        card.getChildren().add(btnBox);
-        
-        return card;
+        return CardUtils.createWeaponCard(weapon, () -> editWeapon(weapon), () -> deleteItem(weapon));
     }
 
     private VBox createArmorCard(Armor armor) {
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(10));
-        card.setPrefWidth(180);
-        card.setStyle(getCardStyle(armor.getDisplayColor()));
-        
-        Label nameLabel = new Label(armor.getName());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
-        card.getChildren().add(nameLabel);
-        
-        card.getChildren().add(new Label("Type: " + ARMOR_TYPES[armor.getArmorType()]));
-        card.getChildren().add(new Label("Defense: " + armor.getDefense()));
-        int[] attrs = armor.getModifiedAttributes();
-        for (int i = 0; i < attrs.length && i < ATTRIBUTE_NAMES.length; i++) {
-            if (attrs[i] != 0) card.getChildren().add(new Label(ATTRIBUTE_NAMES[i] + ": " + (attrs[i] > 0 ? "+" : "") + attrs[i]));
-        }
-        
-        HBox btnBox = new HBox(5);
-        Button editBtn = new Button("Edit");
-        editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> editArmor(armor));
-        Button deleteBtn = new Button("Delete");
-        deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteItem(armor));
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        card.getChildren().add(btnBox);
-        
-        return card;
+        return CardUtils.createArmorCard(armor, () -> editArmor(armor), () -> deleteItem(armor));
     }
 
     private VBox createConsumableCard(Consumable item) {
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(10));
-        card.setPrefWidth(150);
-        card.setStyle(getCardStyle(item.getDisplayColor()));
-        
-        Label nameLabel = new Label(item.getName());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
-        card.getChildren().add(nameLabel);
-        
-        card.getChildren().add(new Label("Heal: " + item.getHealAmount()));
-        
-        HBox btnBox = new HBox(5);
-        Button editBtn = new Button("Edit");
-        editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> editConsumable(item));
-        Button deleteBtn = new Button("Delete");
-        deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteItem(item));
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        card.getChildren().add(btnBox);
-        
-        return card;
+        return CardUtils.createConsumableCard(item, () -> editConsumable(item), () -> deleteItem(item));
     }
 
     private VBox createAmmunitionCard(Ammunition item) {
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(10));
-        card.setPrefWidth(150);
-        card.setStyle(getCardStyle(item.getDisplayColor()));
-        
-        Label nameLabel = new Label(item.getName());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
-        card.getChildren().add(nameLabel);
-        
-        card.getChildren().add(new Label("Damage +" + item.getDamageBonus()));
-        card.getChildren().add(new Label("For: " + item.getCompatibleWeaponType()));
-        
-        HBox btnBox = new HBox(5);
-        Button editBtn = new Button("Edit");
-        editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> editAmmunition(item));
-        Button deleteBtn = new Button("Delete");
-        deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteItem(item));
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        card.getChildren().add(btnBox);
-        
-        return card;
+        return CardUtils.createAmmunitionCard(item, () -> editAmmunition(item), () -> deleteItem(item));
     }
 
     private VBox createCraftingCard(CraftingItem item) {
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(10));
-        card.setPrefWidth(150);
-        card.setStyle(getCardStyle(item.getDisplayColor()));
-        
-        Label nameLabel = new Label(item.getName());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
-        card.getChildren().add(nameLabel);
-        
-        card.getChildren().add(new Label(item.getCraftingCategory()));
-        
-        HBox btnBox = new HBox(5);
-        Button editBtn = new Button("Edit");
-        editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> editCraftingItem(item));
-        Button deleteBtn = new Button("Delete");
-        deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteItem(item));
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        card.getChildren().add(btnBox);
-        
-        return card;
+        return CardUtils.createCraftingItemCard(item, () -> editCraftingItem(item), () -> deleteItem(item));
     }
 
     private VBox createKeyItemCard(KeyItem item) {
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(10));
-        card.setPrefWidth(150);
-        card.setStyle(getCardStyle(item.getDisplayColor()));
-        
-        Label nameLabel = new Label(item.getName());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
-        card.getChildren().add(nameLabel);
-        
-        card.getChildren().add(new Label(item.isQuestRelated() ? "Quest Item" : "Key Item"));
-        
-        HBox btnBox = new HBox(5);
-        Button editBtn = new Button("Edit");
-        editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> editKeyItem(item));
-        Button deleteBtn = new Button("Delete");
-        deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteItem(item));
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        card.getChildren().add(btnBox);
-        
-        return card;
-    }
-
-    private String getCardStyle(java.awt.Color awtColor) {
-        String hex = String.format("#%02x%02x%02x", awtColor.getRed(), awtColor.getGreen(), awtColor.getBlue());
-        return "-fx-background-color: " + hex + "; -fx-background-radius: 5; -fx-border-radius: 5; " +
-               "-fx-border-color: #505052; -fx-border-width: 1;";
+        return CardUtils.createKeyItemCard(item, () -> editKeyItem(item), () -> deleteItem(item));
     }
 
     // ===== ADD DIALOGS =====

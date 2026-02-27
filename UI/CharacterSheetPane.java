@@ -34,12 +34,13 @@ public class CharacterSheetPane extends BorderPane {
 
     public CharacterSheetPane(CharSheet sheet) {
         this.sheet = sheet;
-        getStyleClass().add("panel");
+        getStyleClass().addAll("card");
+        setStyle("-fx-background-color: linear-gradient(to bottom right, #2d2d30, #252528);");
         setPadding(new Insets(15));
         
         ScrollPane scrollPane = new ScrollPane();
         scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background-color: transparent;");
+        scrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
         
         VBox content = new VBox(15);
         content.setPadding(new Insets(10));
@@ -58,37 +59,42 @@ public class CharacterSheetPane extends BorderPane {
     }
 
     private TitledPane createBasicInfoSection() {
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(10));
+        GridPane grid = FormUtils.createFormGrid(2);
         
         int row = 0;
         
         // Name
-        grid.add(new Label("Name:"), 0, row);
-        nameField = new TextField();
-        nameField.setPrefWidth(150);
+        Label nameLabel = new Label("Name:");
+        nameLabel.getStyleClass().add("form-label");
+        grid.add(nameLabel, 0, row);
+        nameField = FormUtils.createStyledTextField("Character Name", null, 150);
         nameField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
             if (!isFocused) { sheet.setName(nameField.getText()); save(); }
         });
         grid.add(nameField, 1, row);
         
         // Class
-        grid.add(new Label("Class:"), 2, row);
-        classField = new TextField();
-        classField.setPrefWidth(150);
+        Label classLabel = new Label("Class:");
+        classLabel.getStyleClass().add("form-label");
+        grid.add(classLabel, 2, row);
+        classField = FormUtils.createStyledTextField("Fighter, Mage...", null, 150);
         classField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
             if (!isFocused) { sheet.setCharacterClass(classField.getText()); save(); }
         });
         grid.add(classField, 3, row++);
         
         // HP with spinners
-        grid.add(new Label("HP:"), 0, row);
+        Label hpLabel = new Label("HP:");
+        hpLabel.getStyleClass().add("form-label");
+        grid.add(hpLabel, 0, row);
         HBox hpBox = new HBox(5);
+        hpBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        
         currentHpSpinner = new Spinner<>(0, 9999, 0);
         currentHpSpinner.setEditable(true);
         currentHpSpinner.setPrefWidth(80);
+        currentHpSpinner.getStyleClass().add("styled-spinner-fx");
+        FormUtils.styleSpinner(currentHpSpinner);
         currentHpSpinner.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) {
                 sheet.setCurrentHP(newVal);
@@ -98,10 +104,13 @@ public class CharacterSheetPane extends BorderPane {
         });
         
         Label slashLabel = new Label("/");
+        slashLabel.setStyle("-fx-text-fill: #aaa; -fx-font-weight: bold;");
         
         maxHpSpinner = new Spinner<>(1, 9999, 1);
         maxHpSpinner.setEditable(true);
         maxHpSpinner.setPrefWidth(80);
+        maxHpSpinner.getStyleClass().add("styled-spinner-fx");
+        FormUtils.styleSpinner(maxHpSpinner);
         maxHpSpinner.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) {
                 sheet.setTotalHP(newVal);
@@ -120,16 +129,20 @@ public class CharacterSheetPane extends BorderPane {
         // HP bar
         hpBar = new ProgressBar(1.0);
         hpBar.setPrefWidth(150);
+        hpBar.getStyleClass().add("hp-bar");
         hpBar.setStyle("-fx-accent: #4CAF50;");
         grid.add(hpBar, 2, row);
         GridPane.setColumnSpan(hpBar, 2);
         row++;
         
         // Status dropdown
-        grid.add(new Label("Status:"), 0, row);
+        Label statusLabel = new Label("Status:");
+        statusLabel.getStyleClass().add("form-label");
+        grid.add(statusLabel, 0, row);
         statusCombo = new ComboBox<>();
         statusCombo.getItems().addAll(Status.AVAILABLE_STATUSES);
         statusCombo.setPrefWidth(150);
+        statusCombo.getStyleClass().add("styled-combo-box");
         statusCombo.setOnAction(e -> {
             String selected = statusCombo.getValue();
             sheet.clearStatus();
@@ -141,10 +154,13 @@ public class CharacterSheetPane extends BorderPane {
         grid.add(statusCombo, 1, row++);
         
         // Color
-        grid.add(new Label("Color:"), 0, row);
+        Label colorLabel = new Label("Color:");
+        colorLabel.getStyleClass().add("form-label");
+        grid.add(colorLabel, 0, row);
         colorCombo = new ComboBox<>();
         colorCombo.getItems().addAll(CharSheet.getColorNames());
         colorCombo.setPrefWidth(150);
+        colorCombo.getStyleClass().add("styled-combo-box");
         colorCombo.setOnAction(e -> {
             sheet.setColor(colorCombo.getSelectionModel().getSelectedIndex());
             sheet.save();
@@ -152,13 +168,17 @@ public class CharacterSheetPane extends BorderPane {
         grid.add(colorCombo, 1, row++);
         
         TitledPane pane = new TitledPane("Basic Info", grid);
+        pane.getStyleClass().add("form-section");
         pane.setCollapsible(false);
         return pane;
     }
     
     private void updateHpBar() {
         double ratio = (double) sheet.getCurrentHP() / sheet.getTotalHP();
-        hpBar.setProgress(Math.max(0, Math.min(1, ratio)));
+        double targetProgress = Math.max(0, Math.min(1, ratio));
+        
+        // Animate the progress bar change
+        AnimationUtils.animateProgressBar(hpBar, targetProgress);
         
         // Change color based on HP
         if (ratio > 0.5) {
@@ -171,108 +191,141 @@ public class CharacterSheetPane extends BorderPane {
     }
 
     private TitledPane createEquipmentSection() {
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(10));
+        GridPane grid = FormUtils.createFormGrid(3);
         
         int row = 0;
         
         // Weapons
-        grid.add(new Label("Primary:"), 0, row);
+        Label primaryLabel = new Label("Primary:");
+        primaryLabel.getStyleClass().add("form-label");
+        grid.add(primaryLabel, 0, row);
         primaryWeapon = new ComboBox<>();
         primaryWeapon.setPrefWidth(150);
+        primaryWeapon.getStyleClass().add("styled-combo-box");
         grid.add(primaryWeapon, 1, row);
         Button primaryBtn = new Button("Equip");
         primaryBtn.getStyleClass().add("button");
+        primaryBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.SHIELD, 12, "#fff"));
         primaryBtn.setOnAction(e -> updatePrimary());
+        AnimationUtils.addButtonHoverAnimation(primaryBtn);
         grid.add(primaryBtn, 2, row++);
         
-        grid.add(new Label("Secondary:"), 0, row);
+        Label secondaryLabel = new Label("Secondary:");
+        secondaryLabel.getStyleClass().add("form-label");
+        grid.add(secondaryLabel, 0, row);
         secondaryWeapon = new ComboBox<>();
         secondaryWeapon.setPrefWidth(150);
+        secondaryWeapon.getStyleClass().add("styled-combo-box");
         grid.add(secondaryWeapon, 1, row);
         Button secondaryBtn = new Button("Equip");
         secondaryBtn.getStyleClass().add("button");
+        secondaryBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.SHIELD, 12, "#fff"));
         secondaryBtn.setOnAction(e -> updateSecondary());
+        AnimationUtils.addButtonHoverAnimation(secondaryBtn);
         grid.add(secondaryBtn, 2, row++);
         
         // Armor
-        grid.add(new Label("Head:"), 3, 0);
+        Label headLabel = new Label("Head:");
+        headLabel.getStyleClass().add("form-label");
+        grid.add(headLabel, 3, 0);
         headArmor = new ComboBox<>();
         headArmor.setPrefWidth(150);
+        headArmor.getStyleClass().add("styled-combo-box");
         grid.add(headArmor, 4, 0);
         Button headBtn = new Button("Equip");
         headBtn.getStyleClass().add("button");
         headBtn.setOnAction(e -> updateHead());
+        AnimationUtils.addButtonHoverAnimation(headBtn);
         grid.add(headBtn, 5, 0);
         
-        grid.add(new Label("Torso:"), 3, 1);
+        Label torsoLabel = new Label("Torso:");
+        torsoLabel.getStyleClass().add("form-label");
+        grid.add(torsoLabel, 3, 1);
         torsoArmor = new ComboBox<>();
         torsoArmor.setPrefWidth(150);
+        torsoArmor.getStyleClass().add("styled-combo-box");
         grid.add(torsoArmor, 4, 1);
         Button torsoBtn = new Button("Equip");
         torsoBtn.getStyleClass().add("button");
         torsoBtn.setOnAction(e -> updateTorso());
+        AnimationUtils.addButtonHoverAnimation(torsoBtn);
         grid.add(torsoBtn, 5, 1);
         
-        grid.add(new Label("Legs:"), 3, 2);
+        Label legsLabel = new Label("Legs:");
+        legsLabel.getStyleClass().add("form-label");
+        grid.add(legsLabel, 3, 2);
         legsArmor = new ComboBox<>();
         legsArmor.setPrefWidth(150);
+        legsArmor.getStyleClass().add("styled-combo-box");
         grid.add(legsArmor, 4, 2);
         Button legsBtn = new Button("Equip");
         legsBtn.getStyleClass().add("button");
         legsBtn.setOnAction(e -> updateLegs());
+        AnimationUtils.addButtonHoverAnimation(legsBtn);
         grid.add(legsBtn, 5, 2);
         
         TitledPane pane = new TitledPane("Equipment", grid);
+        pane.getStyleClass().add("form-section");
         pane.setCollapsible(false);
         return pane;
     }
 
     private TitledPane createAttributesSection() {
         GridPane grid = new GridPane();
-        grid.setHgap(15);
-        grid.setVgap(8);
-        grid.setPadding(new Insets(10));
+        grid.setHgap(20);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(12));
+        grid.setStyle("-fx-background-color: transparent;");
         
         // Headers
         grid.add(new Label(""), 0, 0);
         Label baseHeader = new Label("Base");
         baseHeader.getStyleClass().add("label-header");
+        baseHeader.setStyle("-fx-text-fill: #569cd6; -fx-font-weight: bold;");
         grid.add(baseHeader, 1, 0);
         Label tempHeader = new Label("Bonus");
         tempHeader.getStyleClass().add("label-header");
+        tempHeader.setStyle("-fx-text-fill: #4ec9b0; -fx-font-weight: bold;");
         grid.add(tempHeader, 2, 0);
         Label totalHeader = new Label("Total");
         totalHeader.getStyleClass().add("label-header");
+        totalHeader.setStyle("-fx-text-fill: #dcdcaa; -fx-font-weight: bold;");
         grid.add(totalHeader, 3, 0);
         
         // STR
-        grid.add(new Label("STR"), 0, 1);
-        strBase = new Label(); grid.add(strBase, 1, 1);
-        strTemp = new Label(); grid.add(strTemp, 2, 1);
-        strTotal = new Label(); grid.add(strTotal, 3, 1);
+        Label strLabel = new Label("STR");
+        strLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #d75f5f;");
+        grid.add(strLabel, 0, 1);
+        strBase = new Label(); strBase.setMinWidth(40); grid.add(strBase, 1, 1);
+        strTemp = new Label(); strTemp.setMinWidth(40); grid.add(strTemp, 2, 1);
+        strTotal = new Label(); strTotal.setMinWidth(40); strTotal.setStyle("-fx-font-weight: bold;"); grid.add(strTotal, 3, 1);
         
         // DEX
-        grid.add(new Label("DEX"), 0, 2);
-        dexBase = new Label(); grid.add(dexBase, 1, 2);
-        dexTemp = new Label(); grid.add(dexTemp, 2, 2);
-        dexTotal = new Label(); grid.add(dexTotal, 3, 2);
+        Label dexLabel = new Label("DEX");
+        dexLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #4CAF50;");
+        grid.add(dexLabel, 0, 2);
+        dexBase = new Label(); dexBase.setMinWidth(40); grid.add(dexBase, 1, 2);
+        dexTemp = new Label(); dexTemp.setMinWidth(40); grid.add(dexTemp, 2, 2);
+        dexTotal = new Label(); dexTotal.setMinWidth(40); dexTotal.setStyle("-fx-font-weight: bold;"); grid.add(dexTotal, 3, 2);
         
         // ITV
-        grid.add(new Label("ITV"), 0, 3);
-        itvBase = new Label(); grid.add(itvBase, 1, 3);
-        itvTemp = new Label(); grid.add(itvTemp, 2, 3);
-        itvTotal = new Label(); grid.add(itvTotal, 3, 3);
+        Label itvLabel = new Label("ITV");
+        itvLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #9c27b0;");
+        grid.add(itvLabel, 0, 3);
+        itvBase = new Label(); itvBase.setMinWidth(40); grid.add(itvBase, 1, 3);
+        itvTemp = new Label(); itvTemp.setMinWidth(40); grid.add(itvTemp, 2, 3);
+        itvTotal = new Label(); itvTotal.setMinWidth(40); itvTotal.setStyle("-fx-font-weight: bold;"); grid.add(itvTotal, 3, 3);
         
         // MOB
-        grid.add(new Label("MOB"), 0, 4);
-        mobBase = new Label(); grid.add(mobBase, 1, 4);
-        mobTemp = new Label(); grid.add(mobTemp, 2, 4);
-        mobTotal = new Label(); grid.add(mobTotal, 3, 4);
+        Label mobLabel = new Label("MOB");
+        mobLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #2196F3;");
+        grid.add(mobLabel, 0, 4);
+        mobBase = new Label(); mobBase.setMinWidth(40); grid.add(mobBase, 1, 4);
+        mobTemp = new Label(); mobTemp.setMinWidth(40); grid.add(mobTemp, 2, 4);
+        mobTotal = new Label(); mobTotal.setMinWidth(40); mobTotal.setStyle("-fx-font-weight: bold;"); grid.add(mobTotal, 3, 4);
         
         TitledPane pane = new TitledPane("Attributes", grid);
+        pane.getStyleClass().add("form-section");
         pane.setCollapsible(false);
         return pane;
     }
@@ -281,22 +334,27 @@ public class CharacterSheetPane extends BorderPane {
         TabPane tabs = new TabPane();
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         tabs.setPrefHeight(200);
+        tabs.getStyleClass().add("styled-tab-pane");
         
         consumablesTab = new TextArea();
         consumablesTab.setEditable(false);
+        consumablesTab.getStyleClass().add("styled-text-area");
         Tab consumables = new Tab("Consumables/Ammo", new ScrollPane(consumablesTab));
         
         craftingTab = new TextArea();
         craftingTab.setEditable(false);
+        craftingTab.getStyleClass().add("styled-text-area");
         Tab crafting = new Tab("Crafting", new ScrollPane(craftingTab));
         
         keyItemsTab = new TextArea();
         keyItemsTab.setEditable(false);
+        keyItemsTab.getStyleClass().add("styled-text-area");
         Tab keyItems = new Tab("Key Items", new ScrollPane(keyItemsTab));
         
         tabs.getTabs().addAll(consumables, crafting, keyItems);
         
         TitledPane pane = new TitledPane("Inventory", tabs);
+        pane.getStyleClass().add("form-section");
         pane.setCollapsible(false);
         return pane;
     }

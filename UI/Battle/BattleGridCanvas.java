@@ -2,6 +2,7 @@ package UI.Battle;
 
 import EntityRes.*;
 import Objects.*;
+import UI.NotificationPane;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
@@ -19,6 +20,8 @@ public class BattleGridCanvas extends Pane {
     private final BattleGrid grid;
     private final TurnManager turnManager;
     private final BattleView battleView;
+    private final NotificationPane notificationPane;
+    private final CombatLogPane combatLogPane;
     private GridObject selectedObject;
     private boolean battleStarted;
     private boolean attackMode;
@@ -31,11 +34,14 @@ public class BattleGridCanvas extends Pane {
     private Entity currentMenuEntity;
     private Enemy currentMenuEnemy;
 
-    public BattleGridCanvas(BattleGrid grid, TurnManager tm, BattleView battleView) {
+    public BattleGridCanvas(BattleGrid grid, TurnManager tm, BattleView battleView, 
+                           NotificationPane notificationPane, CombatLogPane combatLogPane) {
         this.canvas = new Canvas();
         this.grid = grid;
         this.turnManager = tm;
         this.battleView = battleView;
+        this.notificationPane = notificationPane;
+        this.combatLogPane = combatLogPane;
         this.selectedObject = null;
         this.battleStarted = false;
         this.attackMode = false;
@@ -152,9 +158,7 @@ public class BattleGridCanvas extends Pane {
         selectedObject = entity;
         attackMode = true;
         attackingEntity = entity;
-        showAlert(Alert.AlertType.INFORMATION, "Attack Mode",
-                "Left-click an enemy or terrain to attack with " + entity.getName() +
-                "\nAttack Power: " + entity.getAttackPower());
+        notificationPane.showModeChange("⚔ Attack mode: " + entity.getName() + " (ATK: " + entity.getAttackPower() + ")");
         redraw();
     }
 
@@ -189,12 +193,12 @@ public class BattleGridCanvas extends Pane {
     private void useConsumable(Entity entity, Consumable consumable) {
         if (consumable.getHealAmount() > 0) {
             entity.getCharSheet().addCurrentHP(consumable.getHealAmount());
-            showAlert(Alert.AlertType.INFORMATION, "Item Used",
-                    entity.getName() + " healed " + consumable.getHealAmount() + " HP!");
+            combatLogPane.logHeal(entity.getName(), consumable.getHealAmount());
         }
         if (consumable.getEffect() != null) {
             entity.getCharSheet().addStatus(consumable.getEffect());
         }
+        combatLogPane.logItemUse(entity.getName(), consumable.getName());
         if (consumable.getQuantity() > 1) {
             consumable.decQuantity();
         } else {
@@ -202,6 +206,7 @@ public class BattleGridCanvas extends Pane {
         }
         entity.getCharSheet().save();
         redraw();
+        battleView.refreshPartyHealth();
     }
 
     private void triggerEnemyMove(Enemy enemy) {
@@ -223,9 +228,7 @@ public class BattleGridCanvas extends Pane {
         moveMode = false;
         movingEntity = null;
         movingEnemy = null;
-        showAlert(Alert.AlertType.INFORMATION, "Attack Mode",
-                "Left-click a target to attack with " + enemy.getName() +
-                "\nAttack Power: " + enemy.getAttackPower());
+        notificationPane.showModeChange("⚔ Attack mode: " + enemy.getName() + " (ATK: " + enemy.getAttackPower() + ")");
         redraw();
     }
 
@@ -524,43 +527,41 @@ public class BattleGridCanvas extends Pane {
         // Handle attack mode for Entity
         if (attackMode && attackingEntity != null) {
             if (clicked instanceof Entity target && target != attackingEntity) {
+                int damage = Math.max(0, attackingEntity.getAttackPower() - target.getDefense());
                 attackingEntity.attack(target);
-                showAlert(Alert.AlertType.INFORMATION, "Attack",
-                        attackingEntity.getName() + " attacks " + target.getName() + "!" +
-                        "\nDamage dealt: " + Math.max(0, attackingEntity.getAttackPower() - target.getDefense()) +
-                        "\n" + target.getName() + " HP: " + target.getHealth() + "/" + target.getCharSheet().getTotalHP());
+                combatLogPane.logAttack(attackingEntity.getName(), target.getName(), 
+                    damage, target.getHealth(), target.getCharSheet().getTotalHP());
                 if (target.isDead()) {
                     grid.removeEntity(target);
                     turnManager.removeEntity(target);
-                    showAlert(Alert.AlertType.WARNING, "Defeated", target.getName() + " has been defeated!");
+                    combatLogPane.logDefeat(target.getName());
                 }
                 attackMode = false;
                 attackingEntity = null;
                 redraw();
+                battleView.refreshPartyHealth();
                 return;
             } else if (clicked instanceof Enemy targetEnemy) {
                 int damage = Math.max(0, attackingEntity.getAttackPower() - targetEnemy.getDefense());
                 targetEnemy.takeDamage(damage);
-                showAlert(Alert.AlertType.INFORMATION, "Attack",
-                        attackingEntity.getName() + " attacks " + targetEnemy.getName() + "!" +
-                        "\nDamage dealt: " + damage +
-                        "\n" + targetEnemy.getName() + " HP: " + targetEnemy.getHealth() + "/" + targetEnemy.getMaxHealth());
+                combatLogPane.logAttack(attackingEntity.getName(), targetEnemy.getName(), 
+                    damage, targetEnemy.getHealth(), targetEnemy.getMaxHealth());
                 if (targetEnemy.isDead()) {
                     grid.removeEnemy(targetEnemy);
                     turnManager.removeEnemy(targetEnemy);
-                    showAlert(Alert.AlertType.WARNING, "Defeated", targetEnemy.getName() + " has been defeated!");
+                    combatLogPane.logDefeat(targetEnemy.getName());
                 }
                 attackMode = false;
                 attackingEntity = null;
                 redraw();
                 return;
             } else if (clicked instanceof TerrainObject terrain) {
-                terrain.takeDamage(attackingEntity.getAttackPower());
-                showAlert(Alert.AlertType.INFORMATION, "Attack",
-                        attackingEntity.getName() + " attacks the terrain!" +
-                        "\nTerrain HP: " + terrain.getHealth());
+                int damage = attackingEntity.getAttackPower();
+                terrain.takeDamage(damage);
+                combatLogPane.logTerrainDamage(attackingEntity.getName(), damage, terrain.getHealth());
                 if (terrain.isDestroyed()) {
                     grid.removeDestroyedTerrain();
+                    combatLogPane.logTerrainDestroyed();
                 }
                 attackMode = false;
                 attackingEntity = null;
@@ -577,42 +578,41 @@ public class BattleGridCanvas extends Pane {
         // Handle attack mode for Enemy
         if (attackMode && attackingEnemy != null) {
             if (clicked instanceof Entity target) {
+                int damage = Math.max(0, attackingEnemy.getAttackPower() - target.getDefense());
                 attackingEnemy.attack(target);
-                showAlert(Alert.AlertType.INFORMATION, "Attack",
-                        attackingEnemy.getName() + " attacks " + target.getName() + "!" +
-                        "\nDamage dealt: " + Math.max(0, attackingEnemy.getAttackPower() - target.getDefense()) +
-                        "\n" + target.getName() + " HP: " + target.getHealth() + "/" + target.getCharSheet().getTotalHP());
+                combatLogPane.logAttack(attackingEnemy.getName(), target.getName(), 
+                    damage, target.getHealth(), target.getCharSheet().getTotalHP());
                 if (target.isDead()) {
                     grid.removeEntity(target);
                     turnManager.removeEntity(target);
-                    showAlert(Alert.AlertType.WARNING, "Defeated", target.getName() + " has been defeated!");
+                    combatLogPane.logDefeat(target.getName());
                 }
                 attackMode = false;
                 attackingEnemy = null;
                 redraw();
+                battleView.refreshPartyHealth();
                 return;
             } else if (clicked instanceof Enemy targetEnemy && targetEnemy != attackingEnemy) {
+                int damage = attackingEnemy.getAttackPower();
                 attackingEnemy.attack(targetEnemy);
-                showAlert(Alert.AlertType.INFORMATION, "Attack",
-                        attackingEnemy.getName() + " attacks " + targetEnemy.getName() + "!" +
-                        "\nDamage dealt: " + attackingEnemy.getAttackPower() +
-                        "\n" + targetEnemy.getName() + " HP: " + targetEnemy.getHealth() + "/" + targetEnemy.getMaxHealth());
+                combatLogPane.logAttack(attackingEnemy.getName(), targetEnemy.getName(), 
+                    damage, targetEnemy.getHealth(), targetEnemy.getMaxHealth());
                 if (targetEnemy.isDead()) {
                     grid.removeEnemy(targetEnemy);
                     turnManager.removeEnemy(targetEnemy);
-                    showAlert(Alert.AlertType.WARNING, "Defeated", targetEnemy.getName() + " has been defeated!");
+                    combatLogPane.logDefeat(targetEnemy.getName());
                 }
                 attackMode = false;
                 attackingEnemy = null;
                 redraw();
                 return;
             } else if (clicked instanceof TerrainObject terrain) {
-                terrain.takeDamage(attackingEnemy.getAttackPower());
-                showAlert(Alert.AlertType.INFORMATION, "Attack",
-                        attackingEnemy.getName() + " attacks the terrain!" +
-                        "\nTerrain HP: " + terrain.getHealth());
+                int damage = attackingEnemy.getAttackPower();
+                terrain.takeDamage(damage);
+                combatLogPane.logTerrainDamage(attackingEnemy.getName(), damage, terrain.getHealth());
                 if (terrain.isDestroyed()) {
                     grid.removeDestroyedTerrain();
+                    combatLogPane.logTerrainDestroyed();
                 }
                 attackMode = false;
                 attackingEnemy = null;
