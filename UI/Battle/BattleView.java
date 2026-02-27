@@ -252,8 +252,7 @@ public class BattleView {
                               (first instanceof Enemy en) ? en.getName() : "Unknown";
             combatLogPane.logTurnStart(firstName);
         }
-        
-        nextTurnBtn.setDisable(false);
+            // nextTurnBtn.setDisable(false); // Removed to avoid binding error
 
         gridCanvas.setBattleStarted(true);
         timelinePane.refresh();
