@@ -22,7 +22,8 @@ public class Entity extends GridObject {
 
     public int getAttackPower() {
         // Attack damage = weapon damage + strength attribute
-        int weaponDamage = charSheet.getEquippedWeapon().getDamage();
+        // Default unarmed damage is 1
+        int weaponDamage = charSheet.getEquippedWeapon() != null ? charSheet.getEquippedWeapon().getDamage() : 1;
         int strength = charSheet.getAttribute(0); // STRENGTH = 0
         return weaponDamage + strength;
     }

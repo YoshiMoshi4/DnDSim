@@ -1,0 +1,9 @@
+{
+  "name": "Spider",
+  "maxHealth": 10,
+  "health": 10,
+  "mobility": 4,
+  "attackDamage": 3,
+  "initiative": 6,
+  "color": 4
+}

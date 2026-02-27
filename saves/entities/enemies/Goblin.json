@@ -1,0 +1,9 @@
+{
+  "name": "Goblin",
+  "maxHealth": 15,
+  "health": 15,
+  "mobility": 3,
+  "attackDamage": 5,
+  "initiative": 4,
+  "color": 10
+}

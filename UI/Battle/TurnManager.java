@@ -5,7 +5,7 @@ import java.util.*;
 
 public class TurnManager {
 
-    private final List<Entity> turnOrder;
+    private final List<GridObject> turnOrder;
     private int currentIndex = 0;
     private int round = 1;
     private boolean battleStarted = false;
@@ -15,33 +15,56 @@ public class TurnManager {
     }
 
     /**
-     * Sort entities by initiative (INITIATIVE stat), with DEX as tiebreaker.
-     * Higher initiative and DEX go first.
+     * Sort combatants by initiative, with random tiebreaker.
+     * Higher initiative goes first.
      */
     public void calculateInitiativeOrder() {
-        turnOrder.sort((e1, e2) -> {
-            int init1 = e1.getCharSheet().getTotalAttribute(2); // INITIATIVE = 2
-            int init2 = e2.getCharSheet().getTotalAttribute(2);
+        turnOrder.sort((o1, o2) -> {
+            int init1 = getInitiative(o1);
+            int init2 = getInitiative(o2);
             
             if (init1 != init2) {
                 return Integer.compare(init2, init1); // Higher initiative first
             }
             
-            // Tiebreaker: higher DEX goes first
-            int dex1 = e1.getCharSheet().getTotalAttribute(1); // DEXTERITY = 1
-            int dex2 = e2.getCharSheet().getTotalAttribute(1);
-            return Integer.compare(dex2, dex1); // Higher DEX first
+            // Tiebreaker: random
+            return (Math.random() < 0.5) ? -1 : 1;
         });
         
         currentIndex = 0;
         round = 1;
     }
 
-    public Entity getCurrent() {
+    private int getInitiative(GridObject obj) {
+        if (obj instanceof Entity e) {
+            return e.getCharSheet().getTotalAttribute(2); // INITIATIVE = 2
+        } else if (obj instanceof Enemy enemy) {
+            return enemy.getInitiative();
+        }
+        return 0;
+    }
+
+    public GridObject getCurrentCombatant() {
         if (turnOrder.isEmpty()) {
             return null;
         }
         return turnOrder.get(currentIndex);
+    }
+
+    public Entity getCurrent() {
+        GridObject current = getCurrentCombatant();
+        if (current instanceof Entity e) {
+            return e;
+        }
+        return null;
+    }
+
+    public Enemy getCurrentEnemy() {
+        GridObject current = getCurrentCombatant();
+        if (current instanceof Enemy e) {
+            return e;
+        }
+        return null;
     }
 
     public void nextTurn() {
@@ -56,26 +79,30 @@ public class TurnManager {
         }
         
         // Process status effects for the entity whose turn is starting
-        Entity current = getCurrent();
-        if (current != null) {
-            current.getCharSheet().procStatus();
+        GridObject current = getCurrentCombatant();
+        if (current instanceof Entity e) {
+            e.getCharSheet().procStatus();
         }
     }
 
-    public void removeDeadEntities() {
-        turnOrder.removeIf(Entity::isDead);
+    public void removeDeadCombatants() {
+        turnOrder.removeIf(obj -> {
+            if (obj instanceof Entity e) return e.isDead();
+            if (obj instanceof Enemy en) return en.isDead();
+            return false;
+        });
         if (currentIndex >= turnOrder.size() && !turnOrder.isEmpty()) {
             currentIndex = 0;
             round++;
         }
     }
 
-    public boolean isCurrent(Entity e) {
-        Entity current = getCurrent();
-        return current != null && current == e;
+    public boolean isCurrent(GridObject obj) {
+        GridObject current = getCurrentCombatant();
+        return current != null && current == obj;
     }
 
-    public List<Entity> getTurnOrder() {
+    public List<GridObject> getTurnOrder() {
         return new ArrayList<>(turnOrder);
     }
 
@@ -95,7 +122,29 @@ public class TurnManager {
     }
 
     public void removeEntity(Entity entity) {
+        int idx = turnOrder.indexOf(entity);
         turnOrder.remove(entity);
+        if (idx != -1 && idx < currentIndex) {
+            currentIndex--;
+        }
+        if (currentIndex >= turnOrder.size() && !turnOrder.isEmpty()) {
+            currentIndex = 0;
+        }
+    }
+
+    public void addEnemy(Enemy enemy) {
+        turnOrder.add(enemy);
+        if (battleStarted) {
+            calculateInitiativeOrder();
+        }
+    }
+
+    public void removeEnemy(Enemy enemy) {
+        int idx = turnOrder.indexOf(enemy);
+        turnOrder.remove(enemy);
+        if (idx != -1 && idx < currentIndex) {
+            currentIndex--;
+        }
         if (currentIndex >= turnOrder.size() && !turnOrder.isEmpty()) {
             currentIndex = 0;
         }

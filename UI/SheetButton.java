@@ -1,24 +1,27 @@
 package UI;
 
-import javax.swing.*;
+import javafx.scene.control.Button;
 
-public class SheetButton extends JButton
-{
-    private SheetPanel sheet;
+public class SheetButton extends Button {
+    
+    private CharacterSheetPane sheet;
+    private String labelText;
 
-    public SheetButton(SheetPanel sheetPanel, String name)
-    {
+    public SheetButton(CharacterSheetPane sheetPane, String name) {
         super(name);
-        this.sheet = sheetPanel;
+        this.sheet = sheetPane;
+        this.labelText = name;
     }
 
-    public SheetPanel getSheet()
-    {
+    public CharacterSheetPane getSheet() {
         return sheet;
     }
 
-    public void setSheet(SheetPanel sheet)
-    {
+    public void setSheet(CharacterSheetPane sheet) {
         this.sheet = sheet;
+    }
+    
+    public String getLabelText() {
+        return labelText;
     }
 }

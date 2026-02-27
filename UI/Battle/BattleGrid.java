@@ -9,6 +9,7 @@ public class BattleGrid {
     private final int cols;
 
     private final List<Entity> entities = new ArrayList<>();
+    private final List<Enemy> enemies = new ArrayList<>();
     private final List<TerrainObject> terrainObjects = new ArrayList<>();
     private final List<Pickup> pickups = new ArrayList<>();
 
@@ -23,6 +24,12 @@ public class BattleGrid {
 
     public GridObject getObjectAt(int r, int c) {
         for (Entity e : entities) {
+            if (e.getRow() == r && e.getCol() == c) {
+                return e;
+            }
+        }
+
+        for (Enemy e : enemies) {
             if (e.getRow() == r && e.getCol() == c) {
                 return e;
             }
@@ -51,6 +58,12 @@ public class BattleGrid {
         }
 
         for (Entity e : entities) {
+            if (e.getRow() == r && e.getCol() == c) {
+                return true;
+            }
+        }
+
+        for (Enemy e : enemies) {
             if (e.getRow() == r && e.getCol() == c) {
                 return true;
             }
@@ -85,6 +98,10 @@ public class BattleGrid {
         entities.remove(e);
     }
 
+    public void removeEnemy(Enemy e) {
+        enemies.remove(e);
+    }
+
     public void removeDestroyedTerrain() {
         terrainObjects.removeIf(TerrainObject::isDestroyed);
     }
@@ -103,6 +120,10 @@ public class BattleGrid {
 
     public List<Entity> getEntities() {
         return entities;
+    }
+
+    public List<Enemy> getEnemies() {
+        return enemies;
     }
 
     public int getRows() {
@@ -143,6 +164,18 @@ public class BattleGrid {
                 if (getObjectAt(r, c) == null) {
                     pickup.moveTo(r, c);
                     pickups.add(pickup);
+                    return;
+                }
+            }
+        }
+    }
+
+    public void addEnemyAtNextAvailable(Enemy enemy) {
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (getObjectAt(r, c) == null && !isBlocked(r, c)) {
+                    enemy.moveTo(r, c);
+                    enemies.add(enemy);
                     return;
                 }
             }

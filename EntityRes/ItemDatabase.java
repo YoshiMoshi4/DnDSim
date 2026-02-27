@@ -141,11 +141,6 @@ public class ItemDatabase {
     private void addDefaultItems() {
         weapons.put("Sword", new Weapon("Sword", "Weapon", 5, new int[]{1, 0, 0, 0}));
         weapons.put("Dagger", new Weapon("Dagger", "Weapon", 3, new int[]{0, 1, 0, 0}));
-        weapons.put("Fist", new Weapon("Fist", "Unarmed", 1, new int[]{0, 0, 0, 0}));
-
-        armors.put("Bald", new Armor("Bald", "Armor", 0, 0, new int[]{0, 0, 0, 0}));
-        armors.put("Bare Chest", new Armor("Bare Chest", "Armor", 1, 0, new int[]{0, 0, 0, 0}));
-        armors.put("No Pants", new Armor("No Pants", "Armor", 2, 0, new int[]{0, 0, 0, 0}));
 
         consumables.put("Health Potion", new Consumable("Health Potion", "Consumable", 10, null));
     }

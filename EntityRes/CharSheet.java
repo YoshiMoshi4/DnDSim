@@ -66,35 +66,15 @@ public class CharSheet {
             System.out.println("attributesLength Error");
         }
 
-        // Get default items from ItemDatabase
-        ItemDatabase db = ItemDatabase.getInstance();
-        Weapon fist = db.getWeapon("Fist");
-        Armor bald = db.getArmor("Bald");
-        Armor bareChest = db.getArmor("Bare Chest");
-        Armor noPants = db.getArmor("No Pants");
-        
-        // Fallback to creating defaults if not in database
-        if (fist == null) {
-            fist = new Weapon("Fist", "Unarmed", 1, new int[]{0, 0, 0, 0});
-        }
-        if (bald == null) {
-            bald = new Armor("Bald", "Armor", 0, 0, new int[]{0, 0, 0, 0});
-        }
-        if (bareChest == null) {
-            bareChest = new Armor("Bare Chest", "Armor", 1, 0, new int[]{0, 0, 0, 0});
-        }
-        if (noPants == null) {
-            noPants = new Armor("No Pants", "Armor", 2, 0, new int[]{0, 0, 0, 0});
-        }
-
+        // Initialize empty equipment slots (null = nothing equipped)
         weapons = new Weapon[2];
-        weapons[0] = fist;
-        weapons[1] = fist;
+        weapons[0] = null;
+        weapons[1] = null;
 
         armor = new Armor[3];
-        armor[0] = bald;
-        armor[1] = bareChest;
-        armor[2] = noPants;
+        armor[0] = null;
+        armor[1] = null;
+        armor[2] = null;
         
         // Initialize totalAttributes after equipment is equipped
         updateAttributes();
@@ -317,11 +297,11 @@ public class CharSheet {
     }
 
     public void updateAttributes() {
-        // Calculate tempAttributes from equipped items (base + equipment modifications)
-        int[] headAttr = armor[0].getModifiedAttributes();
-        int[] torsoAttr = armor[1].getModifiedAttributes();
-        int[] legsAttr = armor[2].getModifiedAttributes();
-        int[] weapAttr = weapons[0].getModifiedAttributes();
+        // Calculate tempAttributes from equipped items (handle null slots)
+        int[] headAttr = armor[0] != null ? armor[0].getModifiedAttributes() : new int[]{0, 0, 0, 0};
+        int[] torsoAttr = armor[1] != null ? armor[1].getModifiedAttributes() : new int[]{0, 0, 0, 0};
+        int[] legsAttr = armor[2] != null ? armor[2].getModifiedAttributes() : new int[]{0, 0, 0, 0};
+        int[] weapAttr = weapons[0] != null ? weapons[0].getModifiedAttributes() : new int[]{0, 0, 0, 0};
         
         // Reset temp attributes to zero
         for (int i = 0; i < tempAttributes.length; i++) {
