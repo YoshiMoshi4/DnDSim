@@ -134,6 +134,19 @@ public class TerrainManagerView {
         grid.add(new Label(""), 0, row);
         grid.add(blocksCheck, 1, row++);
         
+        // Sprite picker
+        grid.add(new Label("Sprite:"), 0, row);
+        final String[] spritePath = { null };
+        javafx.scene.layout.HBox spritePicker = SpritePickerUtils.createCompactSpritePicker(
+            null,
+            "terrain",
+            colorCombo.getSelectionModel().getSelectedIndex(),
+            false,
+            newPath -> spritePath[0] = newPath,
+            dialog
+        );
+        grid.add(spritePicker, 1, row++);
+        
         HBox btnBox = new HBox(10);
         Button okBtn = new Button("OK");
         okBtn.getStyleClass().add("button-primary");
@@ -146,6 +159,7 @@ public class TerrainManagerView {
                 
                 if (!type.isEmpty()) {
                     TerrainObject newTerrain = new TerrainObject(0, 0, type, hp, color, blocks);
+                    newTerrain.setSpritePath(spritePath[0]);
                     TerrainDatabase.getInstance().addTerrain(newTerrain);
                     dialog.close();
                     refreshDisplay();
@@ -201,6 +215,19 @@ public class TerrainManagerView {
         grid.add(new Label(""), 0, row);
         grid.add(blocksCheck, 1, row++);
         
+        // Sprite picker
+        grid.add(new Label("Sprite:"), 0, row);
+        final String[] spritePath = { terrain.getSpritePath() };
+        javafx.scene.layout.HBox spritePicker = SpritePickerUtils.createCompactSpritePicker(
+            spritePath[0],
+            "terrain",
+            terrain.getColor(),
+            false,
+            newPath -> spritePath[0] = newPath,
+            dialog
+        );
+        grid.add(spritePicker, 1, row++);
+        
         HBox btnBox = new HBox(10);
         Button okBtn = new Button("OK");
         okBtn.getStyleClass().add("button-primary");
@@ -208,6 +235,7 @@ public class TerrainManagerView {
             try {
                 terrain.setColor(colorCombo.getSelectionModel().getSelectedIndex());
                 terrain.setBlocksMovement(blocksCheck.isSelected());
+                terrain.setSpritePath(spritePath[0]);
                 TerrainDatabase.getInstance().saveTerrain(terrain);
                 dialog.close();
                 refreshDisplay();

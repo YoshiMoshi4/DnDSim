@@ -857,7 +857,7 @@ public class AssetEditorView {
     // ==================== TERRAIN DIALOGS ====================
 
     private void addNewTerrain() {
-        Stage dialog = createDialog("Add Terrain", 300, 180);
+        Stage dialog = createDialog("Add Terrain", 300, 250);
         GridPane grid = createDialogGrid();
         
         TextField typeField = new TextField();
@@ -865,10 +865,22 @@ public class AssetEditorView {
         CheckBox blocksCheck = new CheckBox("Blocks Movement");
         blocksCheck.setSelected(true);
         
+        // Sprite picker
+        final String[] spritePath = { null };
+        javafx.scene.layout.HBox spritePicker = SpritePickerUtils.createCompactSpritePicker(
+            null,
+            "terrain",
+            0,
+            false,
+            newPath -> spritePath[0] = newPath,
+            dialog
+        );
+        
         int row = 0;
         grid.add(new Label("Type:"), 0, row); grid.add(typeField, 1, row++);
         grid.add(new Label("HP:"), 0, row); grid.add(hpField, 1, row++);
         grid.add(new Label(""), 0, row); grid.add(blocksCheck, 1, row++);
+        grid.add(new Label("Sprite:"), 0, row); grid.add(spritePicker, 1, row++);
         
         addDialogButtons(grid, row, dialog, () -> {
             String type = typeField.getText();
@@ -876,18 +888,19 @@ public class AssetEditorView {
             boolean blocks = blocksCheck.isSelected();
             if (!type.isEmpty()) {
                 TerrainObject newTerrain = new TerrainObject(0, 0, type, hp, 0, blocks);
+                newTerrain.setSpritePath(spritePath[0]);
                 TerrainDatabase.getInstance().addTerrain(newTerrain);
                 return true;
             }
             return false;
         }, this::refreshTerrainDisplay);
         
-        dialog.setScene(createDialogScene(grid, 300, 180));
+        dialog.setScene(createDialogScene(grid, 300, 250));
         dialog.showAndWait();
     }
 
     private void editTerrain(TerrainObject terrain) {
-        Stage dialog = createDialog("Edit Terrain", 300, 180);
+        Stage dialog = createDialog("Edit Terrain", 300, 250);
         GridPane grid = createDialogGrid();
         
         TextField typeField = new TextField(terrain.getType());
@@ -895,18 +908,31 @@ public class AssetEditorView {
         CheckBox blocksCheck = new CheckBox("Blocks Movement");
         blocksCheck.setSelected(terrain.blocksMovement());
         
+        // Sprite picker
+        final String[] spritePath = { terrain.getSpritePath() };
+        javafx.scene.layout.HBox spritePicker = SpritePickerUtils.createCompactSpritePicker(
+            spritePath[0],
+            "terrain",
+            terrain.getColor(),
+            false,
+            newPath -> spritePath[0] = newPath,
+            dialog
+        );
+        
         int row = 0;
         grid.add(new Label("Type:"), 0, row); grid.add(typeField, 1, row++);
         grid.add(new Label("HP:"), 0, row); grid.add(hpField, 1, row++);
         grid.add(new Label(""), 0, row); grid.add(blocksCheck, 1, row++);
+        grid.add(new Label("Sprite:"), 0, row); grid.add(spritePicker, 1, row++);
         
         addDialogButtons(grid, row, dialog, () -> {
             terrain.setBlocksMovement(blocksCheck.isSelected());
+            terrain.setSpritePath(spritePath[0]);
             TerrainDatabase.getInstance().saveTerrain(terrain);
             return true;
         }, this::refreshTerrainDisplay);
         
-        dialog.setScene(createDialogScene(grid, 300, 180));
+        dialog.setScene(createDialogScene(grid, 300, 250));
         dialog.showAndWait();
     }
 

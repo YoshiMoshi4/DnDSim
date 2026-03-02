@@ -199,62 +199,18 @@ public class CharacterSheetPane extends BorderPane {
     
     /**
      * Create the sprite display section with the character's sprite or fallback avatar.
+     * Uses SpritePickerUtils for browse button and auto-copy functionality.
      */
     private VBox createSpriteSection() {
-        VBox spriteBox = new VBox(8);
-        spriteBox.setAlignment(Pos.CENTER);
-        spriteBox.setPadding(new Insets(10));
-        spriteBox.setMinWidth(100);
-        spriteBox.setStyle(
-            "-fx-background-color: #252528; " +
-            "-fx-background-radius: 8; " +
-            "-fx-border-color: #404042; " +
-            "-fx-border-radius: 8; " +
-            "-fx-border-width: 1;"
+        // Use the sprite picker utility with auto-copy to sprites/party/
+        return SpritePickerUtils.createSpritePicker(
+            sheet.getSpritePath(),
+            "party",
+            sheet.getColor(),
+            true, // isParty
+            newPath -> sheet.setSpritePath(newPath),
+            () -> getScene() != null ? getScene().getWindow() : null
         );
-        
-        // Sprite container - displays the sprite or fallback
-        StackPane spriteContainer = new StackPane();
-        spriteContainer.setMinSize(64, 64);
-        spriteContainer.setMaxSize(64, 64);
-        spriteContainer.setStyle(
-            "-fx-background-color: #1e1e20; " +
-            "-fx-background-radius: 6; " +
-            "-fx-border-color: #4CAF50; " +
-            "-fx-border-radius: 6; " +
-            "-fx-border-width: 2;"
-        );
-        
-        // Create sprite node
-        Node spriteNode = SpriteUtils.createCharacterSprite(sheet, 48);
-        spriteContainer.getChildren().add(spriteNode);
-        
-        // Label
-        Label spriteLabel = new Label("Portrait");
-        spriteLabel.setStyle("-fx-text-fill: #808080; -fx-font-size: 10px;");
-        
-        // Sprite path field (for editing)
-        TextField spritePathField = new TextField();
-        spritePathField.setPromptText("sprites/party/name.png");
-        spritePathField.setPrefWidth(90);
-        spritePathField.setStyle("-fx-font-size: 9px;");
-        spritePathField.setText(sheet.getSpritePath() != null ? sheet.getSpritePath() : "");
-        spritePathField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
-            if (!isFocused) {
-                String path = spritePathField.getText();
-                if (path != null && !path.isEmpty()) {
-                    sheet.setSpritePath(path);
-                } else {
-                    sheet.setSpritePath(null);
-                }
-                // Refresh the sprite display
-                spriteContainer.getChildren().clear();
-                spriteContainer.getChildren().add(SpriteUtils.createCharacterSprite(sheet, 48));
-            }
-        });
-        
-        spriteBox.getChildren().addAll(spriteContainer, spriteLabel, spritePathField);
-        return spriteBox;
     }
     
     private void updateHpBar() {

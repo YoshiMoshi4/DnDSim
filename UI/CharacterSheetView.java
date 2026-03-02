@@ -515,6 +515,19 @@ public class CharacterSheetView {
         colorCombo.getSelectionModel().select(existing != null ? existing.getColor() : 0);
         grid.add(colorCombo, 1, row++);
         
+        // Sprite picker
+        grid.add(new Label("Sprite:"), 0, row);
+        final String[] spritePath = { existing != null ? existing.getSpritePath() : null };
+        javafx.scene.layout.HBox spritePicker = SpritePickerUtils.createCompactSpritePicker(
+            spritePath[0],
+            "enemies",
+            existing != null ? existing.getColor() : 0,
+            false, // Not party
+            newPath -> spritePath[0] = newPath,
+            dialog
+        );
+        grid.add(spritePicker, 1, row++);
+        
         HBox btnBox = new HBox(10);
         Button saveBtn = new Button("Save");
         saveBtn.getStyleClass().add("button-primary");
@@ -523,6 +536,7 @@ public class CharacterSheetView {
             if (!name.isEmpty()) {
                 Enemy enemy = new Enemy(0, 0, name, hpSpinner.getValue(), mobSpinner.getValue(),
                         atkSpinner.getValue(), initSpinner.getValue(), colorCombo.getSelectionModel().getSelectedIndex());
+                enemy.setSpritePath(spritePath[0]);
                 enemy.save();
                 loadEnemies();
                 updateSheetLists();

@@ -820,19 +820,19 @@ public class BattleGridCanvas extends Pane {
             gc.setLineWidth(1);
         }
 
-        // Terrain objects - small black circles
+        // Terrain objects - render sprites or fallback
         for (TerrainObject t : grid.getTerrainObjects()) {
             double x = offsetX + t.getCol() * cellSize;
             double y = offsetY + t.getRow() * cellSize;
-            double circleSize = cellSize * 0.4;
-            double offset = (cellSize - circleSize) / 2;
-            gc.setFill(Color.BLACK);
-            gc.fillOval(x + offset, y + offset, circleSize, circleSize);
+            
+            // Use sprite if available, otherwise fallback to colored display
+            SpriteUtils.drawTerrainSpriteOnCanvas(gc, t, x, y, cellSize);
 
             if (t == selectedObject) {
                 gc.setStroke(Color.ORANGE);
                 gc.setLineWidth(2);
-                gc.strokeOval(x + offset - 2, y + offset - 2, circleSize + 4, circleSize + 4);
+                double padding = 2;
+                gc.strokeRect(x + padding, y + padding, cellSize - padding * 2, cellSize - padding * 2);
             }
         }
 

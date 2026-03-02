@@ -6,6 +6,7 @@ public class TerrainObject extends GridObject {
     protected int health;
     protected int color; // 0-15 representing different colors
     protected boolean blocksMovement = true;
+    protected String spritePath; // Optional sprite image path
 
     public TerrainObject(int row, int col, String type, int health, int color, boolean blocksMovement) {
         super(row, col);
@@ -52,6 +53,14 @@ public class TerrainObject extends GridObject {
 
     public void setBlocksMovement(boolean blocksMovement) {
         this.blocksMovement = blocksMovement;
+    }
+
+    public String getSpritePath() {
+        return spritePath;
+    }
+
+    public void setSpritePath(String spritePath) {
+        this.spritePath = spritePath;
     }
 
     public java.awt.Color getDisplayColor() {

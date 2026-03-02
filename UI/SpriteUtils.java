@@ -69,6 +69,7 @@ public class SpriteUtils {
     /**
      * Create an ImageView for a character's sprite.
      * Falls back to a colored circle icon if no sprite is available.
+     * Sprites are scaled to fit the size while preserving aspect ratio.
      * 
      * @param charSheet The character sheet
      * @param size The desired display size
@@ -81,7 +82,7 @@ public class SpriteUtils {
             ImageView view = new ImageView(sprite);
             view.setFitWidth(size);
             view.setFitHeight(size);
-            view.setPreserveRatio(true);
+            view.setPreserveRatio(true); // Keep aspect ratio, don't squish
             view.setSmooth(false); // Keep pixel art crisp
             return view;
         }
@@ -93,6 +94,7 @@ public class SpriteUtils {
     /**
      * Create an ImageView for an enemy's sprite.
      * Falls back to a colored circle icon if no sprite is available.
+     * Sprites are scaled to fit the size while preserving aspect ratio.
      * 
      * @param enemy The enemy
      * @param size The desired display size
@@ -105,7 +107,7 @@ public class SpriteUtils {
             ImageView view = new ImageView(sprite);
             view.setFitWidth(size);
             view.setFitHeight(size);
-            view.setPreserveRatio(true);
+            view.setPreserveRatio(true); // Keep aspect ratio, don't squish
             view.setSmooth(false); // Keep pixel art crisp
             return view;
         }
@@ -141,12 +143,13 @@ public class SpriteUtils {
     /**
      * Draw a sprite on a canvas GraphicsContext.
      * Used by BattleGridCanvas for rendering entities on the grid.
+     * Sprites are scaled to fit the cell while preserving aspect ratio.
      * 
      * @param gc The graphics context
      * @param spritePath Path to the sprite
      * @param x X coordinate (center)
      * @param y Y coordinate (center)
-     * @param size Size to draw
+     * @param size Cell size to fit within
      * @param fallbackColor Fallback color if sprite not found
      * @param isParty Whether this is a party member (affects fallback border)
      */
@@ -155,10 +158,15 @@ public class SpriteUtils {
         Image sprite = loadSprite(spritePath);
         
         if (sprite != null) {
-            // Draw the sprite centered at x, y
-            double drawX = x - size / 2;
-            double drawY = y - size / 2;
-            gc.drawImage(sprite, drawX, drawY, size, size);
+            // Scale to fit cell while preserving aspect ratio
+            double spriteWidth = sprite.getWidth();
+            double spriteHeight = sprite.getHeight();
+            double scale = Math.min(size / spriteWidth, size / spriteHeight);
+            double drawWidth = spriteWidth * scale;
+            double drawHeight = spriteHeight * scale;
+            double drawX = x - drawWidth / 2;
+            double drawY = y - drawHeight / 2;
+            gc.drawImage(sprite, drawX, drawY, drawWidth, drawHeight);
         } else {
             // Fallback to colored circle
             double radius = size / 2;
@@ -196,5 +204,82 @@ public class SpriteUtils {
         String fullPath = SPRITES_BASE_PATH + spritePath;
         File imageFile = new File(fullPath);
         return imageFile.exists();
+    }
+
+    /**
+     * Create a sprite node for a terrain object.
+     * Falls back to a colored square if no sprite is available.
+     * Sprites are scaled to fit while preserving aspect ratio.
+     * 
+     * @param terrain The terrain object
+     * @param size The desired display size
+     * @return A Node for display
+     */
+    public static javafx.scene.Node createTerrainSprite(Objects.TerrainObject terrain, int size) {
+        Image sprite = loadSprite(terrain.getSpritePath());
+        
+        if (sprite != null) {
+            ImageView view = new ImageView(sprite);
+            view.setFitWidth(size);
+            view.setFitHeight(size);
+            view.setPreserveRatio(true); // Keep aspect ratio
+            view.setSmooth(false);
+            return view;
+        }
+        
+        // Fallback: colored square
+        return createTerrainFallback(terrain.getColor(), size);
+    }
+
+    /**
+     * Create a fallback terrain display (colored square).
+     */
+    public static javafx.scene.Node createTerrainFallback(int colorIndex, int size) {
+        javafx.scene.layout.StackPane square = new javafx.scene.layout.StackPane();
+        square.setMinSize(size, size);
+        square.setMaxSize(size, size);
+        
+        String hexColor = EntityRes.CharSheet.getColorHex(colorIndex);
+        
+        square.setStyle(String.format(
+            "-fx-background-color: %s; " +
+            "-fx-background-radius: 4; " +
+            "-fx-border-color: #505052; " +
+            "-fx-border-radius: 4; " +
+            "-fx-border-width: 1;",
+            hexColor
+        ));
+        
+        return square;
+    }
+
+    /**
+     * Draw a terrain sprite on a canvas GraphicsContext.
+     * Sprites are scaled to fit the cell while preserving aspect ratio.
+     */
+    public static void drawTerrainSpriteOnCanvas(GraphicsContext gc, Objects.TerrainObject terrain,
+            double x, double y, double cellSize) {
+        Image sprite = loadSprite(terrain.getSpritePath());
+        
+        if (sprite != null) {
+            // Scale to fit cell while preserving aspect ratio
+            double spriteWidth = sprite.getWidth();
+            double spriteHeight = sprite.getHeight();
+            double scale = Math.min(cellSize / spriteWidth, cellSize / spriteHeight);
+            double drawWidth = spriteWidth * scale;
+            double drawHeight = spriteHeight * scale;
+            double drawX = x + (cellSize - drawWidth) / 2;
+            double drawY = y + (cellSize - drawHeight) / 2;
+            gc.drawImage(sprite, drawX, drawY, drawWidth, drawHeight);
+        } else {
+            // Fallback to colored square
+            java.awt.Color awtColor = terrain.getDisplayColor();
+            Color fxColor = Color.rgb(awtColor.getRed(), awtColor.getGreen(), awtColor.getBlue());
+            gc.setFill(fxColor);
+            gc.fillRoundRect(x + 2, y + 2, cellSize - 4, cellSize - 4, 4, 4);
+            gc.setStroke(Color.web("#505052"));
+            gc.setLineWidth(1);
+            gc.strokeRoundRect(x + 2, y + 2, cellSize - 4, cellSize - 4, 4, 4);
+        }
     }
 }
