@@ -6,6 +6,9 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.scene.paint.Color;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -35,9 +38,12 @@ public class CharacterSheetPane extends BorderPane {
     private Label itvBase, itvTemp, itvTotal;
     private Label mobBase, mobTemp, mobTotal;
     
-    private TextArea consumablesTab;
-    private TextArea craftingTab;
-    private TextArea keyItemsTab;
+    private ListView<Item> consumablesList;
+    private ListView<Item> craftingList;
+    private ListView<Item> keyItemsList;
+    private ObservableList<Item> consumablesData;
+    private ObservableList<Item> craftingData;
+    private ObservableList<Item> keyItemsData;
 
     public CharacterSheetPane(CharSheet sheet) {
         this.sheet = sheet;
@@ -349,32 +355,275 @@ public class CharacterSheetPane extends BorderPane {
     }
 
     private TitledPane createInventorySection() {
+        VBox inventoryBox = new VBox(10);
+        
+        // Add Item button at top
+        HBox buttonBar = new HBox(10);
+        buttonBar.setAlignment(Pos.CENTER_LEFT);
+        Button addItemBtn = new Button("+ Add Item");
+        addItemBtn.getStyleClass().add("styled-button");
+        addItemBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-weight: bold;");
+        addItemBtn.setOnAction(e -> showAddItemDialog());
+        buttonBar.getChildren().add(addItemBtn);
+        
+        // Tab pane for item categories
         TabPane tabs = new TabPane();
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabs.setPrefHeight(200);
+        tabs.setPrefHeight(180);
         tabs.getStyleClass().add("styled-tab-pane");
         
-        consumablesTab = new TextArea();
-        consumablesTab.setEditable(false);
-        consumablesTab.getStyleClass().add("styled-text-area");
-        Tab consumables = new Tab("Consumables/Ammo", new ScrollPane(consumablesTab));
+        // Consumables/Ammo tab
+        consumablesData = FXCollections.observableArrayList();
+        consumablesList = createItemListView(consumablesData);
+        Tab consumablesTab = new Tab("Consumables/Ammo", consumablesList);
         
-        craftingTab = new TextArea();
-        craftingTab.setEditable(false);
-        craftingTab.getStyleClass().add("styled-text-area");
-        Tab crafting = new Tab("Crafting", new ScrollPane(craftingTab));
+        // Crafting tab
+        craftingData = FXCollections.observableArrayList();
+        craftingList = createItemListView(craftingData);
+        Tab craftingTab = new Tab("Crafting", craftingList);
         
-        keyItemsTab = new TextArea();
-        keyItemsTab.setEditable(false);
-        keyItemsTab.getStyleClass().add("styled-text-area");
-        Tab keyItems = new Tab("Key Items", new ScrollPane(keyItemsTab));
+        // Key Items tab
+        keyItemsData = FXCollections.observableArrayList();
+        keyItemsList = createItemListView(keyItemsData);
+        Tab keyItemsTab = new Tab("Key Items", keyItemsList);
         
-        tabs.getTabs().addAll(consumables, crafting, keyItems);
+        tabs.getTabs().addAll(consumablesTab, craftingTab, keyItemsTab);
         
-        TitledPane pane = new TitledPane("Inventory", tabs);
+        inventoryBox.getChildren().addAll(buttonBar, tabs);
+        
+        TitledPane pane = new TitledPane("Inventory", inventoryBox);
         pane.getStyleClass().add("form-section");
         pane.setCollapsible(false);
         return pane;
+    }
+
+    private ListView<Item> createItemListView(ObservableList<Item> items) {
+        ListView<Item> listView = new ListView<>(items);
+        listView.setStyle("-fx-background-color: #2d2d30; -fx-background: #2d2d30;");
+        listView.setPrefHeight(150);
+        listView.setPlaceholder(new Label("No items"));
+        
+        listView.setCellFactory(lv -> new ListCell<Item>() {
+            private final HBox container = new HBox(10);
+            private final Label nameLabel = new Label();
+            private final Label quantityLabel = new Label();
+            private final Region spacer = new Region();
+            private final Button removeBtn = new Button("×");
+            
+            {
+                container.setAlignment(Pos.CENTER_LEFT);
+                container.setPadding(new Insets(5, 10, 5, 10));
+                HBox.setHgrow(spacer, Priority.ALWAYS);
+                
+                nameLabel.setStyle("-fx-text-fill: #e0e0e0; -fx-font-weight: bold;");
+                quantityLabel.setStyle("-fx-text-fill: #888888; -fx-font-size: 11px;");
+                
+                removeBtn.setStyle("-fx-background-color: #d75f5f; -fx-text-fill: white; " +
+                    "-fx-font-weight: bold; -fx-padding: 2 8 2 8; -fx-cursor: hand;");
+                removeBtn.setOnAction(e -> {
+                    Item item = getItem();
+                    if (item != null) {
+                        showRemoveItemDialog(item);
+                    }
+                });
+                
+                container.getChildren().addAll(nameLabel, quantityLabel, spacer, removeBtn);
+            }
+            
+            @Override
+            protected void updateItem(Item item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    setStyle("-fx-background-color: transparent;");
+                } else {
+                    nameLabel.setText(item.getName());
+                    quantityLabel.setText("×" + item.getQuantity());
+                    setGraphic(container);
+                    setStyle("-fx-background-color: #383838; -fx-background-radius: 5;");
+                }
+            }
+        });
+        
+        return listView;
+    }
+
+    private void showAddItemDialog() {
+        Dialog<Item> dialog = new Dialog<>();
+        dialog.setTitle("Add Item");
+        dialog.setHeaderText("Select an item to add to inventory");
+        dialog.getDialogPane().getStylesheets().addAll(getScene().getStylesheets());
+        dialog.getDialogPane().setStyle("-fx-background-color: #2d2d30;");
+        
+        // Category selection
+        ComboBox<String> categoryCombo = new ComboBox<>();
+        categoryCombo.getItems().addAll("Consumable", "Ammunition", "Crafting Item", "Key Item");
+        categoryCombo.setPromptText("Select category");
+        categoryCombo.setPrefWidth(200);
+        categoryCombo.getStyleClass().add("styled-combo-box");
+        
+        // Item selection
+        ComboBox<String> itemCombo = new ComboBox<>();
+        itemCombo.setPromptText("Select item");
+        itemCombo.setPrefWidth(200);
+        itemCombo.getStyleClass().add("styled-combo-box");
+        itemCombo.setDisable(true);
+        
+        // Quantity spinner
+        Spinner<Integer> quantitySpinner = new Spinner<>(1, 999, 1);
+        quantitySpinner.setEditable(true);
+        quantitySpinner.setPrefWidth(100);
+        FormUtils.styleSpinner(quantitySpinner);
+        
+        // Update item list when category changes
+        categoryCombo.setOnAction(e -> {
+            itemCombo.getItems().clear();
+            ItemDatabase db = ItemDatabase.getInstance();
+            String category = categoryCombo.getValue();
+            if (category == null) return;
+            
+            switch (category) {
+                case "Consumable":
+                    itemCombo.getItems().addAll(db.getAllConsumables().keySet());
+                    break;
+                case "Ammunition":
+                    itemCombo.getItems().addAll(db.getAllAmmunition().keySet());
+                    break;
+                case "Crafting Item":
+                    itemCombo.getItems().addAll(db.getAllCraftingItems().keySet());
+                    break;
+                case "Key Item":
+                    itemCombo.getItems().addAll(db.getAllKeyItems().keySet());
+                    break;
+            }
+            itemCombo.setDisable(itemCombo.getItems().isEmpty());
+        });
+        
+        // Layout
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(15);
+        grid.setPadding(new Insets(20));
+        
+        Label catLabel = new Label("Category:");
+        catLabel.setStyle("-fx-text-fill: #e0e0e0;");
+        grid.add(catLabel, 0, 0);
+        grid.add(categoryCombo, 1, 0);
+        
+        Label itemLabel = new Label("Item:");
+        itemLabel.setStyle("-fx-text-fill: #e0e0e0;");
+        grid.add(itemLabel, 0, 1);
+        grid.add(itemCombo, 1, 1);
+        
+        Label qtyLabel = new Label("Quantity:");
+        qtyLabel.setStyle("-fx-text-fill: #e0e0e0;");
+        grid.add(qtyLabel, 0, 2);
+        grid.add(quantitySpinner, 1, 2);
+        
+        dialog.getDialogPane().setContent(grid);
+        
+        ButtonType addButton = new ButtonType("Add", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(addButton, ButtonType.CANCEL);
+        
+        // Disable Add button until item is selected
+        Node addBtn = dialog.getDialogPane().lookupButton(addButton);
+        addBtn.setDisable(true);
+        itemCombo.valueProperty().addListener((obs, old, val) -> addBtn.setDisable(val == null));
+        
+        dialog.setResultConverter(buttonType -> {
+            if (buttonType == addButton) {
+                String category = categoryCombo.getValue();
+                String itemName = itemCombo.getValue();
+                int quantity = quantitySpinner.getValue();
+                ItemDatabase db = ItemDatabase.getInstance();
+                
+                Item newItem = null;
+                switch (category) {
+                    case "Consumable":
+                        Consumable c = db.getConsumable(itemName);
+                        if (c != null) newItem = new Consumable(c.getName(), c.getType(), c.getColor(), c.getHealAmount(), c.getEffect());
+                        break;
+                    case "Ammunition":
+                        Ammunition a = db.getAmmunition(itemName);
+                        if (a != null) newItem = new Ammunition(a.getName(), a.getType(), a.getColor(), a.getDamageBonus(), a.getCompatibleWeaponType());
+                        break;
+                    case "Crafting Item":
+                        CraftingItem cr = db.getCraftingItem(itemName);
+                        if (cr != null) newItem = new CraftingItem(cr.getName(), cr.getType(), cr.getColor(), cr.getCraftingCategory(), cr.getDescription());
+                        break;
+                    case "Key Item":
+                        KeyItem k = db.getKeyItem(itemName);
+                        if (k != null) newItem = new KeyItem(k.getName(), k.getType(), k.getColor(), k.getDescription(), k.isQuestRelated());
+                        break;
+                }
+                if (newItem != null) {
+                    newItem.setQuantity(quantity);
+                }
+                return newItem;
+            }
+            return null;
+        });
+        
+        dialog.showAndWait().ifPresent(item -> {
+            sheet.addItem(item);
+            updateDisplay();
+        });
+    }
+
+    private void showRemoveItemDialog(Item item) {
+        if (item.getQuantity() == 1) {
+            // Just remove the item directly
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+            confirm.setTitle("Remove Item");
+            confirm.setHeaderText("Remove " + item.getName() + "?");
+            confirm.setContentText("This will remove the item from inventory.");
+            confirm.getDialogPane().setStyle("-fx-background-color: #2d2d30;");
+            confirm.showAndWait().ifPresent(response -> {
+                if (response == ButtonType.OK) {
+                    sheet.removeItem(item);
+                    updateDisplay();
+                }
+            });
+        } else {
+            // Show dialog to choose quantity to remove
+            Dialog<Integer> dialog = new Dialog<>();
+            dialog.setTitle("Remove Item");
+            dialog.setHeaderText("Remove " + item.getName());
+            dialog.getDialogPane().setStyle("-fx-background-color: #2d2d30;");
+            
+            Spinner<Integer> qtySpinner = new Spinner<>(1, item.getQuantity(), 1);
+            qtySpinner.setEditable(true);
+            qtySpinner.setPrefWidth(100);
+            FormUtils.styleSpinner(qtySpinner);
+            
+            Button removeAllBtn = new Button("Remove All");
+            removeAllBtn.setStyle("-fx-background-color: #d75f5f; -fx-text-fill: white;");
+            removeAllBtn.setOnAction(e -> qtySpinner.getValueFactory().setValue(item.getQuantity()));
+            
+            HBox content = new HBox(15);
+            content.setAlignment(Pos.CENTER_LEFT);
+            content.setPadding(new Insets(20));
+            Label qtyLabel = new Label("Quantity to remove:");
+            qtyLabel.setStyle("-fx-text-fill: #e0e0e0;");
+            content.getChildren().addAll(qtyLabel, qtySpinner, removeAllBtn);
+            
+            dialog.getDialogPane().setContent(content);
+            
+            ButtonType removeButton = new ButtonType("Remove", ButtonBar.ButtonData.OK_DONE);
+            dialog.getDialogPane().getButtonTypes().addAll(removeButton, ButtonType.CANCEL);
+            
+            dialog.setResultConverter(buttonType -> {
+                if (buttonType == removeButton) {
+                    return qtySpinner.getValue();
+                }
+                return null;
+            });
+            
+            dialog.showAndWait().ifPresent(qty -> {
+                sheet.removeItemQuantity(item, qty);
+                updateDisplay();
+            });
+        }
     }
 
     public void updateDisplay() {
@@ -467,25 +716,20 @@ public class CharacterSheetPane extends BorderPane {
         mobTemp.setText(String.valueOf(sheet.getTempAttribute(3)));
         mobTotal.setText(String.valueOf(sheet.getTotalAttribute(3)));
         
-        // Inventory
-        StringBuilder consumables = new StringBuilder();
-        StringBuilder crafting = new StringBuilder();
-        StringBuilder keyItems = new StringBuilder();
+        // Inventory - populate ListViews
+        consumablesData.clear();
+        craftingData.clear();
+        keyItemsData.clear();
         
         for (Item item : sheet.getInventory()) {
-            String entry = item.getName() + " (" + item.getQuantity() + ")\n";
             if (item instanceof Consumable || item instanceof Ammunition) {
-                consumables.append(entry);
+                consumablesData.add(item);
             } else if (item instanceof CraftingItem) {
-                crafting.append(entry);
+                craftingData.add(item);
             } else if (item instanceof KeyItem) {
-                keyItems.append(entry);
+                keyItemsData.add(item);
             }
         }
-        
-        consumablesTab.setText(consumables.toString());
-        craftingTab.setText(crafting.toString());
-        keyItemsTab.setText(keyItems.toString());
         } finally {
             updatingDisplay = false;
         }

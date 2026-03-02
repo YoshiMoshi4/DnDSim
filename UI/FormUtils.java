@@ -29,90 +29,6 @@ public class FormUtils {
     // ==================== STYLED TEXT FIELDS ====================
     
     /**
-     * Creates a styled text field with floating label effect.
-     */
-    public static VBox createFloatingTextField(String labelText, String initialValue, Consumer<String> onChange) {
-        VBox container = new VBox(2);
-        container.getStyleClass().add("floating-field-container");
-        
-        Label floatingLabel = new Label(labelText);
-        floatingLabel.getStyleClass().add("floating-label");
-        floatingLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #888;");
-        
-        TextField field = new TextField(initialValue != null ? initialValue : "");
-        field.getStyleClass().add("styled-text-field");
-        field.setPromptText(labelText);
-        
-        // Animate label on focus
-        field.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
-            if (isFocused || !field.getText().isEmpty()) {
-                animateLabelUp(floatingLabel, true);
-            } else {
-                animateLabelUp(floatingLabel, false);
-            }
-            
-            if (!isFocused && onChange != null) {
-                onChange.accept(field.getText());
-            }
-        });
-        
-        // Initial state
-        if (initialValue != null && !initialValue.isEmpty()) {
-            animateLabelUp(floatingLabel, true);
-        }
-        
-        container.getChildren().addAll(floatingLabel, field);
-        return container;
-    }
-    
-    /**
-     * Creates a text field with built-in validation.
-     */
-    public static HBox createValidatedTextField(String labelText, String initialValue, 
-            Predicate<String> validator, String errorMessage, Consumer<String> onChange) {
-        
-        HBox container = new HBox(8);
-        container.setAlignment(Pos.CENTER_LEFT);
-        
-        Label label = new Label(labelText);
-        label.getStyleClass().add("form-label");
-        label.setMinWidth(80);
-        
-        TextField field = new TextField(initialValue != null ? initialValue : "");
-        field.getStyleClass().add("styled-text-field");
-        field.setPrefWidth(150);
-        HBox.setHgrow(field, Priority.ALWAYS);
-        
-        Label validationIcon = new Label();
-        validationIcon.setMinWidth(20);
-        
-        Label errorLabel = new Label(errorMessage);
-        errorLabel.getStyleClass().add("error-label");
-        errorLabel.setStyle("-fx-text-fill: #F44336; -fx-font-size: 10px;");
-        errorLabel.setVisible(false);
-        errorLabel.setManaged(false);
-        
-        // Validation on text change
-        field.textProperty().addListener((obs, oldVal, newVal) -> {
-            boolean isValid = validator == null || validator.test(newVal);
-            updateValidationState(field, validationIcon, errorLabel, isValid);
-        });
-        
-        // Save on focus lost
-        field.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
-            if (!isFocused && onChange != null) {
-                boolean isValid = validator == null || validator.test(field.getText());
-                if (isValid) {
-                    onChange.accept(field.getText());
-                }
-            }
-        });
-        
-        container.getChildren().addAll(label, field, validationIcon);
-        return container;
-    }
-    
-    /**
      * Creates a simple styled text field.
      */
     public static TextField createStyledTextField(String promptText, String initialValue, int prefWidth) {
@@ -542,48 +458,6 @@ public class FormUtils {
     
     // ==================== PRIVATE HELPERS ====================
     
-    private static void animateLabelUp(Label label, boolean up) {
-        double targetY = up ? -8 : 0;
-        double targetScale = up ? 0.85 : 1.0;
-        
-        TranslateTransition translate = new TranslateTransition(Duration.millis(150), label);
-        translate.setToY(targetY);
-        
-        ScaleTransition scale = new ScaleTransition(Duration.millis(150), label);
-        scale.setToX(targetScale);
-        scale.setToY(targetScale);
-        
-        ParallelTransition parallel = new ParallelTransition(translate, scale);
-        parallel.play();
-        
-        // Change color
-        if (up) {
-            label.setStyle("-fx-font-size: 10px; -fx-text-fill: #7289DA;");
-        } else {
-            label.setStyle("-fx-font-size: 10px; -fx-text-fill: #888;");
-        }
-    }
-    
-    private static void updateValidationState(TextField field, Label icon, Label errorLabel, boolean isValid) {
-        if (isValid) {
-            field.getStyleClass().remove("invalid");
-            if (!field.getStyleClass().contains("valid")) {
-                field.getStyleClass().add("valid");
-            }
-            icon.setGraphic(createCheckIcon());
-            errorLabel.setVisible(false);
-            errorLabel.setManaged(false);
-        } else {
-            field.getStyleClass().remove("valid");
-            if (!field.getStyleClass().contains("invalid")) {
-                field.getStyleClass().add("invalid");
-            }
-            icon.setGraphic(createErrorIcon());
-            errorLabel.setVisible(true);
-            errorLabel.setManaged(true);
-        }
-    }
-    
     private static void pulseButton(Button btn) {
         ScaleTransition pulse = new ScaleTransition(Duration.millis(100), btn);
         pulse.setFromX(1.0);
@@ -616,28 +490,6 @@ public class FormUtils {
         svg.setStrokeWidth(2);
         svg.setScaleX(0.5);
         svg.setScaleY(0.5);
-        return svg;
-    }
-    
-    private static Node createCheckIcon() {
-        SVGPath svg = new SVGPath();
-        svg.setContent("M5 13l4 4L19 7");
-        svg.setFill(Color.TRANSPARENT);
-        svg.setStroke(Color.web("#4CAF50"));
-        svg.setStrokeWidth(2);
-        svg.setScaleX(0.6);
-        svg.setScaleY(0.6);
-        return svg;
-    }
-    
-    private static Node createErrorIcon() {
-        SVGPath svg = new SVGPath();
-        svg.setContent("M12 9v4m0 4h.01M12 2a10 10 0 100 20 10 10 0 000-20z");
-        svg.setFill(Color.TRANSPARENT);
-        svg.setStroke(Color.web("#F44336"));
-        svg.setStrokeWidth(1.5);
-        svg.setScaleX(0.6);
-        svg.setScaleY(0.6);
         return svg;
     }
     

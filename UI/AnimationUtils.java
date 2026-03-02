@@ -16,9 +16,7 @@ public class AnimationUtils {
     // Default durations
     private static final Duration BUTTON_HOVER_DURATION = Duration.millis(100);
     private static final Duration PROGRESS_BAR_DURATION = Duration.millis(300);
-    private static final Duration FADE_DURATION = Duration.millis(200);
     private static final Duration SLIDE_DURATION = Duration.millis(250);
-    private static final Duration PULSE_DURATION = Duration.millis(150);
 
     /**
      * Adds hover animation to a button (scale up + glow effect).
@@ -72,65 +70,6 @@ public class AnimationUtils {
             )
         );
         timeline.play();
-    }
-
-    /**
-     * Fades a node in (opacity 0 -> 1).
-     */
-    public static void fadeIn(Node node) {
-        fadeIn(node, FADE_DURATION);
-    }
-
-    /**
-     * Fades a node in with custom duration.
-     */
-    public static void fadeIn(Node node, Duration duration) {
-        node.setOpacity(0);
-        FadeTransition fade = new FadeTransition(duration, node);
-        fade.setFromValue(0);
-        fade.setToValue(1);
-        fade.play();
-    }
-
-    /**
-     * Fades a node out (opacity 1 -> 0).
-     */
-    public static FadeTransition fadeOut(Node node) {
-        return fadeOut(node, FADE_DURATION);
-    }
-
-    /**
-     * Fades a node out with custom duration.
-     */
-    public static FadeTransition fadeOut(Node node, Duration duration) {
-        FadeTransition fade = new FadeTransition(duration, node);
-        fade.setFromValue(1);
-        fade.setToValue(0);
-        fade.play();
-        return fade;
-    }
-
-    /**
-     * Plays a quick pulse animation (scale up then down) to draw attention.
-     */
-    public static void pulse(Node node) {
-        pulse(node, 1.1);
-    }
-
-    /**
-     * Plays a pulse animation with custom scale factor.
-     */
-    public static void pulse(Node node, double scaleFactor) {
-        ScaleTransition scaleUp = new ScaleTransition(PULSE_DURATION, node);
-        scaleUp.setToX(scaleFactor);
-        scaleUp.setToY(scaleFactor);
-
-        ScaleTransition scaleDown = new ScaleTransition(PULSE_DURATION, node);
-        scaleDown.setToX(1.0);
-        scaleDown.setToY(1.0);
-
-        SequentialTransition pulse = new SequentialTransition(scaleUp, scaleDown);
-        pulse.play();
     }
 
     /**
@@ -189,29 +128,6 @@ public class AnimationUtils {
             timeline.setOnFinished(e -> onFinished.run());
         }
         
-        timeline.play();
-    }
-
-    /**
-     * Creates a highlight effect animation (for selected items, current turns, etc.)
-     * Uses smooth easing for a polished look.
-     */
-    public static void highlightPulse(Node node, Color highlightColor) {
-        DropShadow glow = new DropShadow();
-        glow.setColor(highlightColor);
-        glow.setRadius(0);
-        glow.setSpread(0.4);
-        
-        node.setEffect(glow);
-        
-        Timeline timeline = new Timeline(
-            new KeyFrame(Duration.ZERO, 
-                new KeyValue(glow.radiusProperty(), 0, Interpolator.EASE_OUT)),
-            new KeyFrame(Duration.millis(400), 
-                new KeyValue(glow.radiusProperty(), 12, Interpolator.EASE_OUT)),
-            new KeyFrame(Duration.millis(800), 
-                new KeyValue(glow.radiusProperty(), 8, Interpolator.EASE_BOTH))
-        );
         timeline.play();
     }
 

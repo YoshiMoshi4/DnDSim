@@ -428,40 +428,12 @@ public class CharSheet {
 
     public void equipPrimaryWeapon(Weapon newWeapon) {
         weapons[PRIMARY] = newWeapon;
-        // For when inventory is properly implemented
-        // int temp = indexInInventory(newWeapon);
-        // if (temp == -1) {
-        //     // Temp exception
-        //     System.out.println("notInInventory Error");
-        // } else if (weapons[PRIMARY] == null) {
-        //     weapons[PRIMARY] = (Weapon) inventory.get(temp);
-        //     inventory.remove(temp);
-        // } else {
-        //     inventory.add(weapons[PRIMARY]);
-        //     weapons[PRIMARY] = (Weapon) inventory.get(temp);
-        //     inventory.remove(temp);
-        // }
         updateAttributes();
         this.save();
-
     }
 
     public void equipSecondaryWeapon(Weapon newWeapon) {
         weapons[SECONDARY] = newWeapon;
-        // For when inventory is properly implemented
-        // int temp = indexInInventory(newWeapon);
-        // if (temp == -1) {
-        //     // Temp exception
-        //     System.out.println("notInInventory Error");
-        // } else if (weapons[SECONDARY] == null) {
-        //     weapons[SECONDARY] = (Weapon) inventory.get(temp);
-        //     inventory.remove(temp);
-        // } else {
-        //     inventory.add(weapons[SECONDARY]);
-        //     weapons[SECONDARY] = (Weapon) inventory.get(temp);
-        //     inventory.remove(temp);
-        // }
-        // Secondary weapon doesn't affect primary stats, but keep for consistency
         this.save();
     }
 
@@ -494,66 +466,18 @@ public class CharSheet {
 
     public void equipHead(Armor newArmor) {
         armor[HEAD] = newArmor;
-        // For when inventory is properly implemented
-        // int temp = indexInInventory(newArmor);
-        // if (temp == -1) {
-        //     // Temp exception
-        //     System.out.println("notInInventory Error");
-        // }
-        // if (newArmor.getArmorType() == HEAD) {
-        //     if (armor[HEAD] == null) {
-        //         armor[HEAD] = (Armor) inventory.get(temp);
-        //         inventory.remove(temp);
-        //     } else {
-        //         inventory.add(armor[HEAD]);
-        //         armor[HEAD] = (Armor) inventory.get(temp);
-        //         inventory.remove(temp);
-        //     }
-        // }
         updateAttributes();
         this.save();
     }
 
     public void equipTorso(Armor newArmor) {
         armor[TORSO] = newArmor;
-        // For when inventory is properly implemented
-        // int temp = indexInInventory(newArmor);
-        // if (temp == -1) {
-        //     // Temp exception
-        //     System.out.println("notInInventory Error");
-        // }
-        // if (newArmor.getArmorType() == TORSO) {
-        //     if (armor[TORSO] == null) {
-        //         armor[TORSO] = (Armor) inventory.get(temp);
-        //         inventory.remove(temp);
-        //     } else {
-        //         inventory.add(armor[TORSO]);
-        //         armor[TORSO] = (Armor) inventory.get(temp);
-        //         inventory.remove(temp);
-        //     }
-        // }
         updateAttributes();
         this.save();
     }
 
     public void equipLegs(Armor newArmor) {
         armor[LEGS] = newArmor;
-        // For when inventory is properly implemented
-        // int temp = indexInInventory(newArmor);
-        // if (temp == -1) {
-        //     // Temp exception
-        //     System.out.println("notInInventory Error");
-        // }
-        // if (newArmor.getArmorType() == LEGS) {
-        //     if (armor[LEGS] == null) {
-        //         armor[LEGS] = (Armor) inventory.get(temp);
-        //         inventory.remove(temp);
-        //     } else {
-        //         inventory.add(armor[LEGS]);
-        //         armor[LEGS] = (Armor) inventory.get(temp);
-        //         inventory.remove(temp);
-        //     }
-        // }
         updateAttributes();
         this.save();
     }
@@ -672,6 +596,56 @@ public class CharSheet {
 
     public ArrayList<Item> getInventory() {
         return inventory;
+    }
+
+    /**
+     * Add an item to the inventory. If an identical item already exists (by name and type),
+     * increase its quantity instead of adding a duplicate.
+     */
+    public void addItem(Item item) {
+        if (item == null) return;
+        
+        // Check if item already exists in inventory (stack by name)
+        for (Item existing : inventory) {
+            if (existing.getName().equals(item.getName()) && 
+                existing.getClass().equals(item.getClass())) {
+                existing.addQuantity(item.getQuantity());
+                save();
+                return;
+            }
+        }
+        
+        // Item doesn't exist, add as new
+        inventory.add(item);
+        save();
+    }
+
+    /**
+     * Remove an item from the inventory completely.
+     */
+    public void removeItem(Item item) {
+        if (item == null) return;
+        inventory.remove(item);
+        save();
+    }
+
+    /**
+     * Remove a specific quantity of an item. If quantity becomes 0 or less, remove the item entirely.
+     */
+    public void removeItemQuantity(Item item, int quantity) {
+        if (item == null) return;
+        
+        for (Item existing : inventory) {
+            if (existing.getName().equals(item.getName()) && 
+                existing.getClass().equals(item.getClass())) {
+                existing.addQuantity(-quantity);
+                if (existing.getQuantity() <= 0) {
+                    inventory.remove(existing);
+                }
+                save();
+                return;
+            }
+        }
     }
 
     public int getWallet() {

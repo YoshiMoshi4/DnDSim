@@ -161,34 +161,6 @@ public class IconUtils {
         return wrapper;
     }
 
-    /**
-     * Creates a colored icon with glow effect (for highlighted states).
-     */
-    public static Node createGlowIcon(Icon icon, double size, String colorHex) {
-        String pathData = getPathData(icon);
-        SVGPath svgPath = new SVGPath();
-        svgPath.setContent(pathData);
-        svgPath.setFill(Color.web(colorHex));
-        
-        // Add glow effect
-        javafx.scene.effect.DropShadow glow = new javafx.scene.effect.DropShadow();
-        glow.setColor(Color.web(colorHex));
-        glow.setRadius(8);
-        glow.setSpread(0.4);
-        svgPath.setEffect(glow);
-        
-        double scale = size / 24.0;
-        svgPath.setScaleX(scale);
-        svgPath.setScaleY(scale);
-        
-        StackPane wrapper = new StackPane(svgPath);
-        wrapper.setMinSize(size, size);
-        wrapper.setPrefSize(size, size);
-        wrapper.setMaxSize(size, size);
-        
-        return wrapper;
-    }
-
     private static String getPathData(Icon icon) {
         return switch (icon) {
             case SWORDS -> SWORDS_PATH;
@@ -228,44 +200,9 @@ public class IconUtils {
     // ===== CONVENIENCE METHODS FOR COMMON USE CASES =====
 
     /**
-     * Creates a button-sized icon (24px).
-     */
-    public static Node buttonIcon(Icon icon) {
-        return createIcon(icon, 24);
-    }
-
-    /**
-     * Creates a button-sized icon with custom color.
-     */
-    public static Node buttonIcon(Icon icon, String colorHex) {
-        return createIcon(icon, 24, colorHex);
-    }
-
-    /**
      * Creates a small icon for inline use (16px).
      */
     public static Node smallIcon(Icon icon) {
         return createIcon(icon, 16);
-    }
-
-    /**
-     * Creates a large icon for headers/titles (32px).
-     */
-    public static Node largeIcon(Icon icon) {
-        return createIcon(icon, 32);
-    }
-
-    /**
-     * Creates an extra-large icon for main menu (48px).
-     */
-    public static Node heroIcon(Icon icon) {
-        return createIcon(icon, 48);
-    }
-
-    /**
-     * Creates a hero icon with custom color.
-     */
-    public static Node heroIcon(Icon icon, String colorHex) {
-        return createIcon(icon, 48, colorHex);
     }
 }
