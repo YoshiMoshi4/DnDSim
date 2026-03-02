@@ -193,8 +193,7 @@ public class BattleView {
         addObjBtn.getStyleClass().add("button");
         addObjBtn.setPrefSize(140, 40);
         addObjBtn.setOnAction(e -> toggleAddObjectsPanel());
-        // Disable add objects during battle
-        addObjBtn.disableProperty().bind(battleState.battleStartedProperty());
+        // Objects can now be placed during battle
 
         battleToggleBtn = new Button();
         battleToggleBtn.setPrefSize(150, 40);
@@ -349,9 +348,34 @@ public class BattleView {
                     entity.getCharSheet().save();
                 }
             }
+            
+            // Check if this is a victory (enemies were defeated or no enemies remain)
+            boolean isVictory = grid.getEnemies().isEmpty() || battleState.getEnemiesDefeated() > 0;
+            
+            if (isVictory) {
+                // Show victory screen
+                showVictoryScreen();
+            } else {
+                // Direct return (retreat/cancel)
+                sheetView.endBattle();
+                appController.returnFromBattle();
+            }
+        }
+    }
+    
+    /**
+     * Display the Final Fantasy-style victory screen.
+     */
+    private void showVictoryScreen() {
+        VictoryView victoryView = new VictoryView(grid.getEntities(), () -> {
+            // On continue - remove victory screen and return from battle
+            root.getChildren().removeIf(n -> n instanceof VictoryView);
             sheetView.endBattle();
             appController.returnFromBattle();
-        }
+        });
+        
+        root.getChildren().add(victoryView);
+        victoryView.playEntranceAnimation();
     }
 
     private ScrollPane createPartyPanel() {
@@ -360,12 +384,20 @@ public class BattleView {
         content.getStyleClass().add("panel");
 
         ArrayList<SheetButton> sheets = sheetView.getSheets();
-        boolean hasParty = false;
+        boolean hasAvailableParty = false;
 
         for (SheetButton sheetBtn : sheets) {
             if (sheetBtn.getSheet().getCharSheet().getParty()) {
-                hasParty = true;
                 CharSheet cs = sheetBtn.getSheet().getCharSheet();
+                
+                // Skip characters already on the field
+                boolean alreadyOnField = grid.getEntities().stream()
+                    .anyMatch(entity -> entity.getCharSheet().getName().equals(cs.getName()));
+                if (alreadyOnField) {
+                    continue;
+                }
+                
+                hasAvailableParty = true;
                 
                 // Create a card-style button for party members
                 HBox card = createEntitySelectionCard(cs, true);
@@ -376,12 +408,14 @@ public class BattleView {
                     addEntity(newEntity);
                     gridCanvas.redraw();
                     addStatusLabel.setText("Added: " + sheetBtn.getText());
+                    // Refresh the panel to remove the added character
+                    refreshAddObjectsPanels();
                 });
                 content.getChildren().add(card);
             }
         }
 
-        if (!hasParty) {
+        if (!hasAvailableParty) {
             Label empty = new Label("No party characters available");
             empty.setStyle("-fx-text-fill: #808080;");
             content.getChildren().add(empty);

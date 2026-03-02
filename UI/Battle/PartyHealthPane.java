@@ -1,8 +1,8 @@
 package UI.Battle;
 
 import Objects.Entity;
-import UI.AnimationUtils;
 import UI.IconUtils;
+import UI.SpriteUtils;
 import javafx.beans.binding.Bindings;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -25,7 +25,6 @@ import java.util.Map;
 public class PartyHealthPane extends VBox {
 
     private final Map<Entity, EntityHealthBinding> healthBindings = new HashMap<>();
-    private final Map<Entity, ProgressBar> healthBars = new HashMap<>();
     private final VBox membersContainer;
 
     public PartyHealthPane() {
@@ -65,7 +64,6 @@ public class PartyHealthPane extends VBox {
     public void updateParty(List<Entity> partyMembers) {
         membersContainer.getChildren().clear();
         healthBindings.clear();
-        healthBars.clear();
 
         for (Entity member : partyMembers) {
             if (member.isParty()) {
@@ -87,15 +85,8 @@ public class PartyHealthPane extends VBox {
             
             EntityHealthBinding binding = healthBindings.get(member);
             if (binding != null) {
-                double oldRatio = binding.getHealthRatio();
+                // Refresh the binding - this automatically updates the bound progress bar
                 binding.refresh();
-                double newRatio = binding.getHealthRatio();
-                
-                // Animate the progress bar if ratio changed
-                ProgressBar bar = healthBars.get(member);
-                if (bar != null && Math.abs(oldRatio - newRatio) > 0.001) {
-                    AnimationUtils.animateProgressBar(bar, Math.max(0, Math.min(1, newRatio)));
-                }
             }
         }
     }
@@ -120,8 +111,9 @@ public class PartyHealthPane extends VBox {
         HBox topRow = new HBox(8);
         topRow.setAlignment(Pos.CENTER_LEFT);
 
-        // Small icon indicating party member
-        topRow.getChildren().add(IconUtils.createIcon(IconUtils.Icon.PERSON, 14, "#4CAF50"));
+        // Character sprite or fallback icon
+        javafx.scene.Node sprite = SpriteUtils.createCharacterSprite(member.getCharSheet(), 20);
+        topRow.getChildren().add(sprite);
 
         Label nameLabel = new Label(truncateName(member.getName(), 12));
         nameLabel.setStyle("-fx-text-fill: #dcdcdc; -fx-font-size: 12px; -fx-font-weight: bold;");
@@ -141,7 +133,6 @@ public class PartyHealthPane extends VBox {
         hpBar.setPrefHeight(12);
         hpBar.setMaxWidth(Double.MAX_VALUE);
         hpBar.getStyleClass().add("hp-bar");
-        healthBars.put(member, hpBar);
         
         // Update bar color when health status changes
         binding.healthStatusProperty().addListener((obs, oldStatus, newStatus) -> {

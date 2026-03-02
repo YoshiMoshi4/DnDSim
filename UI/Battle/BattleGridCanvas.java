@@ -3,6 +3,7 @@ package UI.Battle;
 import EntityRes.*;
 import Objects.*;
 import UI.NotificationPane;
+import UI.SpriteUtils;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
@@ -550,6 +551,7 @@ public class BattleGridCanvas extends Pane {
                     grid.removeEnemy(targetEnemy);
                     turnManager.removeEnemy(targetEnemy);
                     combatLogPane.logDefeat(targetEnemy.getName());
+                    battleView.getBattleState().incrementEnemiesDefeated();
                 }
                 attackMode = false;
                 attackingEntity = null;
@@ -579,7 +581,7 @@ public class BattleGridCanvas extends Pane {
         if (attackMode && attackingEnemy != null) {
             if (clicked instanceof Entity target) {
                 int damage = Math.max(0, attackingEnemy.getAttackPower() - target.getDefense());
-                attackingEnemy.attack(target);
+                target.takeDamage(damage);
                 combatLogPane.logAttack(attackingEnemy.getName(), target.getName(), 
                     damage, target.getHealth(), target.getCharSheet().getTotalHP());
                 if (target.isDead()) {
@@ -594,13 +596,14 @@ public class BattleGridCanvas extends Pane {
                 return;
             } else if (clicked instanceof Enemy targetEnemy && targetEnemy != attackingEnemy) {
                 int damage = attackingEnemy.getAttackPower();
-                attackingEnemy.attack(targetEnemy);
+                targetEnemy.takeDamage(damage);
                 combatLogPane.logAttack(attackingEnemy.getName(), targetEnemy.getName(), 
                     damage, targetEnemy.getHealth(), targetEnemy.getMaxHealth());
                 if (targetEnemy.isDead()) {
                     grid.removeEnemy(targetEnemy);
                     turnManager.removeEnemy(targetEnemy);
                     combatLogPane.logDefeat(targetEnemy.getName());
+                    battleView.getBattleState().incrementEnemiesDefeated();
                 }
                 attackMode = false;
                 attackingEnemy = null;
@@ -845,12 +848,19 @@ public class BattleGridCanvas extends Pane {
 
         // Entities
         for (Entity e : grid.getEntities()) {
-            java.awt.Color awtColor = e.getCharSheet().getDisplayColor();
-            gc.setFill(Color.rgb(awtColor.getRed(), awtColor.getGreen(), awtColor.getBlue()));
-
             double x = offsetX + e.getCol() * cellSize;
             double y = offsetY + e.getRow() * cellSize;
-            gc.fillOval(x + 4, y + 4, cellSize - 8, cellSize - 8);
+            double spriteSize = cellSize - 8;
+            double centerX = x + cellSize / 2;
+            double centerY = y + cellSize / 2;
+            
+            // Get fallback color
+            java.awt.Color awtColor = e.getCharSheet().getDisplayColor();
+            Color fallbackColor = Color.rgb(awtColor.getRed(), awtColor.getGreen(), awtColor.getBlue());
+            
+            // Draw sprite or fallback
+            SpriteUtils.drawSpriteOnCanvas(gc, e.getCharSheet().getSpritePath(), 
+                centerX, centerY, spriteSize, fallbackColor, true);
 
             if (e == selectedObject) {
                 gc.setStroke(Color.ORANGE);
@@ -864,13 +874,24 @@ public class BattleGridCanvas extends Pane {
 
         // Enemies
         for (Enemy en : grid.getEnemies()) {
-            Color enemyColor = getEnemyColor(en.getColor());
-            gc.setFill(enemyColor);
-
             double x = offsetX + en.getCol() * cellSize;
             double y = offsetY + en.getRow() * cellSize;
-            // Draw enemies as diamonds/squares rotated 45 degrees to distinguish from entities
-            gc.fillRect(x + 4, y + 4, cellSize - 8, cellSize - 8);
+            double spriteSize = cellSize - 8;
+            double centerX = x + cellSize / 2;
+            double centerY = y + cellSize / 2;
+            
+            // Get fallback color
+            Color fallbackColor = getEnemyColor(en.getColor());
+            
+            // Draw sprite or fallback (enemies use squares as fallback)
+            String spritePath = en.getSpritePath();
+            if (spritePath != null && SpriteUtils.spriteExists(spritePath)) {
+                SpriteUtils.drawSpriteOnCanvas(gc, spritePath, centerX, centerY, spriteSize, fallbackColor, false);
+            } else {
+                // Fallback to colored square for enemies
+                gc.setFill(fallbackColor);
+                gc.fillRect(x + 4, y + 4, cellSize - 8, cellSize - 8);
+            }
 
             if (en == selectedObject) {
                 gc.setStroke(Color.ORANGE);

@@ -15,6 +15,7 @@ public class Enemy extends GridObject {
     private int color;
     private int instanceNumber = 0;
     private String baseName;
+    private String spritePath; // Path to enemy sprite image (e.g., "sprites/enemies/spider.png")
 
     public Enemy(int row, int col, String name, int maxHealth, int mobility, int attackDamage, int initiative, int color) {
         super(row, col);
@@ -39,6 +40,7 @@ public class Enemy extends GridObject {
         this.attackDamage = template.attackDamage;
         this.initiative = template.initiative;
         this.color = template.color;
+        this.spritePath = template.spritePath;
     }
 
     public void attack(Entity target) {
@@ -88,6 +90,14 @@ public class Enemy extends GridObject {
 
     public int getColor() {
         return color;
+    }
+
+    public void setSpritePath(String spritePath) {
+        this.spritePath = spritePath;
+    }
+
+    public String getSpritePath() {
+        return spritePath;
     }
 
     public void setInstanceNumber(int number) {

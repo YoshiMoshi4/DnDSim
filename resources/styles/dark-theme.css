@@ -1933,3 +1933,44 @@
 .hidden-scrollbar:hover .scroll-bar {
     -fx-opacity: 1;
 }
+
+/* ===== VICTORY SCREEN STYLES ===== */
+.victory-overlay {
+    -fx-background-color: rgba(0, 0, 0, 0.9);
+}
+
+.victory-title {
+    -fx-font-size: 48px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #FFD700;
+    -fx-effect: dropshadow(gaussian, rgba(255, 215, 0, 0.6), 20, 0.4, 0, 0);
+}
+
+.victory-quote {
+    -fx-font-size: 16px;
+    -fx-font-style: italic;
+    -fx-text-fill: #c0a060;
+}
+
+.victory-panel {
+    -fx-background-color: rgba(45, 45, 48, 0.9);
+    -fx-background-radius: 12;
+    -fx-border-color: #505052;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 15, 0, 0, 5);
+}
+
+.victory-party-row {
+    -fx-background-color: linear-gradient(to right, #2d3530, #283028);
+    -fx-background-radius: 6;
+    -fx-border-color: #3c4540;
+    -fx-border-radius: 6;
+    -fx-border-width: 1;
+    -fx-padding: 8 12;
+}
+
+.victory-party-row:hover {
+    -fx-background-color: linear-gradient(to right, #353d38, #303830);
+    -fx-border-color: #4CAF50;
+}

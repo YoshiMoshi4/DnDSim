@@ -11,6 +11,7 @@ public class CharSheet {
     private String characterClass;
     private int color; // 0-15 representing different colors
     private boolean isParty;
+    private String spritePath; // Path to character sprite image (e.g., "sprites/party/henry.png")
 
     // HP and Statuses
     private int totalHP;
@@ -107,6 +108,15 @@ public class CharSheet {
 
     public boolean getParty() {
         return isParty;
+    }
+
+    public void setSpritePath(String spritePath) {
+        this.spritePath = spritePath;
+        this.save();
+    }
+
+    public String getSpritePath() {
+        return spritePath;
     }
 
     public void setColor(int color) {
@@ -234,6 +244,12 @@ public class CharSheet {
         }
     }
 
+    public void addStatusWithoutSave(Status newStatus) {
+        if (!isInStatus(newStatus)) {
+            status.add(newStatus);
+        }
+    }
+
     public Status removeStatus(Status statusToRemove) {
         Status ans = new Status("temp");
         if (isInStatus(statusToRemove)) {
@@ -247,9 +263,20 @@ public class CharSheet {
         return ans;
     }
 
+    public void removeStatusWithoutSave(Status statusToRemove) {
+        int idx = indexInStatus(statusToRemove);
+        if (idx != -1) {
+            status.remove(idx);
+        }
+    }
+
     public void clearStatus() {
         status.clear();
         this.save();
+    }
+
+    public void clearStatusWithoutSave() {
+        status.clear();
     }
 
     public Status[] getStatus() {
@@ -628,9 +655,8 @@ public class CharSheet {
     }
 
     private int indexInStatus(Status stat) {
-        Status[] arr = (Status[]) status.toArray();
-        for (int i = 0; i < arr.length; i++) {
-            if (arr[i].getName().equals(stat.getName())) {
+        for (int i = 0; i < status.size(); i++) {
+            if (status.get(i).getName().equals(stat.getName())) {
                 return i;
             }
         }
@@ -688,6 +714,9 @@ public class CharSheet {
             }
             if (sheet.baseAttributes == null) {
                 sheet.baseAttributes = new int[4];
+            }
+            if (sheet.status == null) {
+                sheet.status = new ArrayList<Status>();
             }
             // Recalculate attributes in case they were corrupted
             sheet.updateAttributes();

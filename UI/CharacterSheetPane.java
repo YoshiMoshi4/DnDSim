@@ -2,8 +2,13 @@ package UI;
 
 import EntityRes.*;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class CharacterSheetPane extends BorderPane {
 
@@ -15,7 +20,8 @@ public class CharacterSheetPane extends BorderPane {
     private Spinner<Integer> currentHpSpinner;
     private Spinner<Integer> maxHpSpinner;
     private ProgressBar hpBar;
-    private ComboBox<String> statusCombo;
+    private MenuButton statusMenu;
+    private Map<String, CheckMenuItem> statusMenuItems;
     private ComboBox<String> colorCombo;
     
     private ComboBox<String> primaryWeapon;
@@ -60,6 +66,13 @@ public class CharacterSheetPane extends BorderPane {
     }
 
     private TitledPane createBasicInfoSection() {
+        HBox mainBox = new HBox(20);
+        mainBox.setAlignment(Pos.TOP_LEFT);
+        
+        // Sprite display on the left
+        VBox spriteBox = createSpriteSection();
+        
+        // Form fields on the right
         GridPane grid = FormUtils.createFormGrid(2);
         
         int row = 0;
@@ -136,23 +149,29 @@ public class CharacterSheetPane extends BorderPane {
         GridPane.setColumnSpan(hpBar, 2);
         row++;
         
-        // Status dropdown
+        // Status menu (supports multiple via checkable menu items)
         Label statusLabel = new Label("Status:");
         statusLabel.getStyleClass().add("form-label");
         grid.add(statusLabel, 0, row);
-        statusCombo = new ComboBox<>();
-        statusCombo.getItems().addAll(Status.AVAILABLE_STATUSES);
-        statusCombo.setPrefWidth(150);
-        statusCombo.getStyleClass().add("styled-combo-box");
-        statusCombo.setOnAction(e -> {
-            String selected = statusCombo.getValue();
-            sheet.clearStatus();
-            if (selected != null && !selected.equals("Neutral")) {
-                sheet.addStatus(new Status(selected));
-            }
-            sheet.save();
-        });
-        grid.add(statusCombo, 1, row++);
+        
+        statusMenu = new MenuButton("None");
+        statusMenu.setPrefWidth(150);
+        statusMenu.getStyleClass().add("styled-combo-box");
+        statusMenuItems = new HashMap<>();
+        
+        for (String statusName : Status.AVAILABLE_STATUSES) {
+            if (statusName.equals("Neutral")) continue; // Skip neutral - no selection means neutral
+            
+            CheckMenuItem item = new CheckMenuItem(statusName);
+            item.setOnAction(e -> {
+                if (updatingDisplay) return;
+                syncStatusesToSheet();
+                updateStatusMenuText();
+            });
+            statusMenuItems.put(statusName, item);
+            statusMenu.getItems().add(item);
+        }
+        grid.add(statusMenu, 1, row++);
         
         // Color
         Label colorLabel = new Label("Color:");
@@ -163,15 +182,79 @@ public class CharacterSheetPane extends BorderPane {
         colorCombo.setPrefWidth(150);
         colorCombo.getStyleClass().add("styled-combo-box");
         colorCombo.setOnAction(e -> {
+            if (updatingDisplay) return;
             sheet.setColor(colorCombo.getSelectionModel().getSelectedIndex());
             sheet.save();
         });
         grid.add(colorCombo, 1, row++);
         
-        TitledPane pane = new TitledPane("Basic Info", grid);
+        // Combine sprite and form
+        mainBox.getChildren().addAll(spriteBox, grid);
+        
+        TitledPane pane = new TitledPane("Basic Info", mainBox);
         pane.getStyleClass().add("form-section");
         pane.setCollapsible(false);
         return pane;
+    }
+    
+    /**
+     * Create the sprite display section with the character's sprite or fallback avatar.
+     */
+    private VBox createSpriteSection() {
+        VBox spriteBox = new VBox(8);
+        spriteBox.setAlignment(Pos.CENTER);
+        spriteBox.setPadding(new Insets(10));
+        spriteBox.setMinWidth(100);
+        spriteBox.setStyle(
+            "-fx-background-color: #252528; " +
+            "-fx-background-radius: 8; " +
+            "-fx-border-color: #404042; " +
+            "-fx-border-radius: 8; " +
+            "-fx-border-width: 1;"
+        );
+        
+        // Sprite container - displays the sprite or fallback
+        StackPane spriteContainer = new StackPane();
+        spriteContainer.setMinSize(64, 64);
+        spriteContainer.setMaxSize(64, 64);
+        spriteContainer.setStyle(
+            "-fx-background-color: #1e1e20; " +
+            "-fx-background-radius: 6; " +
+            "-fx-border-color: #4CAF50; " +
+            "-fx-border-radius: 6; " +
+            "-fx-border-width: 2;"
+        );
+        
+        // Create sprite node
+        Node spriteNode = SpriteUtils.createCharacterSprite(sheet, 48);
+        spriteContainer.getChildren().add(spriteNode);
+        
+        // Label
+        Label spriteLabel = new Label("Portrait");
+        spriteLabel.setStyle("-fx-text-fill: #808080; -fx-font-size: 10px;");
+        
+        // Sprite path field (for editing)
+        TextField spritePathField = new TextField();
+        spritePathField.setPromptText("sprites/party/name.png");
+        spritePathField.setPrefWidth(90);
+        spritePathField.setStyle("-fx-font-size: 9px;");
+        spritePathField.setText(sheet.getSpritePath() != null ? sheet.getSpritePath() : "");
+        spritePathField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+            if (!isFocused) {
+                String path = spritePathField.getText();
+                if (path != null && !path.isEmpty()) {
+                    sheet.setSpritePath(path);
+                } else {
+                    sheet.setSpritePath(null);
+                }
+                // Refresh the sprite display
+                spriteContainer.getChildren().clear();
+                spriteContainer.getChildren().add(SpriteUtils.createCharacterSprite(sheet, 48));
+            }
+        });
+        
+        spriteBox.getChildren().addAll(spriteContainer, spriteLabel, spritePathField);
+        return spriteBox;
     }
     
     private void updateHpBar() {
@@ -351,14 +434,16 @@ public class CharacterSheetPane extends BorderPane {
         maxHpSpinner.getValueFactory().setValue(sheet.getTotalHP());
         updateHpBar();
         
-        // Status dropdown
+        // Status menu items - check items for current statuses
         Status[] statuses = sheet.getStatus();
-        if (statuses.length == 0) {
-            statusCombo.getSelectionModel().select("Neutral");
-        } else {
-            // Select the first status (dropdown only supports one)
-            statusCombo.getSelectionModel().select(statuses[0].getName());
+        java.util.Set<String> activeStatuses = new java.util.HashSet<>();
+        for (Status s : statuses) {
+            activeStatuses.add(s.getName());
         }
+        for (Map.Entry<String, CheckMenuItem> entry : statusMenuItems.entrySet()) {
+            entry.getValue().setSelected(activeStatuses.contains(entry.getKey()));
+        }
+        updateStatusMenuText();
         
         // Update weapon combos
         primaryWeapon.getItems().clear();
@@ -451,6 +536,7 @@ public class CharacterSheetPane extends BorderPane {
     }
 
     private void updatePrimary() {
+        if (updatingDisplay) return;
         String selected = primaryWeapon.getSelectionModel().getSelectedItem();
         if (selected != null) {
             if (selected.equals("None")) {
@@ -469,6 +555,7 @@ public class CharacterSheetPane extends BorderPane {
     }
 
     private void updateSecondary() {
+        if (updatingDisplay) return;
         String selected = secondaryWeapon.getSelectionModel().getSelectedItem();
         if (selected != null) {
             if (selected.equals("None")) {
@@ -487,6 +574,7 @@ public class CharacterSheetPane extends BorderPane {
     }
 
     private void updateHead() {
+        if (updatingDisplay) return;
         String selected = headArmor.getSelectionModel().getSelectedItem();
         if (selected != null) {
             if (selected.equals("None")) {
@@ -505,6 +593,7 @@ public class CharacterSheetPane extends BorderPane {
     }
 
     private void updateTorso() {
+        if (updatingDisplay) return;
         String selected = torsoArmor.getSelectionModel().getSelectedItem();
         if (selected != null) {
             if (selected.equals("None")) {
@@ -523,6 +612,7 @@ public class CharacterSheetPane extends BorderPane {
     }
 
     private void updateLegs() {
+        if (updatingDisplay) return;
         String selected = legsArmor.getSelectionModel().getSelectedItem();
         if (selected != null) {
             if (selected.equals("None")) {
@@ -537,6 +627,38 @@ public class CharacterSheetPane extends BorderPane {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Sync menu item states to the character sheet's status list
+     */
+    private void syncStatusesToSheet() {
+        sheet.clearStatusWithoutSave();
+        for (Map.Entry<String, CheckMenuItem> entry : statusMenuItems.entrySet()) {
+            if (entry.getValue().isSelected()) {
+                sheet.addStatusWithoutSave(new Status(entry.getKey()));
+            }
+        }
+        sheet.save();
+    }
+
+    /**
+     * Update the status menu button text to show active statuses
+     */
+    private void updateStatusMenuText() {
+        java.util.List<String> active = new java.util.ArrayList<>();
+        for (Map.Entry<String, CheckMenuItem> entry : statusMenuItems.entrySet()) {
+            if (entry.getValue().isSelected()) {
+                active.add(entry.getKey());
+            }
+        }
+        if (active.isEmpty()) {
+            statusMenu.setText("None");
+        } else if (active.size() <= 2) {
+            statusMenu.setText(String.join(", ", active));
+        } else {
+            statusMenu.setText(active.get(0) + " +" + (active.size() - 1));
         }
     }
 
