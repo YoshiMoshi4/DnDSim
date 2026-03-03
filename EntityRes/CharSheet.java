@@ -22,10 +22,10 @@ public class CharSheet {
     private int[] baseAttributes;
     private int[] tempAttributes;    // Equipment modifications
     private int[] totalAttributes;   // baseAttributes + tempAttributes
-    private final int STRENGTH = 0;
-    private final int DEXTERITY = 1;
-    private final int INITIATIVE = 2;
-    private final int MOBILITY = 3;
+    public static final int STRENGTH = 0;
+    public static final int DEXTERITY = 1;
+    public static final int INITIATIVE = 2;
+    public static final int MOBILITY = 3;
 
     // Weapons
     private Weapon[] weapons;

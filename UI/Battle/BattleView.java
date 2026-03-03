@@ -7,7 +7,6 @@ import UI.AppController;
 import UI.CardUtils;
 import UI.CharacterSheetView;
 import UI.IconUtils;
-import UI.NotificationPane;
 import UI.SheetButton;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -20,25 +19,41 @@ import java.util.*;
 public class BattleView {
 
     private final AppController appController;
-    private final StackPane root;
+    private final StackPane rootWrapper;
+    private final BorderPane root;
     private final BattleGrid grid;
     private final TurnManager turnManager;
     private final CharacterSheetView sheetView;
     private final BattleGridCanvas gridCanvas;
-    private final TimelinePane timelinePane;
-    private final NotificationPane notificationPane;
     private final CombatLogPane combatLogPane;
     private final PartyHealthPane partyHealthPane;
+    private final TimelinePane timelinePane;
     private final BattleState battleState;
+    private GridObject selectedEntity;
     private Button nextTurnBtn;
     private Button battleToggleBtn;
     private Button addObjBtn;
+    private VBox actionPanel;
+    private Button moveBtn;
+    private Button attackBtn;
+    private Button useItemBtn;
+    private Button swapBtn;
+    private Button endTurnBtn;
     private final Map<String, Integer> enemyInstanceCounts = new HashMap<>();
     
     // Pull-up panel
     private VBox addObjectsPanel;
     private boolean panelExpanded = false;
     private Label addStatusLabel;
+    
+    // Surprise round toggle
+    private CheckBox surpriseRoundCheckbox;
+    
+    // Placement mode
+    private boolean placementMode = false;
+    private final Queue<CharSheet> partyToPlace = new LinkedList<>();
+    private CharSheet currentPlacing = null;
+    private javafx.beans.property.BooleanProperty placementModeProperty = new javafx.beans.property.SimpleBooleanProperty(false);
 
     public BattleView(int rows, int cols, CharacterSheetView sheetView, AppController appController) {
         this.appController = appController;
@@ -52,30 +67,41 @@ public class BattleView {
         grid = new BattleGrid(rows, cols, entities, terrainObjects, pickups);
         turnManager = new TurnManager(entities);
         turnManager.setBattleStarted(false);
+        
+        // Set up tie resolution handler for new rounds
+        turnManager.setTieResolutionHandler(this::handleTieResolutions);
 
-        // Create notification system
-        notificationPane = new NotificationPane();
+        // Create UI components
         combatLogPane = new CombatLogPane();
         partyHealthPane = new PartyHealthPane();
-
-        gridCanvas = new BattleGridCanvas(grid, turnManager, this, notificationPane, combatLogPane);
         timelinePane = new TimelinePane(turnManager);
+        timelinePane.setVisible(false);
+
+        gridCanvas = new BattleGridCanvas(grid, turnManager, this, combatLogPane);
 
         BorderPane mainPane = new BorderPane();
         mainPane.setPadding(new Insets(10));
         mainPane.getStyleClass().add("panel-dark");
 
-        // Timeline at top (hidden initially)
-        timelinePane.setVisible(false);
+        // Top: Timeline pane showing turn order
         mainPane.setTop(timelinePane);
+        BorderPane.setMargin(timelinePane, new Insets(0, 0, 10, 0));
 
-        // Grid in center with party health on left and combat log on right
+        // Left side: Party health stacked with combat log
+        VBox leftPanel = new VBox(10);
+        leftPanel.getChildren().addAll(partyHealthPane, combatLogPane);
+        VBox.setVgrow(combatLogPane, Priority.ALWAYS);
+        
+        // Right side: Action panel
+        actionPanel = createActionPanel();
+
+        // Grid in center with left panel and action panel
         BorderPane centerArea = new BorderPane();
-        centerArea.setLeft(partyHealthPane);
+        centerArea.setLeft(leftPanel);
         centerArea.setCenter(gridCanvas);
-        centerArea.setRight(combatLogPane);
-        BorderPane.setMargin(partyHealthPane, new Insets(0, 10, 0, 0));
-        BorderPane.setMargin(combatLogPane, new Insets(0, 0, 0, 10));
+        centerArea.setRight(actionPanel);
+        BorderPane.setMargin(leftPanel, new Insets(0, 10, 0, 0));
+        BorderPane.setMargin(actionPanel, new Insets(0, 0, 0, 10));
         mainPane.setCenter(centerArea);
 
         // Bottom area with controls and pull-up panel
@@ -94,15 +120,105 @@ public class BattleView {
         bottomArea.getChildren().addAll(addObjectsPanel, controlPanel);
         mainPane.setBottom(bottomArea);
 
-        // Wrap in StackPane to overlay notifications
-        root = new StackPane(mainPane, notificationPane);
-        StackPane.setAlignment(notificationPane, Pos.TOP_CENTER);
+        root = mainPane;
+        rootWrapper = new StackPane(root);
 
         sheetView.setBattleView(this);
     }
 
     public StackPane getRoot() {
-        return root;
+        return rootWrapper;
+    }
+    
+    // ================== Placement Mode Methods ==================
+    
+    /**
+     * Start the party placement phase, loading party members from PartyConfig.
+     */
+    public void startPlacementPhase() {
+        List<String> partyNames = PartyConfig.getMembers();
+        if (partyNames.isEmpty()) {
+            combatLogPane.log("No party configured. Use Add Objects to add characters.", CombatLogPane.LogType.INFO);
+            return;
+        }
+        
+        partyToPlace.clear();
+        
+        // Load CharSheets for each party member
+        for (String name : partyNames) {
+            for (SheetButton sheetBtn : sheetView.getSheets()) {
+                if (sheetBtn.getSheet().getCharSheet().getName().equals(name)) {
+                    partyToPlace.add(sheetBtn.getSheet().getCharSheet());
+                    break;
+                }
+            }
+        }
+        
+        if (partyToPlace.isEmpty()) {
+            combatLogPane.log("No valid party members found.", CombatLogPane.LogType.INFO);
+            return;
+        }
+        
+        placementMode = true;
+        placementModeProperty.set(true);
+        
+        // Log placement start
+        combatLogPane.log("=== Party Placement ===", CombatLogPane.LogType.ROUND);
+        
+        // Start with first party member
+        advancePlacement();
+        gridCanvas.redraw();
+    }
+    
+    /**
+     * Advance to the next party member to place.
+     */
+    private void advancePlacement() {
+        if (partyToPlace.isEmpty()) {
+            // Placement complete
+            endPlacementPhase();
+            return;
+        }
+        
+        currentPlacing = partyToPlace.poll();
+        combatLogPane.log("Place " + currentPlacing.getName() + " - click on a tile", CombatLogPane.LogType.INFO);
+    }
+    
+    /**
+     * End the placement phase and enable normal controls.
+     */
+    private void endPlacementPhase() {
+        placementMode = false;
+        placementModeProperty.set(false);
+        currentPlacing = null;
+        
+        combatLogPane.log("All party members placed!", CombatLogPane.LogType.INFO);
+        partyHealthPane.updateParty(grid.getEntities());
+        gridCanvas.redraw();
+    }
+    
+    /**
+     * Called when a party member is placed on the grid during placement mode.
+     */
+    public void entityPlaced(Entity entity) {
+        grid.addEntity(entity);
+        addEntity(entity);
+        advancePlacement();
+        gridCanvas.redraw();
+    }
+    
+    /**
+     * Check if currently in placement mode.
+     */
+    public boolean isPlacementMode() {
+        return placementMode;
+    }
+    
+    /**
+     * Get the currently placing CharSheet.
+     */
+    public CharSheet getCurrentPlacing() {
+        return currentPlacing;
     }
 
     private VBox createAddObjectsPanel() {
@@ -176,6 +292,192 @@ public class BattleView {
         }
     }
 
+    private VBox createActionPanel() {
+        VBox panel = new VBox(8);
+        panel.setPadding(new Insets(10));
+        panel.setPrefWidth(170);
+        panel.setMinWidth(170);
+        panel.getStyleClass().add("panel");
+        panel.setStyle("-fx-background-color: #2d2d30; -fx-border-color: #505052; -fx-border-width: 0 0 0 1;");
+        
+        // Selected entity indicator
+        Label selectLabel = new Label("Selected");
+        selectLabel.getStyleClass().add("label-title");
+        selectLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #daa520;");
+        
+        Label selectedEntityLabel = new Label("--");
+        selectedEntityLabel.setId("selectedEntityLabel");
+        selectedEntityLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #e0e0e0; -fx-font-weight: bold;");
+        selectedEntityLabel.setWrapText(true);
+        
+        // Attributes section
+        Label attrLabel = new Label("Attributes");
+        attrLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
+        
+        HBox attrRow1 = new HBox(8);
+        Label strLabel = new Label("STR: --");
+        strLabel.setId("strLabel");
+        strLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
+        Label dexLabel = new Label("DEX: --");
+        dexLabel.setId("dexLabel");
+        dexLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
+        attrRow1.getChildren().addAll(strLabel, dexLabel);
+        
+        HBox attrRow2 = new HBox(8);
+        Label itvLabel = new Label("ITV: --");
+        itvLabel.setId("itvLabel");
+        itvLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
+        Label mobLabel = new Label("MOB: --");
+        mobLabel.setId("mobLabel");
+        mobLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
+        attrRow2.getChildren().addAll(itvLabel, mobLabel);
+        
+        // Weapons section
+        Label weapLabel = new Label("Weapons");
+        weapLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
+        
+        Label primaryLabel = new Label("1: --");
+        primaryLabel.setId("primaryLabel");
+        primaryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
+        primaryLabel.setWrapText(true);
+        
+        Label secondaryLabel = new Label("2: --");
+        secondaryLabel.setId("secondaryLabel");
+        secondaryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
+        secondaryLabel.setWrapText(true);
+        
+        Separator sep = new Separator();
+        sep.setStyle("-fx-background-color: #505052;");
+        
+        Label actionsLabel = new Label("Actions");
+        actionsLabel.getStyleClass().add("label-title");
+        actionsLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #808080;");
+        
+        // Action buttons
+        moveBtn = new Button("Move (F)");
+        moveBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.MOVE));
+        moveBtn.getStyleClass().add("button");
+        moveBtn.setMaxWidth(Double.MAX_VALUE);
+        moveBtn.setDisable(true);
+        moveBtn.setOnAction(e -> gridCanvas.startMoveMode());
+        
+        attackBtn = new Button("Attack (E)");
+        attackBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.TARGET));
+        attackBtn.getStyleClass().add("button");
+        attackBtn.setMaxWidth(Double.MAX_VALUE);
+        attackBtn.setDisable(true);
+        attackBtn.setOnAction(e -> gridCanvas.startAttackMode());
+        
+        useItemBtn = new Button("Use Item (R)");
+        useItemBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.POTION));
+        useItemBtn.getStyleClass().add("button");
+        useItemBtn.setMaxWidth(Double.MAX_VALUE);
+        useItemBtn.setDisable(true);
+        useItemBtn.setOnAction(e -> gridCanvas.triggerUseItemForSelected());
+        
+        swapBtn = new Button("Swap (Q)");
+        swapBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.UNDO));
+        swapBtn.getStyleClass().add("button");
+        swapBtn.setMaxWidth(Double.MAX_VALUE);
+        swapBtn.setDisable(true);
+        swapBtn.setOnAction(e -> gridCanvas.triggerSwapForSelected());
+        
+        Separator sep2 = new Separator();
+        sep2.setStyle("-fx-background-color: #505052;");
+        
+        endTurnBtn = new Button("End Turn");
+        endTurnBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.FAST_FORWARD));
+        endTurnBtn.getStyleClass().add("button");
+        endTurnBtn.setMaxWidth(Double.MAX_VALUE);
+        endTurnBtn.setDisable(true);
+        endTurnBtn.setOnAction(e -> handleNextTurn());
+        
+        // Round indicator
+        Label roundLabel = new Label("Round: --");
+        roundLabel.setId("roundLabel");
+        roundLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #888888;");
+        
+        panel.getChildren().addAll(
+            selectLabel, selectedEntityLabel,
+            attrLabel, attrRow1, attrRow2,
+            weapLabel, primaryLabel, secondaryLabel, sep,
+            actionsLabel, moveBtn, attackBtn, useItemBtn, swapBtn, sep2,
+            endTurnBtn, roundLabel
+        );
+        
+        return panel;
+    }
+    
+    private void updateActionPanel() {
+        Label roundLabel = (Label) actionPanel.lookup("#roundLabel");
+        if (roundLabel != null) {
+            roundLabel.setText("Round: " + turnManager.getRound());
+        }
+        // End turn is always available during battle
+        endTurnBtn.setDisable(turnManager.getTurnOrder().isEmpty());
+    }
+    
+    public void updateSelectedEntity(GridObject obj) {
+        this.selectedEntity = obj;
+        Label selectedLabel = (Label) actionPanel.lookup("#selectedEntityLabel");
+        Label strLabel = (Label) actionPanel.lookup("#strLabel");
+        Label dexLabel = (Label) actionPanel.lookup("#dexLabel");
+        Label itvLabel = (Label) actionPanel.lookup("#itvLabel");
+        Label mobLabel = (Label) actionPanel.lookup("#mobLabel");
+        Label primaryLabel = (Label) actionPanel.lookup("#primaryLabel");
+        Label secondaryLabel = (Label) actionPanel.lookup("#secondaryLabel");
+        
+        if (obj == null) {
+            if (selectedLabel != null) selectedLabel.setText("--");
+            if (strLabel != null) strLabel.setText("STR: --");
+            if (dexLabel != null) dexLabel.setText("DEX: --");
+            if (itvLabel != null) itvLabel.setText("ITV: --");
+            if (mobLabel != null) mobLabel.setText("MOB: --");
+            if (primaryLabel != null) primaryLabel.setText("1: --");
+            if (secondaryLabel != null) secondaryLabel.setText("2: --");
+            moveBtn.setDisable(true);
+            attackBtn.setDisable(true);
+            useItemBtn.setDisable(true);
+            swapBtn.setDisable(true);
+        } else if (obj instanceof Entity e) {
+            if (selectedLabel != null) selectedLabel.setText(e.getName());
+            if (strLabel != null) strLabel.setText("STR: " + e.getCharSheet().getTotalAttribute(0));
+            if (dexLabel != null) dexLabel.setText("DEX: " + e.getCharSheet().getTotalAttribute(1));
+            if (itvLabel != null) itvLabel.setText("ITV: " + e.getCharSheet().getTotalAttribute(2));
+            if (mobLabel != null) mobLabel.setText("MOB: " + e.getCharSheet().getTotalAttribute(3));
+            
+            Weapon primary = e.getCharSheet().getEquippedWeapon();
+            Weapon secondary = e.getCharSheet().getEquippedSecondary();
+            if (primaryLabel != null) primaryLabel.setText("1: " + (primary != null ? primary.getName() : "None"));
+            if (secondaryLabel != null) secondaryLabel.setText("2: " + (secondary != null ? secondary.getName() : "None"));
+            
+            boolean canAct = e.isParty() && battleState.isBattleStarted();
+            moveBtn.setDisable(!canAct);
+            attackBtn.setDisable(!canAct);
+            useItemBtn.setDisable(!canAct);
+            swapBtn.setDisable(!canAct);
+        } else if (obj instanceof Enemy en) {
+            if (selectedLabel != null) selectedLabel.setText(en.getName());
+            if (strLabel != null) strLabel.setText("STR: --");
+            if (dexLabel != null) dexLabel.setText("DEX: --");
+            if (itvLabel != null) itvLabel.setText("ITV: --");
+            if (mobLabel != null) mobLabel.setText("MOB: " + en.getMovement());
+            if (primaryLabel != null) primaryLabel.setText("ATK: " + en.getAttackPower());
+            if (secondaryLabel != null) secondaryLabel.setText("");
+            
+            boolean canAct = battleState.isBattleStarted();
+            moveBtn.setDisable(!canAct);
+            attackBtn.setDisable(!canAct);
+            useItemBtn.setDisable(true);
+            swapBtn.setDisable(true);
+        }
+        
+        // Keep focus on grid canvas for keyboard shortcuts
+        if (obj != null) {
+            gridCanvas.requestFocus();
+        }
+    }
+
     private HBox createControlPanel() {
         HBox panel = new HBox(10);
         panel.setAlignment(Pos.CENTER);
@@ -193,12 +495,14 @@ public class BattleView {
         addObjBtn.getStyleClass().add("button");
         addObjBtn.setPrefSize(140, 40);
         addObjBtn.setOnAction(e -> toggleAddObjectsPanel());
+        addObjBtn.disableProperty().bind(placementModeProperty);
         // Objects can now be placed during battle
 
         battleToggleBtn = new Button();
         battleToggleBtn.setPrefSize(150, 40);
         battleToggleBtn.getStyleClass().clear();
         battleToggleBtn.getStyleClass().add(battleState.isBattleStarted() ? "button-danger" : "button-primary");
+        battleToggleBtn.disableProperty().bind(placementModeProperty);
         battleState.battleStartedProperty().addListener((obs, oldVal, newVal) -> {
             battleToggleBtn.getStyleClass().clear();
             battleToggleBtn.getStyleClass().add(newVal ? "button-danger" : "button-primary");
@@ -222,10 +526,19 @@ public class BattleView {
         nextTurnBtn.getStyleClass().add("button");
         nextTurnBtn.setPrefSize(140, 40);
         nextTurnBtn.setOnAction(e -> handleNextTurn());
-        // Enable next turn only when battle is active
-        nextTurnBtn.disableProperty().bind(battleState.battleStartedProperty().not());
+        // Enable next turn only when battle is active and not in placement mode
+        nextTurnBtn.disableProperty().bind(
+            battleState.battleStartedProperty().not().or(placementModeProperty)
+        );
+        
+        // Surprise round toggle (only visible before battle)
+        surpriseRoundCheckbox = new CheckBox("Surprise Round");
+        surpriseRoundCheckbox.getStyleClass().add("check-box");
+        surpriseRoundCheckbox.setTooltip(new Tooltip("Party members act first before normal turn order"));
+        surpriseRoundCheckbox.visibleProperty().bind(battleState.battleStartedProperty().not());
+        surpriseRoundCheckbox.managedProperty().bind(battleState.battleStartedProperty().not());
 
-        panel.getChildren().addAll(backBtn, addObjBtn, battleToggleBtn, nextTurnBtn);
+        panel.getChildren().addAll(backBtn, addObjBtn, surpriseRoundCheckbox, battleToggleBtn, nextTurnBtn);
         return panel;
     }
 
@@ -238,10 +551,19 @@ public class BattleView {
 
         battleState.setBattleStarted(true);
         turnManager.setBattleStarted(true);
-        turnManager.calculateInitiativeOrder();
-
-        timelinePane.setVisible(true);
+        
+        // Set surprise round before calculating initiative
+        turnManager.setSurpriseRound(surpriseRoundCheckbox.isSelected());
+        
+        // Calculate initiative and get log messages
         combatLogPane.clear();
+        List<String> initiativeMessages = turnManager.calculateInitiativeOrder();
+        
+        // Log all initiative rolls
+        for (String msg : initiativeMessages) {
+            combatLogPane.log(msg, CombatLogPane.LogType.INFO);
+        }
+        
         combatLogPane.logRound(1);
         
         // Log first turn
@@ -251,13 +573,17 @@ public class BattleView {
                               (first instanceof Enemy en) ? en.getName() : "Unknown";
             combatLogPane.logTurnStart(firstName);
         }
-            // nextTurnBtn.setDisable(false); // Removed to avoid binding error
+        
+        // Check for pending tie resolutions
+        if (turnManager.hasPendingTieResolutions()) {
+            handleTieResolutions(turnManager.getPendingTieResolutions());
+        }
 
         gridCanvas.setBattleStarted(true);
+        timelinePane.setVisible(true);
         timelinePane.refresh();
+        updateActionPanel();
         gridCanvas.redraw();
-        
-        notificationPane.showToast("Battle started! Round 1", NotificationPane.ToastType.INFO);
     }
 
     private void handleNextTurn() {
@@ -279,8 +605,128 @@ public class BattleView {
             combatLogPane.logTurnStart(name);
         }
         
+        updateActionPanel();
         timelinePane.refresh();
         gridCanvas.redraw();
+    }
+    
+    /**
+     * Handle tie resolution requests from TurnManager.
+     * Shows dialog for each group of tied party members.
+     */
+    private void handleTieResolutions(List<List<GridObject>> tieGroups) {
+        for (List<GridObject> tiedGroup : tieGroups) {
+            if (tiedGroup.size() > 1) {
+                showTieResolutionDialog(tiedGroup);
+            }
+        }
+    }
+    
+    /**
+     * Show a dialog for players to choose turn order among tied party members.
+     */
+    private void showTieResolutionDialog(List<GridObject> tiedGroup) {
+        Dialog<List<GridObject>> dialog = new Dialog<>();
+        dialog.setTitle("Initiative Tie");
+        dialog.setHeaderText("These party members tied for initiative.\nClick to set turn order (first click goes first):");
+        
+        int initRoll = turnManager.getInitiativeRoll(tiedGroup.get(0));
+        
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(10));
+        
+        Label rollLabel = new Label("Initiative Roll: " + initRoll);
+        rollLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #569cd6;");
+        content.getChildren().add(rollLabel);
+        
+        // Track selection order
+        List<GridObject> selectionOrder = new ArrayList<>();
+        Map<GridObject, Button> buttonMap = new HashMap<>();
+        
+        VBox buttonBox = new VBox(5);
+        for (GridObject obj : tiedGroup) {
+            String name = (obj instanceof Entity e) ? e.getName() : "Unknown";
+            Button btn = new Button(name);
+            btn.setPrefWidth(200);
+            btn.getStyleClass().add("button");
+            
+            btn.setOnAction(e -> {
+                if (!selectionOrder.contains(obj)) {
+                    selectionOrder.add(obj);
+                    btn.setText((selectionOrder.size()) + ". " + name);
+                    btn.setDisable(true);
+                    btn.setStyle("-fx-opacity: 0.7;");
+                }
+            });
+            
+            buttonMap.put(obj, btn);
+            buttonBox.getChildren().add(btn);
+        }
+        
+        content.getChildren().add(buttonBox);
+        
+        // Add reset button
+        Button resetBtn = new Button("Reset");
+        resetBtn.getStyleClass().add("button");
+        resetBtn.setOnAction(e -> {
+            selectionOrder.clear();
+            for (GridObject obj : tiedGroup) {
+                Button btn = buttonMap.get(obj);
+                String name = (obj instanceof Entity en) ? en.getName() : "Unknown";
+                btn.setText(name);
+                btn.setDisable(false);
+                btn.setStyle("");
+            }
+        });
+        content.getChildren().add(resetBtn);
+        
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        
+        // Disable OK until all are selected
+        Button okBtn = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
+        okBtn.setDisable(true);
+        
+        // Check selection completeness on each click
+        dialog.getDialogPane().addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            if (event.getTarget() != okBtn && event.getTarget() != resetBtn) {
+                okBtn.setDisable(selectionOrder.size() < tiedGroup.size());
+            }
+        });
+        
+        // Also use a simple polling approach since the above may not catch everything
+        javafx.animation.Timeline checker = new javafx.animation.Timeline(
+            new javafx.animation.KeyFrame(javafx.util.Duration.millis(100), e -> {
+                okBtn.setDisable(selectionOrder.size() < tiedGroup.size());
+            })
+        );
+        checker.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        checker.play();
+        
+        dialog.setResultConverter(buttonType -> {
+            checker.stop();
+            if (buttonType == ButtonType.OK && selectionOrder.size() == tiedGroup.size()) {
+                return selectionOrder;
+            }
+            // If cancelled or incomplete, use current order (random)
+            return null;
+        });
+        
+        dialog.showAndWait().ifPresent(chosenOrder -> {
+            if (chosenOrder != null) {
+                turnManager.applyTieResolution(tiedGroup, chosenOrder);
+                timelinePane.refresh();
+                
+                // Log the chosen order
+                StringBuilder orderStr = new StringBuilder("Turn order set: ");
+                for (int i = 0; i < chosenOrder.size(); i++) {
+                    if (i > 0) orderStr.append(" → ");
+                    GridObject obj = chosenOrder.get(i);
+                    orderStr.append((obj instanceof Entity e) ? e.getName() : "Unknown");
+                }
+                combatLogPane.log(orderStr.toString(), CombatLogPane.LogType.INFO);
+            }
+        });
     }
 
     public boolean isBattleStarted() {
@@ -295,7 +741,7 @@ public class BattleView {
         turnManager.addEntity(entity);
         partyHealthPane.updateParty(grid.getEntities());
         if (battleState.isBattleStarted()) {
-            timelinePane.refresh();
+            updateActionPanel();
         }
     }
 
@@ -303,21 +749,21 @@ public class BattleView {
         turnManager.removeEntity(entity);
         partyHealthPane.updateParty(grid.getEntities());
         if (battleState.isBattleStarted()) {
-            timelinePane.refresh();
+            updateActionPanel();
         }
     }
 
     public void addEnemy(Enemy enemy) {
         turnManager.addEnemy(enemy);
         if (battleState.isBattleStarted()) {
-            timelinePane.refresh();
+            updateActionPanel();
         }
     }
 
     public void removeEnemy(Enemy enemy) {
         turnManager.removeEnemy(enemy);
         if (battleState.isBattleStarted()) {
-            timelinePane.refresh();
+            updateActionPanel();
         }
     }
 
@@ -369,12 +815,12 @@ public class BattleView {
     private void showVictoryScreen() {
         VictoryView victoryView = new VictoryView(grid.getEntities(), () -> {
             // On continue - remove victory screen and return from battle
-            root.getChildren().removeIf(n -> n instanceof VictoryView);
+            rootWrapper.getChildren().removeIf(n -> n instanceof VictoryView);
             sheetView.endBattle();
             appController.returnFromBattle();
         });
         
-        root.getChildren().add(victoryView);
+        rootWrapper.getChildren().add(victoryView);
         victoryView.playEntranceAnimation();
     }
 

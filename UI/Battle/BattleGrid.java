@@ -145,6 +145,13 @@ public class BattleGrid {
             }
         }
     }
+    
+    /**
+     * Add an entity at its current position.
+     */
+    public void addEntity(Entity entity) {
+        entities.add(entity);
+    }
 
     public void addTerrainAtNextAvailable(TerrainObject terrain) {
         for (int r = 0; r < rows; r++) {

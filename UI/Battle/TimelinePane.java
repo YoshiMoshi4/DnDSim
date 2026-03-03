@@ -9,6 +9,7 @@ import javafx.animation.*;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -231,6 +232,17 @@ public class TimelinePane extends HBox {
         nameLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #dcdcdc;");
         
         box.getChildren().add(nameLabel);
+        
+        // Add tooltip with initiative info
+        int initRoll = turnManager.getInitiativeRoll(combatant);
+        int[] breakdown = turnManager.getRollBreakdown(combatant);
+        String tooltipText = name + "\nInitiative: " + initRoll;
+        if (breakdown[0] > 0 || breakdown[1] != 0) {
+            tooltipText += " (d20: " + breakdown[0] + " + DEX: " + breakdown[1] + ")";
+        }
+        Tooltip tooltip = new Tooltip(tooltipText);
+        tooltip.setShowDelay(javafx.util.Duration.millis(200));
+        Tooltip.install(box, tooltip);
         
         // Add subtle hover effect
         box.setOnMouseEntered(e -> {

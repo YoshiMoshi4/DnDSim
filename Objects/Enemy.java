@@ -12,12 +12,13 @@ public class Enemy extends GridObject {
     private int mobility;
     private int attackDamage;
     private int initiative;
+    private int dexterity;
     private int color;
     private int instanceNumber = 0;
     private String baseName;
     private String spritePath; // Path to enemy sprite image (e.g., "sprites/enemies/spider.png")
 
-    public Enemy(int row, int col, String name, int maxHealth, int mobility, int attackDamage, int initiative, int color) {
+    public Enemy(int row, int col, String name, int maxHealth, int mobility, int attackDamage, int initiative, int dexterity, int color) {
         super(row, col);
         this.name = name;
         this.baseName = name;
@@ -26,6 +27,7 @@ public class Enemy extends GridObject {
         this.mobility = mobility;
         this.attackDamage = attackDamage;
         this.initiative = initiative;
+        this.dexterity = dexterity;
         this.color = color;
     }
 
@@ -39,6 +41,7 @@ public class Enemy extends GridObject {
         this.mobility = template.mobility;
         this.attackDamage = template.attackDamage;
         this.initiative = template.initiative;
+        this.dexterity = template.dexterity;
         this.color = template.color;
         this.spritePath = template.spritePath;
     }
@@ -86,6 +89,10 @@ public class Enemy extends GridObject {
 
     public int getInitiative() {
         return initiative;
+    }
+
+    public int getDexterity() {
+        return dexterity;
     }
 
     public int getColor() {

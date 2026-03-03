@@ -3,17 +3,21 @@ package UI;
 import EntityRes.*;
 import Objects.Enemy;
 import UI.Battle.BattleView;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.input.*;
 import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
 
 public class CharacterSheetView {
 
@@ -24,6 +28,8 @@ public class CharacterSheetView {
     private BattleView battleView;
     private TabPane listTabs;
     private StackPane displayPane;
+    private VBox partyPopup;
+    private boolean partyPopupVisible = false;
 
     public CharacterSheetView(AppController appController) {
         this.appController = appController;
@@ -80,17 +86,24 @@ public class CharacterSheetView {
         
         Button newCharBtn = new Button("+ Character");
         newCharBtn.getStyleClass().add("button-primary");
-        newCharBtn.setMinWidth(140);
+        newCharBtn.setMinWidth(145);
         newCharBtn.setPrefHeight(35);
         newCharBtn.setOnAction(e -> handleNew());
         
         Button newEnemyBtn = new Button("+ Enemy");
         newEnemyBtn.getStyleClass().add("button-primary");
-        newEnemyBtn.setMinWidth(120);
+        newEnemyBtn.setMinWidth(125);
         newEnemyBtn.setPrefHeight(35);
         newEnemyBtn.setOnAction(e -> handleNewEnemy());
         
-        panel.getChildren().addAll(backBtn, newCharBtn, newEnemyBtn);
+        Button partyBtn = new Button("Party");
+        partyBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.PERSON));
+        partyBtn.getStyleClass().add("button");
+        partyBtn.setMinWidth(110);
+        partyBtn.setPrefHeight(35);
+        partyBtn.setOnAction(e -> togglePartyPopup());
+        
+        panel.getChildren().addAll(backBtn, newCharBtn, newEnemyBtn, partyBtn);
         return panel;
     }
 
@@ -160,6 +173,241 @@ public class CharacterSheetView {
         enemyScroll.setFitToWidth(true);
         Tab enemyTab = new Tab("Enemies", enemyScroll);
         listTabs.getTabs().add(enemyTab);
+    }
+    
+    /**
+     * Toggle the party management popup visibility.
+     */
+    private void togglePartyPopup() {
+        if (partyPopupVisible) {
+            hidePartyPopup();
+        } else {
+            showPartyPopup();
+        }
+    }
+    
+    private void showPartyPopup() {
+        if (partyPopup != null) {
+            displayPane.getChildren().remove(partyPopup);
+        }
+        partyPopup = createPartyPopup();
+        displayPane.getChildren().add(partyPopup);
+        partyPopupVisible = true;
+    }
+    
+    private void hidePartyPopup() {
+        if (partyPopup != null) {
+            displayPane.getChildren().remove(partyPopup);
+            partyPopup = null;
+        }
+        partyPopupVisible = false;
+    }
+    
+    /**
+     * Create the party management popup with drag-and-drop lists.
+     */
+    private VBox createPartyPopup() {
+        VBox popup = new VBox(10);
+        popup.getStyleClass().add("card");
+        popup.setStyle("-fx-background-color: #2d2d30; -fx-border-color: #4CAF50; -fx-border-width: 2; -fx-border-radius: 8; -fx-background-radius: 8;");
+        popup.setPadding(new Insets(15));
+        popup.setMaxWidth(500);
+        popup.setMaxHeight(420);
+        StackPane.setAlignment(popup, Pos.CENTER);
+        
+        // Header with title and close button
+        HBox header = new HBox(10);
+        header.setAlignment(Pos.CENTER_LEFT);
+        
+        Label titleLabel = new Label("Manage Party");
+        titleLabel.getStyleClass().add("label-title");
+        titleLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #4CAF50;");
+        HBox.setHgrow(titleLabel, Priority.ALWAYS);
+        
+        Button closeBtn = new Button("X");
+        closeBtn.getStyleClass().add("button");
+        closeBtn.setStyle("-fx-font-size: 14px; -fx-min-width: 30; -fx-min-height: 30;");
+        closeBtn.setOnAction(e -> hidePartyPopup());
+        
+        header.getChildren().addAll(titleLabel, closeBtn);
+        
+        // Content
+        HBox content = createPartyManagementContent();
+        
+        popup.getChildren().addAll(header, new Separator(), content);
+        return popup;
+    }
+    
+    /**
+     * Create the party management content with drag-and-drop lists.
+     */
+    private HBox createPartyManagementContent() {
+        HBox container = new HBox(15);
+        container.setPadding(new Insets(10));
+        container.setAlignment(Pos.TOP_CENTER);
+        
+        // Get current party members
+        List<String> partyMembers = PartyConfig.getMembers();
+        
+        // Build available list (all characters not in party)
+        ObservableList<String> availableItems = FXCollections.observableArrayList();
+        ObservableList<String> partyItems = FXCollections.observableArrayList(partyMembers);
+        
+        for (SheetButton sheetBtn : sheets) {
+            String name = sheetBtn.getSheet().getCharSheet().getName();
+            if (!partyMembers.contains(name)) {
+                availableItems.add(name);
+            }
+        }
+        
+        // Available characters list
+        VBox availableBox = new VBox(5);
+        Label availableLabel = new Label("Available");
+        availableLabel.getStyleClass().add("label-title");
+        availableLabel.setStyle("-fx-font-size: 14px;");
+        
+        ListView<String> availableList = new ListView<>(availableItems);
+        availableList.setPrefHeight(250);
+        availableList.setPrefWidth(150);
+        setupDragSource(availableList);
+        setupDragTarget(availableList, partyItems, availableItems, false);
+        
+        availableBox.getChildren().addAll(availableLabel, availableList);
+        
+        // Party list
+        VBox partyBox = new VBox(5);
+        Label partyLabel = new Label("Active Party");
+        partyLabel.getStyleClass().add("label-title");
+        partyLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #4CAF50;");
+        
+        ListView<String> partyList = new ListView<>(partyItems);
+        partyList.setPrefHeight(250);
+        partyList.setPrefWidth(150);
+        setupDragSource(partyList);
+        setupDragTarget(partyList, availableItems, partyItems, true);
+        
+        // Add reorder within party list
+        setupReorderDrag(partyList, partyItems);
+        
+        partyBox.getChildren().addAll(partyLabel, partyList);
+        
+        // Arrow buttons for moving items
+        VBox arrowBox = new VBox(10);
+        arrowBox.setAlignment(Pos.CENTER);
+        arrowBox.setPadding(new Insets(30, 0, 0, 0));
+        
+        Button addToPartyBtn = new Button("Add >");
+        addToPartyBtn.getStyleClass().add("button-primary");
+        addToPartyBtn.setMinWidth(70);
+        addToPartyBtn.setOnAction(e -> {
+            String selected = availableList.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                availableItems.remove(selected);
+                partyItems.add(selected);
+                PartyConfig.setMembers(new ArrayList<>(partyItems));
+            }
+        });
+        
+        Button removeFromPartyBtn = new Button("< Remove");
+        removeFromPartyBtn.getStyleClass().add("button");
+        removeFromPartyBtn.setMinWidth(70);
+        removeFromPartyBtn.setOnAction(e -> {
+            String selected = partyList.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                partyItems.remove(selected);
+                availableItems.add(selected);
+                PartyConfig.setMembers(new ArrayList<>(partyItems));
+            }
+        });
+        
+        arrowBox.getChildren().addAll(addToPartyBtn, removeFromPartyBtn);
+        
+        container.getChildren().addAll(availableBox, arrowBox, partyBox);
+        
+        return container;
+    }
+    
+    private void setupDragSource(ListView<String> listView) {
+        listView.setOnDragDetected(event -> {
+            String selected = listView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                Dragboard db = listView.startDragAndDrop(TransferMode.MOVE);
+                ClipboardContent content = new ClipboardContent();
+                content.putString(selected);
+                db.setContent(content);
+                event.consume();
+            }
+        });
+    }
+    
+    private void setupDragTarget(ListView<String> listView, ObservableList<String> sourceList, 
+                                  ObservableList<String> targetList, boolean isPartyList) {
+        listView.setOnDragOver(event -> {
+            if (event.getGestureSource() != listView && event.getDragboard().hasString()) {
+                event.acceptTransferModes(TransferMode.MOVE);
+            }
+            event.consume();
+        });
+        
+        listView.setOnDragDropped(event -> {
+            Dragboard db = event.getDragboard();
+            boolean success = false;
+            if (db.hasString()) {
+                String item = db.getString();
+                // Remove from source, add to target
+                sourceList.remove(item);
+                if (!targetList.contains(item)) {
+                    targetList.add(item);
+                }
+                // Update party config
+                if (isPartyList) {
+                    PartyConfig.setMembers(new ArrayList<>(targetList));
+                } else {
+                    // This is the available list - need to get party items from the other list
+                    // The sourceList here would be partyItems
+                    PartyConfig.setMembers(new ArrayList<>(sourceList));
+                }
+                success = true;
+            }
+            event.setDropCompleted(success);
+            event.consume();
+        });
+    }
+    
+    private void setupReorderDrag(ListView<String> listView, ObservableList<String> items) {
+        listView.setOnDragOver(event -> {
+            if (event.getGestureSource() == listView && event.getDragboard().hasString()) {
+                event.acceptTransferModes(TransferMode.MOVE);
+            }
+            event.consume();
+        });
+        
+        listView.setOnDragDropped(event -> {
+            Dragboard db = event.getDragboard();
+            boolean success = false;
+            if (db.hasString() && event.getGestureSource() == listView) {
+                String item = db.getString();
+                int draggedIdx = items.indexOf(item);
+                
+                // Calculate target index based on drop position
+                int targetIdx = items.size() - 1;
+                
+                // Get the item we're dropping on
+                double y = event.getY();
+                int cellHeight = 24; // Approximate cell height
+                int dropIdx = Math.min((int)(y / cellHeight), items.size() - 1);
+                dropIdx = Math.max(0, dropIdx);
+                
+                if (draggedIdx != dropIdx) {
+                    items.remove(draggedIdx);
+                    items.add(dropIdx, item);
+                    PartyConfig.setMembers(new ArrayList<>(items));
+                }
+                success = true;
+            }
+            event.setDropCompleted(success);
+            event.consume();
+        });
     }
 
     private Button createListButton(SheetButton sheetBtn) {
@@ -509,6 +757,11 @@ public class CharacterSheetView {
         initSpinner.setEditable(true);
         grid.add(initSpinner, 1, row++);
         
+        grid.add(new Label("Dexterity:"), 0, row);
+        Spinner<Integer> dexSpinner = new Spinner<>(-10, 99, existing != null ? existing.getDexterity() : 2);
+        dexSpinner.setEditable(true);
+        grid.add(dexSpinner, 1, row++);
+        
         grid.add(new Label("Color:"), 0, row);
         ComboBox<String> colorCombo = new ComboBox<>();
         colorCombo.getItems().addAll(CharSheet.getColorNames());
@@ -535,7 +788,8 @@ public class CharacterSheetView {
             String name = nameField.getText().trim();
             if (!name.isEmpty()) {
                 Enemy enemy = new Enemy(0, 0, name, hpSpinner.getValue(), mobSpinner.getValue(),
-                        atkSpinner.getValue(), initSpinner.getValue(), colorCombo.getSelectionModel().getSelectedIndex());
+                        atkSpinner.getValue(), initSpinner.getValue(), dexSpinner.getValue(),
+                        colorCombo.getSelectionModel().getSelectedIndex());
                 enemy.setSpritePath(spritePath[0]);
                 enemy.save();
                 loadEnemies();

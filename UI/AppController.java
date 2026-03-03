@@ -87,6 +87,9 @@ public class AppController {
             characterSheetView.setBattleView(currentBattleView);
             setContent(currentBattleView.getRoot());
             primaryStage.setTitle("Battle - Cassandralis");
+            
+            // Auto-start party placement phase
+            currentBattleView.startPlacementPhase();
         } catch (Exception e) {
             e.printStackTrace();
             // Reset to allow retry

@@ -45,9 +45,9 @@ public class CombatLogPane extends VBox {
         setStyle("-fx-background-color: linear-gradient(to bottom, #2d2d30, #252528);");
         setPadding(new Insets(12));
         setSpacing(8);
-        setPrefWidth(260);
-        setMinWidth(200);
-        setMaxWidth(300);
+        setPrefWidth(210);
+        setMinWidth(180);
+        setMaxWidth(230);
 
         HBox headerBox = new HBox(8);
         headerBox.setAlignment(Pos.CENTER_LEFT);

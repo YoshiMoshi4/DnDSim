@@ -2,12 +2,10 @@ package UI.Battle;
 
 import EntityRes.*;
 import Objects.*;
-import UI.NotificationPane;
 import UI.SpriteUtils;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
-import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
@@ -21,7 +19,6 @@ public class BattleGridCanvas extends Pane {
     private final BattleGrid grid;
     private final TurnManager turnManager;
     private final BattleView battleView;
-    private final NotificationPane notificationPane;
     private final CombatLogPane combatLogPane;
     private GridObject selectedObject;
     private boolean battleStarted;
@@ -31,17 +28,13 @@ public class BattleGridCanvas extends Pane {
     private boolean moveMode;
     private Entity movingEntity;
     private Enemy movingEnemy;
-    private ContextMenu currentMenu;
-    private Entity currentMenuEntity;
-    private Enemy currentMenuEnemy;
 
     public BattleGridCanvas(BattleGrid grid, TurnManager tm, BattleView battleView, 
-                           NotificationPane notificationPane, CombatLogPane combatLogPane) {
+                           CombatLogPane combatLogPane) {
         this.canvas = new Canvas();
         this.grid = grid;
         this.turnManager = tm;
         this.battleView = battleView;
-        this.notificationPane = notificationPane;
         this.combatLogPane = combatLogPane;
         this.selectedObject = null;
         this.battleStarted = false;
@@ -51,9 +44,6 @@ public class BattleGridCanvas extends Pane {
         this.moveMode = false;
         this.movingEntity = null;
         this.movingEnemy = null;
-        this.currentMenu = null;
-        this.currentMenuEntity = null;
-        this.currentMenuEnemy = null;
 
         getChildren().add(canvas);
         setStyle("-fx-background-color: white;");
@@ -87,63 +77,97 @@ public class BattleGridCanvas extends Pane {
                 if (grid.inBounds(row, col)) {
                     GridObject obj = grid.getObjectAt(row, col);
                     if (obj != null && !moveMode && !attackMode) {
-                        closeContextMenu();
-                        showContextMenu(obj, e.getScreenX(), e.getScreenY());
+                        // Select the entity and update action panel
+                        selectedObject = obj;
+                        battleView.updateSelectedEntity(obj);
+                        requestFocus();
+                        redraw();
                         return;
                     }
                 }
             }
-            closeContextMenu();
             handleLeftClick(e);
         }
     }
 
-    private void closeContextMenu() {
-        if (currentMenu != null) {
-            currentMenu.hide();
-            currentMenu = null;
-            currentMenuEntity = null;
-            currentMenuEnemy = null;
+    private void handleKeyPressed(javafx.scene.input.KeyEvent e) {
+        // Handle shortcuts when entity is selected
+        if (battleStarted && selectedObject != null) {
+            if (selectedObject instanceof Entity entity && entity.isParty()) {
+                switch (e.getCode()) {
+                    case F -> {
+                        // Toggle move mode
+                        if (moveMode && movingEntity == entity) {
+                            cancelModes();
+                        } else {
+                            triggerMove(entity);
+                        }
+                        e.consume();
+                    }
+                    case E -> {
+                        // Toggle attack mode
+                        if (attackMode && attackingEntity == entity) {
+                            cancelModes();
+                        } else {
+                            triggerAttack(entity);
+                        }
+                        e.consume();
+                    }
+                    case R -> {
+                        triggerUseItem(entity);
+                        e.consume();
+                    }
+                    case Q -> {
+                        entity.getCharSheet().swapWeapons();
+                        redraw();
+                        battleView.updateSelectedEntity(entity);
+                        e.consume();
+                    }
+                    case ESCAPE -> {
+                        cancelModes();
+                        e.consume();
+                    }
+                    default -> {}
+                }
+            } else if (selectedObject instanceof Enemy enemy) {
+                switch (e.getCode()) {
+                    case F -> {
+                        // Toggle move mode
+                        if (moveMode && movingEnemy == enemy) {
+                            cancelModes();
+                        } else {
+                            triggerEnemyMove(enemy);
+                        }
+                        e.consume();
+                    }
+                    case E -> {
+                        // Toggle attack mode
+                        if (attackMode && attackingEnemy == enemy) {
+                            cancelModes();
+                        } else {
+                            triggerEnemyAttack(enemy);
+                        }
+                        e.consume();
+                    }
+                    case ESCAPE -> {
+                        cancelModes();
+                        e.consume();
+                    }
+                    default -> {}
+                }
+            }
         }
     }
 
-    private void handleKeyPressed(javafx.scene.input.KeyEvent e) {
-        if (currentMenu != null && currentMenuEntity != null) {
-            Entity entity = currentMenuEntity;
-            switch (e.getCode()) {
-                case F -> {
-                    closeContextMenu();
-                    triggerMove(entity);
-                    e.consume();
-                }
-                case E -> {
-                    closeContextMenu();
-                    triggerAttack(entity);
-                    e.consume();
-                }
-                case R -> {
-                    closeContextMenu();
-                    triggerUseItem(entity);
-                    e.consume();
-                }
-                default -> {}
-            }
-        } else if (currentMenu != null && currentMenuEnemy != null) {
-            Enemy enemy = currentMenuEnemy;
-            switch (e.getCode()) {
-                case F -> {
-                    closeContextMenu();
-                    triggerEnemyMove(enemy);
-                    e.consume();
-                }
-                case E -> {
-                    closeContextMenu();
-                    triggerEnemyAttack(enemy);
-                    e.consume();
-                }
-                default -> {}
-            }
-        }
+    private void cancelModes() {
+        GridObject current = selectedObject;
+        moveMode = false;
+        movingEntity = null;
+        movingEnemy = null;
+        attackMode = false;
+        attackingEntity = null;
+        attackingEnemy = null;
+        redraw();
     }
 
     private void triggerMove(Entity entity) {
@@ -159,7 +183,6 @@ public class BattleGridCanvas extends Pane {
         selectedObject = entity;
         attackMode = true;
         attackingEntity = entity;
-        notificationPane.showModeChange("⚔ Attack mode: " + entity.getName() + " (ATK: " + entity.getAttackPower() + ")");
         redraw();
     }
 
@@ -229,8 +252,41 @@ public class BattleGridCanvas extends Pane {
         moveMode = false;
         movingEntity = null;
         movingEnemy = null;
-        notificationPane.showModeChange("⚔ Attack mode: " + enemy.getName() + " (ATK: " + enemy.getAttackPower() + ")");
         redraw();
+    }
+
+    public void startMoveMode() {
+        if (!battleStarted) return;
+        if (selectedObject instanceof Entity entity && entity.isParty()) {
+            triggerMove(entity);
+        } else if (selectedObject instanceof Enemy enemy) {
+            triggerEnemyMove(enemy);
+        }
+    }
+
+    public void startAttackMode() {
+        if (!battleStarted) return;
+        if (selectedObject instanceof Entity entity && entity.isParty()) {
+            triggerAttack(entity);
+        } else if (selectedObject instanceof Enemy enemy) {
+            triggerEnemyAttack(enemy);
+        }
+    }
+
+    public void triggerUseItemForSelected() {
+        if (!battleStarted) return;
+        if (selectedObject instanceof Entity entity && entity.isParty()) {
+            triggerUseItem(entity);
+        }
+    }
+
+    public void triggerSwapForSelected() {
+        if (!battleStarted) return;
+        if (selectedObject instanceof Entity entity && entity.isParty()) {
+            entity.getCharSheet().swapWeapons();
+            redraw();
+            battleView.updateSelectedEntity(entity);
+        }
     }
 
     private int[] getCellAtPoint(double mouseX, double mouseY) {
@@ -252,218 +308,6 @@ public class BattleGridCanvas extends Pane {
         return new int[]{row, col};
     }
 
-    private void showContextMenu(GridObject obj, double screenX, double screenY) {
-        closeContextMenu();
-        ContextMenu menu = new ContextMenu();
-        currentMenu = menu;
-        currentMenuEntity = (obj instanceof Entity e) ? e : null;
-        currentMenuEnemy = (obj instanceof Enemy en) ? en : null;
-
-        // Handle keyboard shortcuts on the menu
-        menu.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, this::handleKeyPressed);
-
-        addInfoSection(menu, obj);
-        menu.getItems().add(new SeparatorMenuItem());
-        addActionSection(menu, obj);
-
-        menu.show(this, screenX, screenY);
-    }
-
-    private MenuItem createLabel(String text) {
-        MenuItem item = new MenuItem(text);
-        item.setDisable(true);
-        return item;
-    }
-
-    private void addInfoSection(ContextMenu menu, GridObject obj) {
-        if (obj instanceof Enemy enemy) {
-            menu.getItems().add(createLabel("=== Enemy ==="));
-            menu.getItems().add(createLabel("Name: " + enemy.getName()));
-            menu.getItems().add(createLabel("HP: " + enemy.getHealth() + "/" + enemy.getMaxHealth()));
-            menu.getItems().add(createLabel("Mobility: " + enemy.getMovement()));
-            menu.getItems().add(createLabel("Attack: " + enemy.getAttackPower()));
-        } else if (obj instanceof Entity e) {
-            menu.getItems().add(createLabel("Name: " + e.getName()));
-            menu.getItems().add(createLabel("HP: " + e.getHealth() + "/" + e.getCharSheet().getTotalHP()));
-            menu.getItems().add(createLabel("Move: " + e.getMovement()));
-
-            menu.getItems().add(new SeparatorMenuItem());
-            menu.getItems().add(createLabel("Attributes:"));
-            menu.getItems().add(createLabel("STR: " + e.getCharSheet().getTotalAttribute(0)));
-            menu.getItems().add(createLabel("DEX: " + e.getCharSheet().getTotalAttribute(1)));
-            menu.getItems().add(createLabel("ITV: " + e.getCharSheet().getTotalAttribute(2)));
-            menu.getItems().add(createLabel("MOB: " + e.getCharSheet().getTotalAttribute(3)));
-
-            Status[] statuses = e.getCharSheet().getStatus();
-            if (statuses.length > 0) {
-                menu.getItems().add(new SeparatorMenuItem());
-                menu.getItems().add(createLabel("Status Effects:"));
-                for (Status s : statuses) {
-                    menu.getItems().add(createLabel("- " + s.getName()));
-                }
-            }
-
-            menu.getItems().add(new SeparatorMenuItem());
-            menu.getItems().add(createLabel("Equipment:"));
-            Weapon primary = e.getCharSheet().getEquippedWeapon();
-            Weapon secondary = e.getCharSheet().getEquippedSecondary();
-            menu.getItems().add(createLabel("Primary: " + (primary != null ? primary.getName() : "None")));
-            menu.getItems().add(createLabel("Secondary: " + (secondary != null ? secondary.getName() : "None")));
-
-            Armor head = e.getCharSheet().getHead();
-            Armor torso = e.getCharSheet().getTorso();
-            Armor legs = e.getCharSheet().getLegs();
-            menu.getItems().add(createLabel("Head: " + (head != null ? head.getName() : "None")));
-            menu.getItems().add(createLabel("Torso: " + (torso != null ? torso.getName() : "None")));
-            menu.getItems().add(createLabel("Legs: " + (legs != null ? legs.getName() : "None")));
-
-            menu.getItems().add(new SeparatorMenuItem());
-            menu.getItems().add(createLabel("Inventory: " + e.getCharSheet().getInventory().size() + " items"));
-            menu.getItems().add(createLabel("Wallet: " + e.getCharSheet().getWallet() + " gold"));
-        }
-
-        if (obj instanceof TerrainObject t) {
-            menu.getItems().add(createLabel("Terrain"));
-            menu.getItems().add(createLabel("HP: " + t.getHealth()));
-            menu.getItems().add(createLabel("Blocks Movement: " + t.blocksMovement()));
-        }
-
-        if (obj instanceof Pickup p) {
-            menu.getItems().add(createLabel("Item: " + p.getItem().getName()));
-            menu.getItems().add(createLabel("Type: " + p.getItem().getType()));
-            menu.getItems().add(createLabel("Quantity: " + p.getItem().getQuantity()));
-        }
-    }
-
-    private void addActionSection(ContextMenu menu, GridObject obj) {
-        // Pickup actions
-        if (obj instanceof Pickup p && selectedObject instanceof Entity entity && entity.isParty()) {
-            MenuItem pickup = new MenuItem("Pick Up");
-            pickup.setOnAction(ev -> {
-                entity.pickup(p);
-                grid.removePickup(p);
-                redraw();
-            });
-            menu.getItems().add(pickup);
-        }
-
-        // Terrain actions
-        if (obj instanceof TerrainObject t && selectedObject instanceof Entity e) {
-            MenuItem attack = new MenuItem("Attack Terrain");
-            attack.setOnAction(ev -> {
-                t.takeDamage(e.getAttackPower());
-                if (t.isDestroyed()) {
-                    grid.removeDestroyedTerrain();
-                }
-                redraw();
-            });
-            menu.getItems().add(attack);
-        }
-
-        // Entity vs Entity actions
-        if (obj instanceof Entity target && selectedObject instanceof Entity attacker && target != attacker) {
-            MenuItem attack = new MenuItem("Attack");
-            attack.setOnAction(ev -> {
-                attacker.attack(target);
-                if (target.isDead()) {
-                    grid.removeEntity(target);
-                    turnManager.removeEntity(target);
-                }
-                redraw();
-            });
-            menu.getItems().add(attack);
-        }
-
-        // Direct entity commands
-        if (obj instanceof Entity e) {
-            menu.getItems().add(new SeparatorMenuItem());
-            menu.getItems().add(createLabel("=== Commands ==="));
-
-            MenuItem moveCmd = new MenuItem("Move (F)");
-            moveCmd.setOnAction(ev -> {
-                triggerMove(e);
-                closeContextMenu();
-            });
-            menu.getItems().add(moveCmd);
-
-            MenuItem attackCmd = new MenuItem("Attack (E)");
-            attackCmd.setOnAction(ev -> {
-                triggerAttack(e);
-                closeContextMenu();
-            });
-            menu.getItems().add(attackCmd);
-
-            MenuItem itemCmd = new MenuItem("Item (R)");
-            itemCmd.setOnAction(ev -> {
-                closeContextMenu();
-                triggerUseItem(e);
-            });
-            menu.getItems().add(itemCmd);
-
-            MenuItem swapWeapons = new MenuItem("Swap Weapons");
-            swapWeapons.setOnAction(ev -> {
-                e.getCharSheet().swapWeapons();
-                redraw();
-            });
-            menu.getItems().add(swapWeapons);
-
-            Pickup standingOn = grid.getPickupAt(e.getRow(), e.getCol());
-            if (standingOn != null && e.isParty()) {
-                MenuItem pickupCmd = new MenuItem("Pick Up " + standingOn.getItem().getName());
-                pickupCmd.setOnAction(ev -> {
-                    e.pickup(standingOn);
-                    grid.removePickup(standingOn);
-                    redraw();
-                });
-                menu.getItems().add(pickupCmd);
-            }
-
-            if (!battleStarted) {
-                menu.getItems().add(new SeparatorMenuItem());
-                MenuItem removeEntity = new MenuItem("Remove Entity");
-                removeEntity.setOnAction(ev -> {
-                    grid.removeEntity(e);
-                    battleView.removeEntity(e);
-                    selectedObject = null;
-                    redraw();
-                });
-                menu.getItems().add(removeEntity);
-            }
-        }
-
-        // Direct enemy commands
-        if (obj instanceof Enemy enemy) {
-            menu.getItems().add(new SeparatorMenuItem());
-            menu.getItems().add(createLabel("=== Commands ==="));
-
-            MenuItem moveCmd = new MenuItem("Move (F)");
-            moveCmd.setOnAction(ev -> {
-                triggerEnemyMove(enemy);
-                closeContextMenu();
-            });
-            menu.getItems().add(moveCmd);
-
-            MenuItem attackCmd = new MenuItem("Attack (E)");
-            attackCmd.setOnAction(ev -> {
-                triggerEnemyAttack(enemy);
-                closeContextMenu();
-            });
-            menu.getItems().add(attackCmd);
-
-            if (!battleStarted) {
-                menu.getItems().add(new SeparatorMenuItem());
-                MenuItem removeEnemy = new MenuItem("Remove Enemy");
-                removeEnemy.setOnAction(ev -> {
-                    grid.removeEnemy(enemy);
-                    battleView.removeEnemy(enemy);
-                    selectedObject = null;
-                    redraw();
-                });
-                menu.getItems().add(removeEnemy);
-            }
-        }
-    }
-
     private void handleLeftClick(MouseEvent e) {
         int[] cellInfo = getCellAtPoint(e.getX(), e.getY());
         if (cellInfo == null) return;
@@ -474,6 +318,22 @@ public class BattleGridCanvas extends Pane {
         if (!grid.inBounds(row, col)) return;
 
         GridObject clicked = grid.getObjectAt(row, col);
+        
+        // Handle placement mode
+        if (battleView.isPlacementMode()) {
+            CharSheet placing = battleView.getCurrentPlacing();
+            if (placing != null && clicked == null && !grid.isBlocked(row, col)) {
+                // Place the entity at clicked location
+                Entity newEntity = new Entity(row, col, placing);
+                battleView.entityPlaced(newEntity);
+                return;
+            } else if (clicked != null || grid.isBlocked(row, col)) {
+                // Invalid placement location - log message
+                combatLogPane.log("Cannot place here - tile is occupied", CombatLogPane.LogType.INFO);
+                return;
+            }
+            return;
+        }
 
         // Handle move mode for Entity
         if (moveMode && movingEntity != null) {
@@ -482,19 +342,32 @@ public class BattleGridCanvas extends Pane {
                 int mobilityLimit = movingEntity.getCharSheet().getTotalAttribute(3);
 
                 if (dist <= mobilityLimit) {
+                    Entity movedEntity = movingEntity;
                     movingEntity.setRow(row);
                     movingEntity.setCol(col);
                     moveMode = false;
                     movingEntity = null;
-                    selectedObject = null;
+                    // Keep entity selected for additional actions
+                    selectedObject = movedEntity;
                     redraw();
+                    battleView.updateSelectedEntity(movedEntity);
+                    return;
+                } else {
+                    // Clicked outside range - cancel mode
+                    cancelModes();
                     return;
                 }
+            }
+            if (clicked == null && grid.isBlocked(row, col)) {
+                // Clicked on blocked space - cancel mode
+                cancelModes();
+                return;
             }
             if (clicked != null) {
                 moveMode = false;
                 movingEntity = null;
                 selectedObject = clicked;
+                battleView.updateSelectedEntity(clicked);
                 redraw();
                 return;
             }
@@ -507,19 +380,32 @@ public class BattleGridCanvas extends Pane {
                 int mobilityLimit = movingEnemy.getMovement();
 
                 if (dist <= mobilityLimit) {
+                    Enemy movedEnemy = movingEnemy;
                     movingEnemy.setRow(row);
                     movingEnemy.setCol(col);
                     moveMode = false;
                     movingEnemy = null;
-                    selectedObject = null;
+                    // Keep enemy selected for additional actions
+                    selectedObject = movedEnemy;
                     redraw();
+                    battleView.updateSelectedEntity(movedEnemy);
+                    return;
+                } else {
+                    // Clicked outside range - cancel mode
+                    cancelModes();
                     return;
                 }
+            }
+            if (clicked == null && grid.isBlocked(row, col)) {
+                // Clicked on blocked space - cancel mode
+                cancelModes();
+                return;
             }
             if (clicked != null) {
                 moveMode = false;
                 movingEnemy = null;
                 selectedObject = clicked;
+                battleView.updateSelectedEntity(clicked);
                 redraw();
                 return;
             }
@@ -528,6 +414,7 @@ public class BattleGridCanvas extends Pane {
         // Handle attack mode for Entity
         if (attackMode && attackingEntity != null) {
             if (clicked instanceof Entity target && target != attackingEntity) {
+                Entity attacker = attackingEntity;
                 int damage = Math.max(0, attackingEntity.getAttackPower() - target.getDefense());
                 attackingEntity.attack(target);
                 combatLogPane.logAttack(attackingEntity.getName(), target.getName(), 
@@ -539,10 +426,13 @@ public class BattleGridCanvas extends Pane {
                 }
                 attackMode = false;
                 attackingEntity = null;
+                selectedObject = attacker;
                 redraw();
                 battleView.refreshPartyHealth();
+                battleView.updateSelectedEntity(attacker);
                 return;
             } else if (clicked instanceof Enemy targetEnemy) {
+                Entity attacker = attackingEntity;
                 int damage = Math.max(0, attackingEntity.getAttackPower() - targetEnemy.getDefense());
                 targetEnemy.takeDamage(damage);
                 combatLogPane.logAttack(attackingEntity.getName(), targetEnemy.getName(), 
@@ -555,9 +445,12 @@ public class BattleGridCanvas extends Pane {
                 }
                 attackMode = false;
                 attackingEntity = null;
+                selectedObject = attacker;
                 redraw();
+                battleView.updateSelectedEntity(attacker);
                 return;
             } else if (clicked instanceof TerrainObject terrain) {
+                Entity attacker = attackingEntity;
                 int damage = attackingEntity.getAttackPower();
                 terrain.takeDamage(damage);
                 combatLogPane.logTerrainDamage(attackingEntity.getName(), damage, terrain.getHealth());
@@ -567,12 +460,17 @@ public class BattleGridCanvas extends Pane {
                 }
                 attackMode = false;
                 attackingEntity = null;
+                selectedObject = attacker;
                 redraw();
+                battleView.updateSelectedEntity(attacker);
                 return;
             } else if (clicked == null) {
+                Entity attacker = attackingEntity;
                 attackMode = false;
                 attackingEntity = null;
+                selectedObject = attacker;
                 redraw();
+                battleView.updateSelectedEntity(attacker);
                 return;
             }
         }
@@ -580,6 +478,7 @@ public class BattleGridCanvas extends Pane {
         // Handle attack mode for Enemy
         if (attackMode && attackingEnemy != null) {
             if (clicked instanceof Entity target) {
+                Enemy attacker = attackingEnemy;
                 int damage = Math.max(0, attackingEnemy.getAttackPower() - target.getDefense());
                 target.takeDamage(damage);
                 combatLogPane.logAttack(attackingEnemy.getName(), target.getName(), 
@@ -591,10 +490,13 @@ public class BattleGridCanvas extends Pane {
                 }
                 attackMode = false;
                 attackingEnemy = null;
+                selectedObject = attacker;
                 redraw();
                 battleView.refreshPartyHealth();
+                battleView.updateSelectedEntity(attacker);
                 return;
             } else if (clicked instanceof Enemy targetEnemy && targetEnemy != attackingEnemy) {
+                Enemy attacker = attackingEnemy;
                 int damage = attackingEnemy.getAttackPower();
                 targetEnemy.takeDamage(damage);
                 combatLogPane.logAttack(attackingEnemy.getName(), targetEnemy.getName(), 
@@ -607,9 +509,12 @@ public class BattleGridCanvas extends Pane {
                 }
                 attackMode = false;
                 attackingEnemy = null;
+                selectedObject = attacker;
                 redraw();
+                battleView.updateSelectedEntity(attacker);
                 return;
             } else if (clicked instanceof TerrainObject terrain) {
+                Enemy attacker = attackingEnemy;
                 int damage = attackingEnemy.getAttackPower();
                 terrain.takeDamage(damage);
                 combatLogPane.logTerrainDamage(attackingEnemy.getName(), damage, terrain.getHealth());
@@ -619,12 +524,17 @@ public class BattleGridCanvas extends Pane {
                 }
                 attackMode = false;
                 attackingEnemy = null;
+                selectedObject = attacker;
                 redraw();
+                battleView.updateSelectedEntity(attacker);
                 return;
             } else if (clicked == null) {
+                Enemy attacker = attackingEnemy;
                 attackMode = false;
                 attackingEnemy = null;
+                selectedObject = attacker;
                 redraw();
+                battleView.updateSelectedEntity(attacker);
                 return;
             }
         }
@@ -687,6 +597,20 @@ public class BattleGridCanvas extends Pane {
         for (int c = 0; c <= cols; c++) {
             gc.strokeLine(offsetX + c * cellSize, offsetY, offsetX + c * cellSize, offsetY + gridHeight);
         }
+        
+        // Placement mode highlight - show valid placement cells
+        if (battleView.isPlacementMode()) {
+            gc.setFill(Color.rgb(100, 200, 255, 0.3));
+            for (int r = 0; r < rows; r++) {
+                for (int c = 0; c < cols; c++) {
+                    if (grid.getObjectAt(r, c) == null && !grid.isBlocked(r, c)) {
+                        double x = offsetX + c * cellSize;
+                        double y = offsetY + r * cellSize;
+                        gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+                    }
+                }
+            }
+        }
 
         // Movement range highlight for Entity
         if (moveMode && movingEntity != null) {
@@ -705,20 +629,6 @@ public class BattleGridCanvas extends Pane {
                     }
                 }
             }
-
-            gc.setStroke(Color.rgb(0, 200, 0));
-            gc.setLineWidth(2);
-            for (int r = 0; r < rows; r++) {
-                for (int c = 0; c < cols; c++) {
-                    int dist = Math.abs(entityRow - r) + Math.abs(entityCol - c);
-                    if (dist > 0 && dist <= mobilityLimit && !grid.isBlocked(r, c)) {
-                        double x = offsetX + c * cellSize;
-                        double y = offsetY + r * cellSize;
-                        gc.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
-                    }
-                }
-            }
-            gc.setLineWidth(1);
         }
 
         // Movement range highlight for Enemy
@@ -738,20 +648,6 @@ public class BattleGridCanvas extends Pane {
                     }
                 }
             }
-
-            gc.setStroke(Color.rgb(0, 200, 0));
-            gc.setLineWidth(2);
-            for (int r = 0; r < rows; r++) {
-                for (int c = 0; c < cols; c++) {
-                    int dist = Math.abs(entityRow - r) + Math.abs(entityCol - c);
-                    if (dist > 0 && dist <= mobilityLimit && !grid.isBlocked(r, c)) {
-                        double x = offsetX + c * cellSize;
-                        double y = offsetY + r * cellSize;
-                        gc.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
-                    }
-                }
-            }
-            gc.setLineWidth(1);
         }
 
         // Attack targets highlight for Entity
