@@ -153,6 +153,41 @@ public class CombatLogPane extends VBox {
         LogType type = remainingHp <= maxHp * 0.25 ? LogType.DAMAGE : LogType.ATTACK;
         log(message, type);
     }
+    
+    /**
+     * Logs an attack roll with full details (new combat system).
+     */
+    public void logAttackRoll(String attacker, String target, int d20, int modifier, 
+                             int ac, int margin, int tier, int damage) {
+        // Log the roll details
+        String modSign = modifier >= 0 ? "+" : "";
+        int total = d20 + modifier;
+        String rollMsg = String.format("🎲 %s: d20(%d) %s%d = %d vs AC %d", 
+            attacker, d20, modSign, modifier, total, ac);
+        log(rollMsg, LogType.INFO);
+        
+        // Log the hit result
+        String tierName = switch (tier) {
+            case 1 -> "Tier 1";
+            case 2 -> "Tier 2";
+            case 3 -> "Tier 3";
+            default -> "Hit";
+        };
+        String hitMsg = String.format("⚔ %s HIT! %s (margin: %d) → %d damage to %s", 
+            tierName, margin >= 7 ? "(+" + (margin - 7) + " bonus)" : "", margin, damage, target);
+        log(hitMsg, LogType.ATTACK);
+    }
+    
+    /**
+     * Logs a missed attack with roll details.
+     */
+    public void logMiss(String attacker, String target, int d20, int modifier, int ac, int margin) {
+        String modSign = modifier >= 0 ? "+" : "";
+        int total = d20 + modifier;
+        String msg = String.format("🎲 %s: d20(%d) %s%d = %d vs AC %d → MISS (margin: %d)", 
+            attacker, d20, modSign, modifier, total, ac, margin);
+        log(msg, LogType.DAMAGE);
+    }
 
     /**
      * Logs a defeat.

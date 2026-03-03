@@ -10,14 +10,36 @@ public class Enemy extends GridObject {
     private int health;
     private int maxHealth;
     private int mobility;
-    private int attackDamage;
+    private int armorClass;           // AC for attack rolls
+    private int attackModifier;       // Modifier added to attack rolls
+    private String[] damageDice;      // Damage dice per tier [tier1, tier2, tier3]
     private int initiative;
     private int dexterity;
     private int color;
     private int instanceNumber = 0;
     private String baseName;
     private String spritePath; // Path to enemy sprite image (e.g., "sprites/enemies/spider.png")
+    
+    // Legacy field for backward compatibility
+    private int attackDamage;
 
+    public Enemy(int row, int col, String name, int maxHealth, int mobility, int armorClass, 
+                 int attackModifier, String[] damageDice, int initiative, int dexterity, int color) {
+        super(row, col);
+        this.name = name;
+        this.baseName = name;
+        this.maxHealth = maxHealth;
+        this.health = maxHealth;
+        this.mobility = mobility;
+        this.armorClass = armorClass;
+        this.attackModifier = attackModifier;
+        this.damageDice = damageDice != null ? damageDice : new String[]{"d4", "d4", "d6"};
+        this.initiative = initiative;
+        this.dexterity = dexterity;
+        this.color = color;
+    }
+    
+    // Legacy constructor for backward compatibility
     public Enemy(int row, int col, String name, int maxHealth, int mobility, int attackDamage, int initiative, int dexterity, int color) {
         super(row, col);
         this.name = name;
@@ -26,6 +48,9 @@ public class Enemy extends GridObject {
         this.health = maxHealth;
         this.mobility = mobility;
         this.attackDamage = attackDamage;
+        this.armorClass = 10;  // Default AC
+        this.attackModifier = attackDamage / 3;  // Derive modifier from legacy damage
+        this.damageDice = convertLegacyDamage(attackDamage);
         this.initiative = initiative;
         this.dexterity = dexterity;
         this.color = color;
@@ -39,29 +64,93 @@ public class Enemy extends GridObject {
         this.maxHealth = template.maxHealth;
         this.health = template.maxHealth;
         this.mobility = template.mobility;
+        this.armorClass = template.armorClass;
+        this.attackModifier = template.attackModifier;
+        this.damageDice = template.damageDice;
         this.attackDamage = template.attackDamage;
         this.initiative = template.initiative;
         this.dexterity = template.dexterity;
         this.color = template.color;
         this.spritePath = template.spritePath;
     }
+    
+    /**
+     * Convert legacy flat damage to dice tiers (for migration)
+     */
+    private String[] convertLegacyDamage(int damage) {
+        if (damage <= 2) return new String[]{"d4", "d4", "d4"};
+        if (damage <= 4) return new String[]{"d4", "d4", "d6"};
+        if (damage <= 6) return new String[]{"d6", "d6", "d8"};
+        return new String[]{"d6", "d8", "d10"};
+    }
 
+    @Deprecated
     public void attack(Entity target) {
-        int damage = attackDamage - target.getDefense();
+        int damage = getAttackPower() - target.getDefense();
         target.takeDamage(Math.max(0, damage));
     }
 
+    @Deprecated
     public void attack(Enemy target) {
-        int damage = attackDamage;  // Enemies have no defense
+        int damage = getAttackPower();  // Enemies have no defense
         target.takeDamage(Math.max(0, damage));
     }
 
+    @Deprecated
     public int getAttackPower() {
-        return attackDamage;
+        // Legacy: return flat attack damage for backward compatibility
+        if (attackDamage > 0) return attackDamage;
+        return 3 + attackModifier;  // Derive from modifier
+    }
+    
+    /**
+     * Get Armor Class for attack roll calculations
+     */
+    public int getAC() {
+        // Handle legacy enemies without explicit AC
+        if (armorClass <= 0) {
+            return 10;  // Default AC
+        }
+        return armorClass;
+    }
+    
+    public void setAC(int ac) {
+        this.armorClass = ac;
+    }
+    
+    /**
+     * Get modifier added to attack rolls
+     */
+    public int getAttackModifier() {
+        // Handle legacy enemies
+        if (attackModifier <= 0 && attackDamage > 0) {
+            return attackDamage / 3;
+        }
+        return attackModifier;
+    }
+    
+    public void setAttackModifier(int modifier) {
+        this.attackModifier = modifier;
+    }
+    
+    /**
+     * Get damage dice per tier [tier1, tier2, tier3]
+     */
+    public String[] getDamageDice() {
+        // Handle legacy enemies
+        if (damageDice == null && attackDamage > 0) {
+            damageDice = convertLegacyDamage(attackDamage);
+        }
+        return damageDice != null ? damageDice : new String[]{"d4", "d4", "d6"};
+    }
+    
+    public void setDamageDice(String[] dice) {
+        this.damageDice = dice;
     }
 
+    @Deprecated
     public int getDefense() {
-        return 0;  // Enemies have no defense
+        return 0;  // Legacy method - enemies now use AC
     }
 
     public int getMovement() {

@@ -34,6 +34,8 @@ public class AssetEditorView {
     private static final String[] ATTRIBUTE_NAMES = {"STR", "DEX", "ITV", "MOB"};
     private static final String[] ARMOR_TYPES = {"Head", "Torso", "Legs"};
     private static final String[] CRAFTING_CATEGORIES = {"Material", "Component", "Reagent", "Miscellaneous"};
+    private static final String[] DICE_TYPES = {"d4", "d6", "d8", "d10", "d12", "d20"};
+    private static final String[] STAT_TYPES = {"STRENGTH", "DEXTERITY"};
 
     public AssetEditorView(AppController appController) {
         this.appController = appController;
@@ -218,9 +220,16 @@ public class AssetEditorView {
         nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: white;");
         card.getChildren().add(nameLabel);
         
-        Label damageLabel = new Label("Damage: " + weapon.getDamage());
-        damageLabel.setStyle("-fx-text-fill: #cccccc;");
-        card.getChildren().add(damageLabel);
+        // Display damage dice tiers
+        String[] dice = weapon.getDamageDice();
+        Label diceLabel = new Label("Dice: " + dice[0] + "/" + dice[1] + "/" + dice[2]);
+        diceLabel.setStyle("-fx-text-fill: #cccccc;");
+        card.getChildren().add(diceLabel);
+        
+        Label statLabel = new Label("Stat: " + weapon.getStatType());
+        statLabel.setStyle("-fx-text-fill: #aaaaaa;");
+        card.getChildren().add(statLabel);
+        
         int[] attrs = weapon.getModifiedAttributes();
         for (int i = 0; i < attrs.length && i < ATTRIBUTE_NAMES.length; i++) {
             if (attrs[i] != 0) {
@@ -461,11 +470,29 @@ public class AssetEditorView {
     // ==================== ITEM DIALOGS ====================
 
     private void addNewWeapon() {
-        Stage dialog = createDialog("Add Weapon", 350, 300);
+        Stage dialog = createDialog("Add Weapon", 380, 450);
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField();
-        TextField damageField = new TextField("1");
+        
+        // Dice tier combos
+        ComboBox<String> tier1Combo = new ComboBox<>();
+        tier1Combo.getItems().addAll(DICE_TYPES);
+        tier1Combo.getSelectionModel().select("d6");
+        
+        ComboBox<String> tier2Combo = new ComboBox<>();
+        tier2Combo.getItems().addAll(DICE_TYPES);
+        tier2Combo.getSelectionModel().select("d6");
+        
+        ComboBox<String> tier3Combo = new ComboBox<>();
+        tier3Combo.getItems().addAll(DICE_TYPES);
+        tier3Combo.getSelectionModel().select("d8");
+        
+        // Stat type combo
+        ComboBox<String> statCombo = new ComboBox<>();
+        statCombo.getItems().addAll(STAT_TYPES);
+        statCombo.getSelectionModel().selectFirst();
+        
         TextField strField = new TextField("0");
         TextField dexField = new TextField("0");
         TextField itvField = new TextField("0");
@@ -473,7 +500,10 @@ public class AssetEditorView {
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
-        grid.add(new Label("Damage:"), 0, row); grid.add(damageField, 1, row++);
+        grid.add(new Label("Tier 1 Die:"), 0, row); grid.add(tier1Combo, 1, row++);
+        grid.add(new Label("Tier 2 Die:"), 0, row); grid.add(tier2Combo, 1, row++);
+        grid.add(new Label("Tier 3 Die:"), 0, row); grid.add(tier3Combo, 1, row++);
+        grid.add(new Label("Stat Type:"), 0, row); grid.add(statCombo, 1, row++);
         grid.add(new Label("STR Mod:"), 0, row); grid.add(strField, 1, row++);
         grid.add(new Label("DEX Mod:"), 0, row); grid.add(dexField, 1, row++);
         grid.add(new Label("ITV Mod:"), 0, row); grid.add(itvField, 1, row++);
@@ -481,17 +511,18 @@ public class AssetEditorView {
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
-            int damage = Integer.parseInt(damageField.getText());
+            String[] damageDice = {tier1Combo.getValue(), tier2Combo.getValue(), tier3Combo.getValue()};
+            String statType = statCombo.getValue();
             int[] attrs = {parseInt(strField), parseInt(dexField), parseInt(itvField), parseInt(mobField)};
             if (!name.isEmpty()) {
-                Weapon weapon = new Weapon(name, "Weapon", damage, attrs);
+                Weapon weapon = new Weapon(name, "Weapon", damageDice, statType, attrs);
                 ItemDatabase.getInstance().saveItem(weapon);
                 return true;
             }
             return false;
         }, this::refreshItemDisplay);
         
-        dialog.setScene(createDialogScene(grid, 350, 300));
+        dialog.setScene(createDialogScene(grid, 380, 450));
         dialog.showAndWait();
     }
 
@@ -651,11 +682,32 @@ public class AssetEditorView {
     // ===== EDIT DIALOGS =====
 
     private void editWeapon(Weapon weapon) {
-        Stage dialog = createDialog("Edit Weapon", 350, 300);
+        Stage dialog = createDialog("Edit Weapon", 380, 450);
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField(weapon.getName());
-        TextField damageField = new TextField(String.valueOf(weapon.getDamage()));
+        
+        // Get existing dice values
+        String[] dice = weapon.getDamageDice();
+        
+        // Dice tier combos
+        ComboBox<String> tier1Combo = new ComboBox<>();
+        tier1Combo.getItems().addAll(DICE_TYPES);
+        tier1Combo.getSelectionModel().select(dice[0]);
+        
+        ComboBox<String> tier2Combo = new ComboBox<>();
+        tier2Combo.getItems().addAll(DICE_TYPES);
+        tier2Combo.getSelectionModel().select(dice[1]);
+        
+        ComboBox<String> tier3Combo = new ComboBox<>();
+        tier3Combo.getItems().addAll(DICE_TYPES);
+        tier3Combo.getSelectionModel().select(dice[2]);
+        
+        // Stat type combo
+        ComboBox<String> statCombo = new ComboBox<>();
+        statCombo.getItems().addAll(STAT_TYPES);
+        statCombo.getSelectionModel().select(weapon.getStatType());
+        
         int[] attrs = weapon.getModifiedAttributes();
         TextField strField = new TextField(String.valueOf(attrs[0]));
         TextField dexField = new TextField(String.valueOf(attrs[1]));
@@ -664,7 +716,10 @@ public class AssetEditorView {
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
-        grid.add(new Label("Damage:"), 0, row); grid.add(damageField, 1, row++);
+        grid.add(new Label("Tier 1 Die:"), 0, row); grid.add(tier1Combo, 1, row++);
+        grid.add(new Label("Tier 2 Die:"), 0, row); grid.add(tier2Combo, 1, row++);
+        grid.add(new Label("Tier 3 Die:"), 0, row); grid.add(tier3Combo, 1, row++);
+        grid.add(new Label("Stat Type:"), 0, row); grid.add(statCombo, 1, row++);
         grid.add(new Label("STR Mod:"), 0, row); grid.add(strField, 1, row++);
         grid.add(new Label("DEX Mod:"), 0, row); grid.add(dexField, 1, row++);
         grid.add(new Label("ITV Mod:"), 0, row); grid.add(itvField, 1, row++);
@@ -672,11 +727,13 @@ public class AssetEditorView {
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
-            int damage = Integer.parseInt(damageField.getText());
+            String[] damageDice = {tier1Combo.getValue(), tier2Combo.getValue(), tier3Combo.getValue()};
+            String statType = statCombo.getValue();
             int[] newAttrs = {parseInt(strField), parseInt(dexField), parseInt(itvField), parseInt(mobField)};
             if (!name.isEmpty()) {
                 weapon.setName(name);
-                weapon.setDamage(damage);
+                weapon.setDamageDice(damageDice);
+                weapon.setStatType(statType);
                 weapon.setModifiedAttributes(newAttrs);
                 ItemDatabase.getInstance().saveItem(weapon);
                 return true;
@@ -684,7 +741,7 @@ public class AssetEditorView {
             return false;
         }, this::refreshItemDisplay);
         
-        dialog.setScene(createDialogScene(grid, 350, 300));
+        dialog.setScene(createDialogScene(grid, 380, 450));
         dialog.showAndWait();
     }
 

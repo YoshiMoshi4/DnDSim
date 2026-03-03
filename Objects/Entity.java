@@ -2,6 +2,7 @@ package Objects;
 
 import EntityRes.CharSheet;
 import EntityRes.Status;
+import EntityRes.Weapon;
 
 public class Entity extends GridObject {
 
@@ -15,21 +16,57 @@ public class Entity extends GridObject {
         this.baseName = charSheet.getName();
     }
 
+    @Deprecated
     public void attack(Entity target) {
         int damage = getAttackPower() - target.getDefense();
         target.takeDamage(Math.max(0, damage));  // Minimum 0 damage
     }
 
+    @Deprecated
     public int getAttackPower() {
-        // Attack damage = weapon damage + strength attribute
+        // Legacy: Attack damage = weapon damage + strength attribute
         // Default unarmed damage is 1
         int weaponDamage = charSheet.getEquippedWeapon() != null ? charSheet.getEquippedWeapon().getDamage() : 1;
         int strength = charSheet.getAttribute(0); // STRENGTH = 0
         return weaponDamage + strength;
     }
+    
+    /**
+     * Get Armor Class for attack roll calculations
+     * AC is based on total defense from equipped armor
+     */
+    public int getAC() {
+        return 10 + charSheet.getTotalDefense();  // Base AC 10 + armor bonus
+    }
 
+    @Deprecated
     public int getDefense() {
         return charSheet.getTotalDefense();
+    }
+    
+    /**
+     * Get the stat modifier used for attack rolls with current weapon
+     */
+    public int getAttackModifier() {
+        Weapon weapon = charSheet.getEquippedWeapon();
+        if (weapon != null) {
+            int statIndex = weapon.getStatIndex();
+            return charSheet.getTotalAttribute(statIndex);
+        }
+        // Unarmed uses STR
+        return charSheet.getTotalAttribute(0);
+    }
+    
+    /**
+     * Get damage dice from equipped weapon
+     */
+    public String[] getDamageDice() {
+        Weapon weapon = charSheet.getEquippedWeapon();
+        if (weapon != null) {
+            return weapon.getDamageDice();
+        }
+        // Unarmed dice
+        return new String[]{"d4", "d4", "d4"};
     }
 
     public int getMovement() {

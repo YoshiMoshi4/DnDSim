@@ -28,6 +28,9 @@ public class BattleGridCanvas extends Pane {
     private boolean moveMode;
     private Entity movingEntity;
     private Enemy movingEnemy;
+    
+    // Pending attack target (while dice roll panel is open)
+    private GridObject pendingAttackTarget;
 
     public BattleGridCanvas(BattleGrid grid, TurnManager tm, BattleView battleView, 
                            CombatLogPane combatLogPane) {
@@ -44,6 +47,7 @@ public class BattleGridCanvas extends Pane {
         this.moveMode = false;
         this.movingEntity = null;
         this.movingEnemy = null;
+        this.pendingAttackTarget = null;
 
         getChildren().add(canvas);
         setStyle("-fx-background-color: white;");
@@ -414,46 +418,19 @@ public class BattleGridCanvas extends Pane {
         // Handle attack mode for Entity
         if (attackMode && attackingEntity != null) {
             if (clicked instanceof Entity target && target != attackingEntity) {
-                Entity attacker = attackingEntity;
-                int damage = Math.max(0, attackingEntity.getAttackPower() - target.getDefense());
-                attackingEntity.attack(target);
-                combatLogPane.logAttack(attackingEntity.getName(), target.getName(), 
-                    damage, target.getHealth(), target.getCharSheet().getTotalHP());
-                if (target.isDead()) {
-                    grid.removeEntity(target);
-                    turnManager.removeEntity(target);
-                    combatLogPane.logDefeat(target.getName());
-                }
-                attackMode = false;
-                attackingEntity = null;
-                selectedObject = attacker;
-                redraw();
-                battleView.refreshPartyHealth();
-                battleView.updateSelectedEntity(attacker);
+                // Start dice roll sequence for Entity attacking Entity
+                startDiceRollAttack(attackingEntity, target);
                 return;
             } else if (clicked instanceof Enemy targetEnemy) {
-                Entity attacker = attackingEntity;
-                int damage = Math.max(0, attackingEntity.getAttackPower() - targetEnemy.getDefense());
-                targetEnemy.takeDamage(damage);
-                combatLogPane.logAttack(attackingEntity.getName(), targetEnemy.getName(), 
-                    damage, targetEnemy.getHealth(), targetEnemy.getMaxHealth());
-                if (targetEnemy.isDead()) {
-                    grid.removeEnemy(targetEnemy);
-                    turnManager.removeEnemy(targetEnemy);
-                    combatLogPane.logDefeat(targetEnemy.getName());
-                    battleView.getBattleState().incrementEnemiesDefeated();
-                }
-                attackMode = false;
-                attackingEntity = null;
-                selectedObject = attacker;
-                redraw();
-                battleView.updateSelectedEntity(attacker);
+                // Start dice roll sequence for Entity attacking Enemy
+                startDiceRollAttack(attackingEntity, targetEnemy);
                 return;
             } else if (clicked instanceof TerrainObject terrain) {
+                // Terrain attacks still use direct damage (no AC)
                 Entity attacker = attackingEntity;
-                int damage = attackingEntity.getAttackPower();
+                int damage = attacker.getAttackPower();
                 terrain.takeDamage(damage);
-                combatLogPane.logTerrainDamage(attackingEntity.getName(), damage, terrain.getHealth());
+                combatLogPane.logTerrainDamage(attacker.getName(), damage, terrain.getHealth());
                 if (terrain.isDestroyed()) {
                     grid.removeDestroyedTerrain();
                     combatLogPane.logTerrainDestroyed();
@@ -478,46 +455,19 @@ public class BattleGridCanvas extends Pane {
         // Handle attack mode for Enemy
         if (attackMode && attackingEnemy != null) {
             if (clicked instanceof Entity target) {
-                Enemy attacker = attackingEnemy;
-                int damage = Math.max(0, attackingEnemy.getAttackPower() - target.getDefense());
-                target.takeDamage(damage);
-                combatLogPane.logAttack(attackingEnemy.getName(), target.getName(), 
-                    damage, target.getHealth(), target.getCharSheet().getTotalHP());
-                if (target.isDead()) {
-                    grid.removeEntity(target);
-                    turnManager.removeEntity(target);
-                    combatLogPane.logDefeat(target.getName());
-                }
-                attackMode = false;
-                attackingEnemy = null;
-                selectedObject = attacker;
-                redraw();
-                battleView.refreshPartyHealth();
-                battleView.updateSelectedEntity(attacker);
+                // Start dice roll sequence for Enemy attacking Entity
+                startDiceRollAttack(attackingEnemy, target);
                 return;
             } else if (clicked instanceof Enemy targetEnemy && targetEnemy != attackingEnemy) {
-                Enemy attacker = attackingEnemy;
-                int damage = attackingEnemy.getAttackPower();
-                targetEnemy.takeDamage(damage);
-                combatLogPane.logAttack(attackingEnemy.getName(), targetEnemy.getName(), 
-                    damage, targetEnemy.getHealth(), targetEnemy.getMaxHealth());
-                if (targetEnemy.isDead()) {
-                    grid.removeEnemy(targetEnemy);
-                    turnManager.removeEnemy(targetEnemy);
-                    combatLogPane.logDefeat(targetEnemy.getName());
-                    battleView.getBattleState().incrementEnemiesDefeated();
-                }
-                attackMode = false;
-                attackingEnemy = null;
-                selectedObject = attacker;
-                redraw();
-                battleView.updateSelectedEntity(attacker);
+                // Start dice roll sequence for Enemy attacking Enemy
+                startDiceRollAttack(attackingEnemy, targetEnemy);
                 return;
             } else if (clicked instanceof TerrainObject terrain) {
+                // Terrain attacks still use direct damage (no AC)
                 Enemy attacker = attackingEnemy;
-                int damage = attackingEnemy.getAttackPower();
+                int damage = attacker.getAttackPower();
                 terrain.takeDamage(damage);
-                combatLogPane.logTerrainDamage(attackingEnemy.getName(), damage, terrain.getHealth());
+                combatLogPane.logTerrainDamage(attacker.getName(), damage, terrain.getHealth());
                 if (terrain.isDestroyed()) {
                     grid.removeDestroyedTerrain();
                     combatLogPane.logTerrainDestroyed();
@@ -538,6 +488,101 @@ public class BattleGridCanvas extends Pane {
                 return;
             }
         }
+    }
+    
+    /**
+     * Start the dice roll attack sequence via DiceRollPanel
+     */
+    private void startDiceRollAttack(GridObject attacker, GridObject target) {
+        pendingAttackTarget = target;
+        
+        // Show dice panel, hide action panel
+        battleView.showDiceRollPanel();
+        
+        DiceRollPanel dicePanel = battleView.getDiceRollPanel();
+        dicePanel.startAttack(attacker, target, 
+            this::handleAttackOutcome,
+            this::handleAttackCancelled
+        );
+    }
+    
+    /**
+     * Handle the outcome of a dice roll attack
+     */
+    private void handleAttackOutcome(DiceRollPanel.AttackOutcome outcome) {
+        GridObject attacker = outcome.attacker;
+        GridObject target = outcome.target;
+        
+        if (outcome.hit) {
+            // Apply damage
+            CombatManager.applyDamage(target, outcome.totalDamage);
+            
+            // Log the attack with detailed info
+            combatLogPane.logAttackRoll(
+                CombatManager.getAttackerName(attacker),
+                CombatManager.getTargetName(target),
+                outcome.d20Roll, outcome.modifier, outcome.targetAC,
+                outcome.margin, outcome.tier, outcome.totalDamage
+            );
+            
+            // Check for defeat
+            if (CombatManager.isTargetDead(target)) {
+                if (target instanceof Entity e) {
+                    grid.removeEntity(e);
+                    turnManager.removeEntity(e);
+                } else if (target instanceof Enemy en) {
+                    grid.removeEnemy(en);
+                    turnManager.removeEnemy(en);
+                    battleView.getBattleState().incrementEnemiesDefeated();
+                }
+                combatLogPane.logDefeat(CombatManager.getTargetName(target));
+            }
+            
+            // Update stats
+            battleView.getBattleState().addDamageDealt(outcome.totalDamage);
+            if (target instanceof Entity) {
+                battleView.getBattleState().addDamageTaken(outcome.totalDamage);
+            }
+        } else {
+            // Miss - log it
+            combatLogPane.logMiss(
+                CombatManager.getAttackerName(attacker),
+                CombatManager.getTargetName(target),
+                outcome.d20Roll, outcome.modifier, outcome.targetAC, outcome.margin
+            );
+        }
+        
+        // Clean up attack state
+        finishAttack(attacker);
+    }
+    
+    /**
+     * Handle attack cancellation
+     */
+    private void handleAttackCancelled() {
+        GridObject attacker = attackingEntity != null ? attackingEntity : attackingEnemy;
+        finishAttack(attacker);
+    }
+    
+    /**
+     * Clean up after attack completes or is cancelled
+     */
+    private void finishAttack(GridObject attacker) {
+        attackMode = false;
+        attackingEntity = null;
+        attackingEnemy = null;
+        pendingAttackTarget = null;
+        
+        // Hide dice panel, show action panel
+        battleView.hideDiceRollPanel();
+        
+        if (attacker != null) {
+            selectedObject = attacker;
+            battleView.updateSelectedEntity(attacker);
+        }
+        
+        redraw();
+        battleView.refreshPartyHealth();
     }
 
     private void attemptMove(GridObject obj, int row, int col) {

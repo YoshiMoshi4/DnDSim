@@ -41,6 +41,9 @@ public class BattleView {
     private Button endTurnBtn;
     private final Map<String, Integer> enemyInstanceCounts = new HashMap<>();
     
+    // Dice roll panel for combat
+    private DiceRollPanel diceRollPanel;
+    
     // Pull-up panel
     private VBox addObjectsPanel;
     private boolean panelExpanded = false;
@@ -92,16 +95,23 @@ public class BattleView {
         leftPanel.getChildren().addAll(partyHealthPane, combatLogPane);
         VBox.setVgrow(combatLogPane, Priority.ALWAYS);
         
-        // Right side: Action panel
+        // Right side: Action panel and dice roll panel (swappable)
         actionPanel = createActionPanel();
+        diceRollPanel = new DiceRollPanel();
+        diceRollPanel.setVisible(false);
+        diceRollPanel.setManaged(false);
+        
+        StackPane rightPanel = new StackPane();
+        rightPanel.getChildren().addAll(actionPanel, diceRollPanel);
+        rightPanel.setAlignment(Pos.TOP_CENTER);
 
         // Grid in center with left panel and action panel
         BorderPane centerArea = new BorderPane();
         centerArea.setLeft(leftPanel);
         centerArea.setCenter(gridCanvas);
-        centerArea.setRight(actionPanel);
+        centerArea.setRight(rightPanel);
         BorderPane.setMargin(leftPanel, new Insets(0, 10, 0, 0));
-        BorderPane.setMargin(actionPanel, new Insets(0, 0, 0, 10));
+        BorderPane.setMargin(rightPanel, new Insets(0, 0, 0, 10));
         mainPane.setCenter(centerArea);
 
         // Bottom area with controls and pull-up panel
@@ -735,6 +745,30 @@ public class BattleView {
     
     public BattleState getBattleState() {
         return battleState;
+    }
+    
+    public DiceRollPanel getDiceRollPanel() {
+        return diceRollPanel;
+    }
+    
+    /**
+     * Show the dice roll panel and hide the action panel
+     */
+    public void showDiceRollPanel() {
+        actionPanel.setVisible(false);
+        actionPanel.setManaged(false);
+        diceRollPanel.setVisible(true);
+        diceRollPanel.setManaged(true);
+    }
+    
+    /**
+     * Hide the dice roll panel and show the action panel
+     */
+    public void hideDiceRollPanel() {
+        diceRollPanel.setVisible(false);
+        diceRollPanel.setManaged(false);
+        actionPanel.setVisible(true);
+        actionPanel.setManaged(true);
     }
 
     public void addEntity(Entity entity) {
