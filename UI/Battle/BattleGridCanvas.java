@@ -28,6 +28,8 @@ public class BattleGridCanvas extends Pane {
     private boolean moveMode;
     private Entity movingEntity;
     private Enemy movingEnemy;
+    private boolean pickupMode;
+    private Entity pickupEntity;
     
     // Pending attack target (while dice roll panel is open)
     private GridObject pendingAttackTarget;
@@ -48,6 +50,8 @@ public class BattleGridCanvas extends Pane {
         this.movingEntity = null;
         this.movingEnemy = null;
         this.pendingAttackTarget = null;
+        this.pickupMode = false;
+        this.pickupEntity = null;
 
         getChildren().add(canvas);
         setStyle("-fx-background-color: white;");
@@ -80,7 +84,7 @@ public class BattleGridCanvas extends Pane {
                 int col = cellInfo[1];
                 if (grid.inBounds(row, col)) {
                     GridObject obj = grid.getObjectAt(row, col);
-                    if (obj != null && !moveMode && !attackMode) {
+                    if (obj != null && !moveMode && !attackMode && !pickupMode) {
                         // Select the entity and update action panel
                         selectedObject = obj;
                         battleView.updateSelectedEntity(obj);
@@ -127,6 +131,15 @@ public class BattleGridCanvas extends Pane {
                         battleView.updateSelectedEntity(entity);
                         e.consume();
                     }
+                    case P -> {
+                        // Toggle pickup mode
+                        if (pickupMode && pickupEntity == entity) {
+                            cancelModes();
+                        } else {
+                            triggerPickup(entity);
+                        }
+                        e.consume();
+                    }
                     case ESCAPE -> {
                         cancelModes();
                         e.consume();
@@ -171,6 +184,8 @@ public class BattleGridCanvas extends Pane {
         attackMode = false;
         attackingEntity = null;
         attackingEnemy = null;
+        pickupMode = false;
+        pickupEntity = null;
         redraw();
     }
 
@@ -178,15 +193,27 @@ public class BattleGridCanvas extends Pane {
         selectedObject = entity;
         attackMode = false;
         attackingEntity = null;
+        pickupMode = false;
+        pickupEntity = null;
         moveMode = true;
         movingEntity = entity;
         redraw();
     }
 
     private void triggerAttack(Entity entity) {
+        // Check if entity has ammo for ranged weapon
+        if (!CombatManager.hasAmmoForWeapon(entity)) {
+            Weapon weapon = entity.getCharSheet().getEquippedWeapon();
+            String ammoType = weapon != null ? weapon.getAmmoType() : "ammo";
+            showAlert(Alert.AlertType.WARNING, "No Ammunition", 
+                "No " + ammoType + " ammo in inventory!");
+            return;
+        }
         selectedObject = entity;
         attackMode = true;
         attackingEntity = entity;
+        pickupMode = false;
+        pickupEntity = null;
         redraw();
     }
 
@@ -237,11 +264,32 @@ public class BattleGridCanvas extends Pane {
         battleView.refreshPartyHealth();
     }
 
+    private void triggerPickup(Entity entity) {
+        selectedObject = entity;
+        attackMode = false;
+        attackingEntity = null;
+        moveMode = false;
+        movingEntity = null;
+        pickupMode = true;
+        pickupEntity = entity;
+        combatLogPane.log("Select an adjacent item to pick up...", CombatLogPane.LogType.INFO);
+        redraw();
+    }
+
+    public void startPickupMode() {
+        if (!battleStarted) return;
+        if (selectedObject instanceof Entity entity && entity.isParty()) {
+            triggerPickup(entity);
+        }
+    }
+
     private void triggerEnemyMove(Enemy enemy) {
         selectedObject = enemy;
         attackMode = false;
         attackingEntity = null;
         attackingEnemy = null;
+        pickupMode = false;
+        pickupEntity = null;
         moveMode = true;
         movingEntity = null;
         movingEnemy = enemy;
@@ -253,6 +301,8 @@ public class BattleGridCanvas extends Pane {
         attackMode = true;
         attackingEntity = null;
         attackingEnemy = enemy;
+        pickupMode = false;
+        pickupEntity = null;
         moveMode = false;
         movingEntity = null;
         movingEnemy = null;
@@ -339,11 +389,49 @@ public class BattleGridCanvas extends Pane {
             return;
         }
 
+        // Handle pickup mode for Entity
+        if (pickupMode && pickupEntity != null) {
+            Pickup pickup = grid.getPickupAt(row, col);
+            if (pickup != null) {
+                // Check if adjacent to entity (within 1 tile)
+                int dx = Math.abs(pickupEntity.getRow() - row);
+                int dy = Math.abs(pickupEntity.getCol() - col);
+                
+                if (dx <= 1 && dy <= 1) {
+                    // Pick up the item
+                    Item item = pickup.getItem();
+                    pickupEntity.getCharSheet().addItem(item);
+                    pickupEntity.getCharSheet().save();
+                    grid.removePickup(pickup);
+                    
+                    combatLogPane.log(pickupEntity.getName() + " picked up " + item.getName(), CombatLogPane.LogType.INFO);
+                    
+                    Entity entity = pickupEntity;
+                    pickupMode = false;
+                    pickupEntity = null;
+                    selectedObject = entity;
+                    redraw();
+                    battleView.updateSelectedEntity(entity);
+                    return;
+                }
+                // Too far away - fall through to cancel
+            }
+            // Clicked empty space, non-pickup, or too-far pickup - cancel mode
+            Entity entity = pickupEntity;
+            pickupMode = false;
+            pickupEntity = null;
+            selectedObject = entity;
+            combatLogPane.log("Pickup cancelled.", CombatLogPane.LogType.INFO);
+            redraw();
+            battleView.updateSelectedEntity(entity);
+            return;
+        }
+
         // Handle move mode for Entity
         if (moveMode && movingEntity != null) {
             if (clicked == null && !grid.isBlocked(row, col)) {
                 int dist = Math.abs(movingEntity.getRow() - row) + Math.abs(movingEntity.getCol() - col);
-                int mobilityLimit = movingEntity.getCharSheet().getTotalAttribute(3);
+                int mobilityLimit = movingEntity.getCharSheet().getTotalAttribute(2);
 
                 if (dist <= mobilityLimit) {
                     Entity movedEntity = movingEntity;
@@ -513,6 +601,12 @@ public class BattleGridCanvas extends Pane {
         GridObject attacker = outcome.attacker;
         GridObject target = outcome.target;
         
+        // Consume ammo for ranged weapons (regardless of hit/miss)
+        String ammoConsumed = CombatManager.consumeAmmo(attacker);
+        if (ammoConsumed != null) {
+            combatLogPane.log(CombatManager.getAttackerName(attacker) + " used 1 " + ammoConsumed, CombatLogPane.LogType.INFO);
+        }
+        
         if (outcome.hit) {
             // Apply damage
             CombatManager.applyDamage(target, outcome.totalDamage);
@@ -592,7 +686,7 @@ public class BattleGridCanvas extends Pane {
             int dist = Math.abs(e.getRow() - row) + Math.abs(e.getCol() - col);
 
             if (battleStarted) {
-                int mobilityLimit = e.getCharSheet().getTotalAttribute(3);
+                int mobilityLimit = e.getCharSheet().getTotalAttribute(2);
                 if (dist > mobilityLimit) return;
             }
         }
@@ -659,7 +753,7 @@ public class BattleGridCanvas extends Pane {
 
         // Movement range highlight for Entity
         if (moveMode && movingEntity != null) {
-            int mobilityLimit = movingEntity.getCharSheet().getTotalAttribute(3);
+            int mobilityLimit = movingEntity.getCharSheet().getTotalAttribute(2);
             int entityRow = movingEntity.getRow();
             int entityCol = movingEntity.getCol();
 

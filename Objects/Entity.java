@@ -70,7 +70,7 @@ public class Entity extends GridObject {
     }
 
     public int getMovement() {
-        return charSheet.getAttribute(3);
+        return charSheet.getAttribute(2);
     }
 
     public int getHealth() {

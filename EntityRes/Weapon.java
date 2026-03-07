@@ -1,11 +1,15 @@
 package EntityRes;
 
+import java.util.ArrayList;
+
 public class Weapon extends Item {
 
     // Fields
     private String[] damageDice;  // Damage dice per tier [tier1, tier2, tier3], e.g. ["d6", "d6", "d10"]
     private String statType;      // "STRENGTH" or "DEXTERITY" - which stat modifier to use
+    private String ammoType;      // Ammo type required (null for melee weapons), e.g. "12 Gauge", "Arrow"
     private int[] modifiedAttributes;
+    private ArrayList<ItemAbility> abilities;
     
     // Legacy field for backward compatibility during migration
     private int damage;
@@ -16,6 +20,18 @@ public class Weapon extends Item {
         this.damageDice = damageDice != null ? damageDice : new String[]{"d4", "d4", "d6"};
         this.statType = statType != null ? statType : "STRENGTH";
         this.modifiedAttributes = modifiedAttributes;
+        this.ammoType = null;  // Default: melee weapon
+        this.abilities = new ArrayList<>();
+    }
+    
+    // Constructor with ammo type
+    public Weapon(String name, String type, String[] damageDice, String statType, String ammoType, int[] modifiedAttributes) {
+        super(name, type);
+        this.damageDice = damageDice != null ? damageDice : new String[]{"d4", "d4", "d6"};
+        this.statType = statType != null ? statType : "STRENGTH";
+        this.ammoType = ammoType;
+        this.modifiedAttributes = modifiedAttributes;
+        this.abilities = new ArrayList<>();
     }
     
     // Legacy constructor for backward compatibility
@@ -69,6 +85,24 @@ public class Weapon extends Item {
         return 0; // STR default
     }
     
+    /**
+     * Get the ammo type this weapon uses (null for melee weapons)
+     */
+    public String getAmmoType() {
+        return ammoType;
+    }
+    
+    public void setAmmoType(String ammoType) {
+        this.ammoType = ammoType;
+    }
+    
+    /**
+     * Check if this weapon is ranged (requires ammo)
+     */
+    public boolean isRanged() {
+        return ammoType != null && !ammoType.isEmpty();
+    }
+    
     // Legacy method for backward compatibility
     @Deprecated
     public void setDamage(int damage) {
@@ -99,22 +133,51 @@ public class Weapon extends Item {
     }
 
     public void setModifiedAttributes(int[] modifiedAttributes) {
-        if (modifiedAttributes.length == this.modifiedAttributes.length) {
-            for (int i = 0; i < modifiedAttributes.length; i++) {
+        // Always store as 4-element array
+        this.modifiedAttributes = new int[4];
+        if (modifiedAttributes != null) {
+            for (int i = 0; i < modifiedAttributes.length && i < 4; i++) {
                 this.modifiedAttributes[i] = modifiedAttributes[i];
             }
-        } else {
-            // Temp exception
-            System.out.println("attributesLength Error");
         }
     }
 
     public int[] getModifiedAttributes() {
-        int[] ans = new int[modifiedAttributes.length];
-        for (int i = 0; i < modifiedAttributes.length; i++) {
-            ans[i] = modifiedAttributes[i];
+        // Always return 4-element array (padded with zeros for older items)
+        int[] ans = new int[4];
+        if (modifiedAttributes != null) {
+            for (int i = 0; i < modifiedAttributes.length && i < 4; i++) {
+                ans[i] = modifiedAttributes[i];
+            }
         }
         return ans;
+    }
+    
+    // Abilities
+    public ArrayList<ItemAbility> getAbilities() {
+        if (abilities == null) abilities = new ArrayList<>();
+        return abilities;
+    }
+    
+    public void setAbilities(ArrayList<ItemAbility> abilities) {
+        this.abilities = abilities != null ? abilities : new ArrayList<>();
+    }
+    
+    public void addAbility(ItemAbility ability) {
+        if (abilities == null) abilities = new ArrayList<>();
+        abilities.add(ability);
+    }
+    
+    public void removeAbility(ItemAbility ability) {
+        if (abilities != null) abilities.remove(ability);
+    }
+    
+    public void clearAbilities() {
+        if (abilities != null) abilities.clear();
+    }
+    
+    public boolean hasAbilities() {
+        return abilities != null && !abilities.isEmpty();
     }
 
 }

@@ -2,41 +2,63 @@ package EntityRes;
 
 public class Ammunition extends Item {
 
+    private String ammoType;  // e.g., "12 Gauge", "Arrow", "Bolt"
+    
+    // Legacy field for backward compatibility
     private int damageBonus;
-    private String compatibleWeaponType;  // e.g., "Bow", "Crossbow", "Any"
+    private String compatibleWeaponType;
 
-    public Ammunition(String name, String type, int color, int damageBonus, String compatibleWeaponType) {
+    public Ammunition(String name, String type, int color, String ammoType) {
         super(name, type, color);
-        this.damageBonus = damageBonus;
-        this.compatibleWeaponType = compatibleWeaponType;
+        this.ammoType = ammoType;
     }
 
-    public Ammunition(String name, int damageBonus, String compatibleWeaponType) {
+    public Ammunition(String name, String ammoType) {
         super(name, "Ammunition", 5);  // Default orange color for ammo
-        this.damageBonus = damageBonus;
-        this.compatibleWeaponType = compatibleWeaponType;
+        this.ammoType = ammoType;
     }
 
+    public String getAmmoType() {
+        // Handle legacy format
+        if (ammoType == null && compatibleWeaponType != null) {
+            return compatibleWeaponType;
+        }
+        return ammoType != null ? ammoType : "Any";
+    }
+
+    public void setAmmoType(String ammoType) {
+        this.ammoType = ammoType;
+    }
+
+    // Legacy methods for backward compatibility
+    @Deprecated
     public int getDamageBonus() {
         return damageBonus;
     }
 
+    @Deprecated
     public void setDamageBonus(int damageBonus) {
         this.damageBonus = damageBonus;
     }
 
+    @Deprecated
     public String getCompatibleWeaponType() {
-        return compatibleWeaponType;
+        return getAmmoType();
     }
 
+    @Deprecated
     public void setCompatibleWeaponType(String compatibleWeaponType) {
-        this.compatibleWeaponType = compatibleWeaponType;
+        this.ammoType = compatibleWeaponType;
     }
 
     public boolean isCompatibleWith(Weapon weapon) {
-        if (compatibleWeaponType == null || compatibleWeaponType.equals("Any")) {
+        String weaponAmmoType = weapon.getAmmoType();
+        if (weaponAmmoType == null || ammoType == null) {
+            return false;  // Melee weapons don't use ammo
+        }
+        if (ammoType.equals("Any") || weaponAmmoType.equals("Any")) {
             return true;
         }
-        return weapon.getType().equalsIgnoreCase(compatibleWeaponType);
+        return ammoType.equalsIgnoreCase(weaponAmmoType);
     }
 }

@@ -24,7 +24,7 @@ public class Enemy extends GridObject {
     private int attackDamage;
 
     public Enemy(int row, int col, String name, int maxHealth, int mobility, int armorClass, 
-                 int attackModifier, String[] damageDice, int initiative, int dexterity, int color) {
+                 String[] damageDice, int initiative, int dexterity, int color) {
         super(row, col);
         this.name = name;
         this.baseName = name;
@@ -32,7 +32,6 @@ public class Enemy extends GridObject {
         this.health = maxHealth;
         this.mobility = mobility;
         this.armorClass = armorClass;
-        this.attackModifier = attackModifier;
         this.damageDice = damageDice != null ? damageDice : new String[]{"d4", "d4", "d6"};
         this.initiative = initiative;
         this.dexterity = dexterity;
@@ -119,14 +118,10 @@ public class Enemy extends GridObject {
     }
     
     /**
-     * Get modifier added to attack rolls
+     * Get modifier added to attack rolls (uses dexterity)
      */
     public int getAttackModifier() {
-        // Handle legacy enemies
-        if (attackModifier <= 0 && attackDamage > 0) {
-            return attackDamage / 3;
-        }
-        return attackModifier;
+        return dexterity;
     }
     
     public void setAttackModifier(int modifier) {
@@ -177,7 +172,8 @@ public class Enemy extends GridObject {
     }
 
     public int getInitiative() {
-        return initiative;
+        // Initiative is now based on dexterity
+        return dexterity;
     }
 
     public int getDexterity() {

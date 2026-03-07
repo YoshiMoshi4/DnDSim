@@ -1,0 +1,1 @@
+{"defense":1,"modifiedAttributes":[0,0,0,0,0],"abilities":[{"name":"REGEN","description":"Regenerates 2HP every turn","triggerType":"ON_TURN_START","effectType":"HEAL","magnitude":2,"targetAttribute":0}],"armorType":0,"name":"Plasmoid Core","type":"Accessory","color":9,"quantity":1}

@@ -38,6 +38,7 @@ public class BattleView {
     private Button attackBtn;
     private Button useItemBtn;
     private Button swapBtn;
+    private Button pickupBtn;
     private Button endTurnBtn;
     private final Map<String, Integer> enemyInstanceCounts = new HashMap<>();
     
@@ -334,13 +335,13 @@ public class BattleView {
         attrRow1.getChildren().addAll(strLabel, dexLabel);
         
         HBox attrRow2 = new HBox(8);
-        Label itvLabel = new Label("ITV: --");
-        itvLabel.setId("itvLabel");
-        itvLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
+        Label intLabel = new Label("INT: --");
+        intLabel.setId("intLabel");
+        intLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
         Label mobLabel = new Label("MOB: --");
         mobLabel.setId("mobLabel");
         mobLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
-        attrRow2.getChildren().addAll(itvLabel, mobLabel);
+        attrRow2.getChildren().addAll(intLabel, mobLabel);
         
         // Weapons section
         Label weapLabel = new Label("Weapons");
@@ -392,6 +393,14 @@ public class BattleView {
         swapBtn.setDisable(true);
         swapBtn.setOnAction(e -> gridCanvas.triggerSwapForSelected());
         
+        pickupBtn = new Button("Pickup (P)");
+        pickupBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.POTION));
+        pickupBtn.getStyleClass().add("button");
+        pickupBtn.setMaxWidth(Double.MAX_VALUE);
+        pickupBtn.setDisable(true);
+        pickupBtn.setOnAction(e -> gridCanvas.startPickupMode());
+        pickupBtn.setStyle("-fx-background-color: #8B4513;");
+        
         Separator sep2 = new Separator();
         sep2.setStyle("-fx-background-color: #505052;");
         
@@ -411,7 +420,7 @@ public class BattleView {
             selectLabel, selectedEntityLabel,
             attrLabel, attrRow1, attrRow2,
             weapLabel, primaryLabel, secondaryLabel, sep,
-            actionsLabel, moveBtn, attackBtn, useItemBtn, swapBtn, sep2,
+            actionsLabel, moveBtn, attackBtn, useItemBtn, swapBtn, pickupBtn, sep2,
             endTurnBtn, roundLabel
         );
         
@@ -432,7 +441,7 @@ public class BattleView {
         Label selectedLabel = (Label) actionPanel.lookup("#selectedEntityLabel");
         Label strLabel = (Label) actionPanel.lookup("#strLabel");
         Label dexLabel = (Label) actionPanel.lookup("#dexLabel");
-        Label itvLabel = (Label) actionPanel.lookup("#itvLabel");
+        Label intLabel = (Label) actionPanel.lookup("#intLabel");
         Label mobLabel = (Label) actionPanel.lookup("#mobLabel");
         Label primaryLabel = (Label) actionPanel.lookup("#primaryLabel");
         Label secondaryLabel = (Label) actionPanel.lookup("#secondaryLabel");
@@ -441,7 +450,7 @@ public class BattleView {
             if (selectedLabel != null) selectedLabel.setText("--");
             if (strLabel != null) strLabel.setText("STR: --");
             if (dexLabel != null) dexLabel.setText("DEX: --");
-            if (itvLabel != null) itvLabel.setText("ITV: --");
+            if (intLabel != null) intLabel.setText("INT: --");
             if (mobLabel != null) mobLabel.setText("MOB: --");
             if (primaryLabel != null) primaryLabel.setText("1: --");
             if (secondaryLabel != null) secondaryLabel.setText("2: --");
@@ -449,12 +458,13 @@ public class BattleView {
             attackBtn.setDisable(true);
             useItemBtn.setDisable(true);
             swapBtn.setDisable(true);
+            pickupBtn.setDisable(true);
         } else if (obj instanceof Entity e) {
             if (selectedLabel != null) selectedLabel.setText(e.getName());
             if (strLabel != null) strLabel.setText("STR: " + e.getCharSheet().getTotalAttribute(0));
             if (dexLabel != null) dexLabel.setText("DEX: " + e.getCharSheet().getTotalAttribute(1));
-            if (itvLabel != null) itvLabel.setText("ITV: " + e.getCharSheet().getTotalAttribute(2));
-            if (mobLabel != null) mobLabel.setText("MOB: " + e.getCharSheet().getTotalAttribute(3));
+            if (intLabel != null) intLabel.setText("INT: " + e.getCharSheet().getTotalAttribute(3));
+            if (mobLabel != null) mobLabel.setText("MOB: " + e.getCharSheet().getTotalAttribute(2));
             
             Weapon primary = e.getCharSheet().getEquippedWeapon();
             Weapon secondary = e.getCharSheet().getEquippedSecondary();
@@ -466,11 +476,12 @@ public class BattleView {
             attackBtn.setDisable(!canAct);
             useItemBtn.setDisable(!canAct);
             swapBtn.setDisable(!canAct);
+            pickupBtn.setDisable(!canAct);
         } else if (obj instanceof Enemy en) {
             if (selectedLabel != null) selectedLabel.setText(en.getName());
             if (strLabel != null) strLabel.setText("STR: --");
             if (dexLabel != null) dexLabel.setText("DEX: --");
-            if (itvLabel != null) itvLabel.setText("ITV: --");
+            if (intLabel != null) intLabel.setText("INT: --");
             if (mobLabel != null) mobLabel.setText("MOB: " + en.getMovement());
             if (primaryLabel != null) primaryLabel.setText("ATK: " + en.getAttackPower());
             if (secondaryLabel != null) secondaryLabel.setText("");
@@ -480,6 +491,7 @@ public class BattleView {
             attackBtn.setDisable(!canAct);
             useItemBtn.setDisable(true);
             swapBtn.setDisable(true);
+            pickupBtn.setDisable(true);
         }
         
         // Keep focus on grid canvas for keyboard shortcuts
@@ -576,12 +588,20 @@ public class BattleView {
         
         combatLogPane.logRound(1);
         
-        // Log first turn
+        // Log first turn and process abilities
         if (!turnManager.getTurnOrder().isEmpty()) {
             GridObject first = turnManager.getTurnOrder().get(0);
             String firstName = (first instanceof Entity e) ? e.getName() : 
                               (first instanceof Enemy en) ? en.getName() : "Unknown";
             combatLogPane.logTurnStart(firstName);
+            
+            // Process ON_TURN_START abilities for first combatant
+            if (first instanceof Entity e) {
+                java.util.List<String> abilityMessages = e.getCharSheet().processEquippedAbilities(EntityRes.ItemAbility.ON_TURN_START);
+                for (String msg : abilityMessages) {
+                    combatLogPane.logAbility(firstName, msg);
+                }
+            }
         }
         
         // Check for pending tie resolutions
@@ -592,13 +612,14 @@ public class BattleView {
         gridCanvas.setBattleStarted(true);
         timelinePane.setVisible(true);
         timelinePane.refresh();
+        partyHealthPane.refresh(grid.getEntities());
         updateActionPanel();
         gridCanvas.redraw();
     }
 
     private void handleNextTurn() {
         int prevRound = turnManager.getRound();
-        turnManager.nextTurn();
+        java.util.List<String> abilityMessages = turnManager.nextTurn();
         int newRound = turnManager.getRound();
         
         // Log new round if round changed
@@ -613,10 +634,16 @@ public class BattleView {
             String name = (current instanceof Entity e) ? e.getName() : 
                          (current instanceof Enemy en) ? en.getName() : "Unknown";
             combatLogPane.logTurnStart(name);
+            
+            // Log any triggered abilities
+            for (String msg : abilityMessages) {
+                combatLogPane.logAbility(name, msg);
+            }
         }
         
         updateActionPanel();
         timelinePane.refresh();
+        partyHealthPane.refresh(grid.getEntities());
         gridCanvas.redraw();
     }
     
@@ -1122,7 +1149,7 @@ public class BattleView {
         content.getStyleClass().add("panel");
 
         Map<String, Weapon> weapons = ItemDatabase.getInstance().getAllWeapons();
-        Map<String, Armor> armors = ItemDatabase.getInstance().getAllArmors();
+        Map<String, Accessory> accessories = ItemDatabase.getInstance().getAllAccessories();
         Map<String, Consumable> consumables = ItemDatabase.getInstance().getAllConsumables();
 
         if (!weapons.isEmpty()) {
@@ -1145,25 +1172,22 @@ public class BattleView {
             }
         }
 
-        if (!armors.isEmpty()) {
-            Label header = new Label("Armor");
+        if (!accessories.isEmpty()) {
+            Label header = new Label("Accessories");
             header.getStyleClass().add("label-header");
             content.getChildren().add(header);
 
-            String[] armorSlotNames = {"Head", "Torso", "Legs"};
-            for (Armor armor : armors.values()) {
-                int slotIndex = armor.getArmorType();
-                String slotName = (slotIndex >= 0 && slotIndex < armorSlotNames.length) ? armorSlotNames[slotIndex] : "?";
-                String btnText = String.format("%s  |  DEF: %d  |  Slot: %s",
-                        armor.getName(), armor.getDefense(), slotName);
+            for (Accessory accessory : accessories.values()) {
+                String btnText = String.format("%s  |  DEF: %d",
+                        accessory.getName(), accessory.getDefense());
                 Button btn = new Button(btnText);
                 btn.getStyleClass().add("button");
                 btn.setMaxWidth(Double.MAX_VALUE);
                 btn.setOnAction(e -> {
-                    Pickup itemPickup = new Pickup(0, 0, armor);
+                    Pickup itemPickup = new Pickup(0, 0, accessory);
                     grid.addPickupAtNextAvailable(itemPickup);
                     gridCanvas.redraw();
-                    addStatusLabel.setText("Added pickup: " + armor.getName());
+                    addStatusLabel.setText("Added pickup: " + accessory.getName());
                 });
                 content.getChildren().add(btn);
             }
@@ -1192,7 +1216,7 @@ public class BattleView {
             }
         }
 
-        if (weapons.isEmpty() && armors.isEmpty() && consumables.isEmpty()) {
+        if (weapons.isEmpty() && accessories.isEmpty() && consumables.isEmpty()) {
             Label empty = new Label("No pickup items available");
             empty.setStyle("-fx-text-fill: #808080;");
             content.getChildren().add(empty);

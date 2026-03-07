@@ -1,5 +1,8 @@
 package UI.Battle;
 
+import EntityRes.Ammunition;
+import EntityRes.Item;
+import EntityRes.Weapon;
 import Objects.Entity;
 import Objects.Enemy;
 import Objects.GridObject;
@@ -256,5 +259,64 @@ public class CombatManager {
             }
         }
         return "STRENGTH";
+    }
+    
+    /**
+     * Consume ammunition for a ranged weapon attack.
+     * @param attacker The attacking entity
+     * @return The name of the ammo consumed, or null if no ammo needed/consumed
+     */
+    public static String consumeAmmo(GridObject attacker) {
+        if (!(attacker instanceof Entity e)) {
+            return null; // Enemies don't use ammo
+        }
+        
+        Weapon weapon = e.getCharSheet().getEquippedWeapon();
+        if (weapon == null || !weapon.isRanged()) {
+            return null; // No weapon or melee weapon
+        }
+        
+        String ammoType = weapon.getAmmoType();
+        
+        // Find compatible ammunition in inventory
+        for (Item item : e.getCharSheet().getInventory()) {
+            if (item instanceof Ammunition ammo) {
+                if (ammo.getAmmoType().equals(ammoType)) {
+                    // Found compatible ammo - consume 1
+                    e.getCharSheet().removeItemQuantity(ammo, 1);
+                    return ammo.getName();
+                }
+            }
+        }
+        
+        return null; // No compatible ammo found
+    }
+    
+    /**
+     * Check if attacker has ammo for their ranged weapon.
+     * @return true if weapon is melee OR has compatible ammo, false if ranged with no ammo
+     */
+    public static boolean hasAmmoForWeapon(GridObject attacker) {
+        if (!(attacker instanceof Entity e)) {
+            return true; // Enemies always have ammo
+        }
+        
+        Weapon weapon = e.getCharSheet().getEquippedWeapon();
+        if (weapon == null || !weapon.isRanged()) {
+            return true; // No weapon or melee weapon doesn't need ammo
+        }
+        
+        String ammoType = weapon.getAmmoType();
+        
+        // Check for compatible ammunition
+        for (Item item : e.getCharSheet().getInventory()) {
+            if (item instanceof Ammunition ammo) {
+                if (ammo.getAmmoType().equals(ammoType) && ammo.getQuantity() > 0) {
+                    return true;
+                }
+            }
+        }
+        
+        return false; // No compatible ammo found
     }
 }

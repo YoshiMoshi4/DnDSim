@@ -16,6 +16,7 @@ public class CharSheet {
     // HP and Statuses
     private int totalHP;
     private int currentHP;
+    private int armorClass;
     private ArrayList<Status> status;
 
     // Attributes
@@ -24,23 +25,23 @@ public class CharSheet {
     private int[] totalAttributes;   // baseAttributes + tempAttributes
     public static final int STRENGTH = 0;
     public static final int DEXTERITY = 1;
-    public static final int INITIATIVE = 2;
-    public static final int MOBILITY = 3;
+    public static final int MOBILITY = 2;
+    public static final int INTELLIGENCE = 3;
 
     // Weapons
     private Weapon[] weapons;
     private final int PRIMARY = 0;
     private final int SECONDARY = 1;
 
-    // Armor
-    private Armor[] armor;
-    private final int HEAD = 0;
-    private final int TORSO = 1;
-    private final int LEGS = 2;
+    // Accessories (3 generic slots)
+    private Accessory[] accessories;
 
     // Inventory
     private ArrayList<Item> inventory;
     private int wallet;
+
+    // Character Abilities (innate abilities not tied to equipment)
+    private ArrayList<ItemAbility> abilities;
 
     //Constructor
     public CharSheet(String name, boolean isParty, int totalHP, int[] baseAttributes, int color) {
@@ -51,6 +52,7 @@ public class CharSheet {
 
         this.totalHP = totalHP;
         currentHP = totalHP;
+        armorClass = 10;
         status = new ArrayList<Status>();
 
         this.baseAttributes = new int[baseAttributes.length];
@@ -72,14 +74,15 @@ public class CharSheet {
         weapons[0] = null;
         weapons[1] = null;
 
-        armor = new Armor[3];
-        armor[0] = null;
-        armor[1] = null;
-        armor[2] = null;
+        accessories = new Accessory[3];
+        accessories[0] = null;
+        accessories[1] = null;
+        accessories[2] = null;
         
         // Initialize totalAttributes after equipment is equipped
         updateAttributes();
         inventory = new ArrayList<Item>();
+        abilities = new ArrayList<ItemAbility>();
     }
 
     // Methods
@@ -227,6 +230,15 @@ public class CharSheet {
         this.save();
     }
 
+    public int getArmorClass() {
+        return armorClass;
+    }
+
+    public void setArmorClass(int ac) {
+        this.armorClass = ac;
+        this.save();
+    }
+
     public void mulCurrentHP(double factorToMul) {
         int temp = (int) (Math.ceil(currentHP * factorToMul));
         if (temp < 1) {
@@ -328,7 +340,97 @@ public class CharSheet {
         
         // Recalculate attributes (in case stat modifiers were removed)
         updateAttributes();
+        
+        // Process equipped item abilities
+        processEquippedAbilities(ItemAbility.ON_TURN_START);
+        
         this.save();
+    }
+    
+    /**
+     * Process abilities from equipped weapons, accessories, and character abilities that match the given trigger type.
+     * @param triggerType The trigger type to process (e.g., ON_TURN_START, ON_HIT)
+     * @return A list of ability descriptions that were triggered (for combat log)
+     */
+    public java.util.List<String> processEquippedAbilities(String triggerType) {
+        java.util.List<String> triggered = new java.util.ArrayList<>();
+        
+        // Process character abilities (innate abilities)
+        if (abilities != null) {
+            for (ItemAbility ability : abilities) {
+                if (triggerType.equals(ability.getTriggerType())) {
+                    String result = applyAbility(ability);
+                    if (result != null) triggered.add(ability.getName() + ": " + result);
+                }
+            }
+        }
+        
+        // Process weapon abilities
+        for (Weapon weapon : weapons) {
+            if (weapon != null && weapon.hasAbilities()) {
+                for (ItemAbility ability : weapon.getAbilities()) {
+                    if (triggerType.equals(ability.getTriggerType())) {
+                        String result = applyAbility(ability);
+                        if (result != null) triggered.add(weapon.getName() + ": " + result);
+                    }
+                }
+            }
+        }
+        
+        // Process accessory abilities
+        for (Accessory accessory : accessories) {
+            if (accessory != null && accessory.hasAbilities()) {
+                for (ItemAbility ability : accessory.getAbilities()) {
+                    if (triggerType.equals(ability.getTriggerType())) {
+                        String result = applyAbility(ability);
+                        if (result != null) triggered.add(accessory.getName() + ": " + result);
+                    }
+                }
+            }
+        }
+        
+        return triggered;
+    }
+    
+    /**
+     * Apply a single item ability effect.
+     * @param ability The ability to apply
+     * @return A description of the effect applied, or null if nothing happened
+     */
+    private String applyAbility(ItemAbility ability) {
+        switch (ability.getEffectType()) {
+            case ItemAbility.EFFECT_HEAL:
+                if (currentHP < totalHP) {
+                    int healAmount = Math.min(ability.getMagnitude(), totalHP - currentHP);
+                    currentHP += healAmount;
+                    return "Healed " + healAmount + " HP";
+                }
+                return null;
+                
+            case ItemAbility.EFFECT_DAMAGE:
+                int dmg = ability.getMagnitude();
+                currentHP = Math.max(1, currentHP - dmg);
+                return "Took " + dmg + " damage";
+                
+            case ItemAbility.EFFECT_STAT_BOOST:
+                // Stat boosts from items are handled via modifiedAttributes
+                // This is for temporary boosts applied as a status
+                return null;
+                
+            case ItemAbility.EFFECT_STATUS:
+                // Apply a status effect
+                String statusName = ability.getStatusName();
+                if (statusName != null) {
+                    // Create a new status based on the ability
+                    Status newStatus = new Status(statusName, Status.NONE, 0, 1, -1);
+                    addStatus(newStatus);
+                    return "Applied " + statusName;
+                }
+                return null;
+                
+            default:
+                return null;
+        }
     }
 
     /**
@@ -347,9 +449,9 @@ public class CharSheet {
 
     public void updateAttributes() {
         // Calculate tempAttributes from equipped items (handle null slots)
-        int[] headAttr = armor[0] != null ? armor[0].getModifiedAttributes() : new int[]{0, 0, 0, 0};
-        int[] torsoAttr = armor[1] != null ? armor[1].getModifiedAttributes() : new int[]{0, 0, 0, 0};
-        int[] legsAttr = armor[2] != null ? armor[2].getModifiedAttributes() : new int[]{0, 0, 0, 0};
+        int[] acc0Attr = accessories[0] != null ? accessories[0].getModifiedAttributes() : new int[]{0, 0, 0, 0};
+        int[] acc1Attr = accessories[1] != null ? accessories[1].getModifiedAttributes() : new int[]{0, 0, 0, 0};
+        int[] acc2Attr = accessories[2] != null ? accessories[2].getModifiedAttributes() : new int[]{0, 0, 0, 0};
         int[] weapAttr = weapons[0] != null ? weapons[0].getModifiedAttributes() : new int[]{0, 0, 0, 0};
         
         // Reset temp attributes to zero
@@ -359,7 +461,7 @@ public class CharSheet {
         
         // Sum all equipment modifications
         for (int i = 0; i < tempAttributes.length; i++) {
-            tempAttributes[i] = headAttr[i] + torsoAttr[i] + legsAttr[i] + weapAttr[i];
+            tempAttributes[i] = acc0Attr[i] + acc1Attr[i] + acc2Attr[i] + weapAttr[i];
         }
         
         // Calculate total attributes = base + equipment modifications + status modifiers
@@ -399,6 +501,7 @@ public class CharSheet {
     }
 
     public int getAttribute(int attribute) {
+        if (attribute < 0 || attribute >= baseAttributes.length) return 0;
         return baseAttributes[attribute];
     }
 
@@ -411,6 +514,7 @@ public class CharSheet {
     }
 
     public int getTempAttribute(int attribute) {
+        if (attribute < 0 || attribute >= tempAttributes.length) return 0;
         return tempAttributes[attribute];
     }
 
@@ -423,17 +527,34 @@ public class CharSheet {
     }
 
     public int getTotalAttribute(int attribute) {
+        if (attribute < 0 || attribute >= totalAttributes.length) return 0;
         return totalAttributes[attribute];
     }
 
     public void equipPrimaryWeapon(Weapon newWeapon) {
+        // Unequip current weapon first (adds back to inventory)
+        if (weapons[PRIMARY] != null) {
+            addItem(weapons[PRIMARY]);
+        }
+        // Equip new weapon and remove from inventory
         weapons[PRIMARY] = newWeapon;
+        if (newWeapon != null) {
+            removeItem(newWeapon);
+        }
         updateAttributes();
         this.save();
     }
 
     public void equipSecondaryWeapon(Weapon newWeapon) {
+        // Unequip current weapon first (adds back to inventory)
+        if (weapons[SECONDARY] != null) {
+            addItem(weapons[SECONDARY]);
+        }
+        // Equip new weapon and remove from inventory
         weapons[SECONDARY] = newWeapon;
+        if (newWeapon != null) {
+            removeItem(newWeapon);
+        }
         this.save();
     }
 
@@ -446,14 +567,20 @@ public class CharSheet {
     }
 
     public void unequipPrimaryWeapon() {
-        inventory.add(weapons[PRIMARY]);
+        if (weapons[PRIMARY] != null) {
+            addItem(weapons[PRIMARY]);
+        }
         weapons[PRIMARY] = null;
         updateAttributes();
+        this.save();
     }
 
     public void unequipSecondaryWeapon() {
-        inventory.add(weapons[SECONDARY]);
+        if (weapons[SECONDARY] != null) {
+            addItem(weapons[SECONDARY]);
+        }
         weapons[SECONDARY] = null;
+        this.save();
     }
 
     public void swapWeapons() {
@@ -464,60 +591,48 @@ public class CharSheet {
         this.save();
     }
 
-    public void equipHead(Armor newArmor) {
-        armor[HEAD] = newArmor;
-        updateAttributes();
-        this.save();
+    public void equipAccessory(int slot, Accessory accessory) {
+        if (slot >= 0 && slot < 3) {
+            // Unequip current accessory first (adds back to inventory)
+            if (accessories[slot] != null) {
+                addItem(accessories[slot]);
+            }
+            // Equip new accessory and remove from inventory
+            accessories[slot] = accessory;
+            if (accessory != null) {
+                removeItem(accessory);
+            }
+            updateAttributes();
+            this.save();
+        }
     }
 
-    public void equipTorso(Armor newArmor) {
-        armor[TORSO] = newArmor;
-        updateAttributes();
-        this.save();
+    public Accessory getAccessory(int slot) {
+        if (slot >= 0 && slot < 3) {
+            return accessories[slot];
+        }
+        return null;
     }
 
-    public void equipLegs(Armor newArmor) {
-        armor[LEGS] = newArmor;
-        updateAttributes();
-        this.save();
-    }
-
-    public Armor getHead() {
-        return armor[HEAD];
-    }
-
-    public Armor getTorso() {
-        return armor[TORSO];
-    }
-
-    public Armor getLegs() {
-        return armor[LEGS];
+    public Accessory[] getAccessories() {
+        return accessories;
     }
 
     public int getTotalDefense() {
         int totalDefense = 0;
-        if (armor[HEAD] != null) totalDefense += armor[HEAD].getDefense();
-        if (armor[TORSO] != null) totalDefense += armor[TORSO].getDefense();
-        if (armor[LEGS] != null) totalDefense += armor[LEGS].getDefense();
+        for (int i = 0; i < 3; i++) {
+            if (accessories[i] != null) totalDefense += accessories[i].getDefense();
+        }
         return totalDefense;
     }
 
-    public void unequipHead() {
-        inventory.add(armor[HEAD]);
-        armor[HEAD] = null;
-        updateAttributes();
-    }
-
-    public void unequipTorso() {
-        inventory.add(armor[TORSO]);
-        armor[TORSO] = null;
-        updateAttributes();
-    }
-
-    public void unequipLegs() {
-        inventory.add(armor[LEGS]);
-        armor[LEGS] = null;
-        updateAttributes();
+    public void unequipAccessory(int slot) {
+        if (slot >= 0 && slot < 3 && accessories[slot] != null) {
+            addItem(accessories[slot]);
+            accessories[slot] = null;
+            updateAttributes();
+            this.save();
+        }
     }
 
     public void pickupItem(Item newItem) {
@@ -598,6 +713,55 @@ public class CharSheet {
         return inventory;
     }
 
+    // Character Abilities Management
+    
+    /**
+     * Get the list of character abilities.
+     */
+    public ArrayList<ItemAbility> getAbilities() {
+        if (abilities == null) {
+            abilities = new ArrayList<ItemAbility>();
+        }
+        return abilities;
+    }
+    
+    /**
+     * Add an ability to the character.
+     */
+    public void addAbility(ItemAbility ability) {
+        if (ability == null) return;
+        if (abilities == null) {
+            abilities = new ArrayList<ItemAbility>();
+        }
+        abilities.add(ability);
+        save();
+    }
+    
+    /**
+     * Remove an ability from the character.
+     */
+    public void removeAbility(ItemAbility ability) {
+        if (ability == null || abilities == null) return;
+        abilities.remove(ability);
+        save();
+    }
+    
+    /**
+     * Remove an ability by name.
+     */
+    public void removeAbilityByName(String name) {
+        if (name == null || abilities == null) return;
+        abilities.removeIf(a -> a.getName().equals(name));
+        save();
+    }
+    
+    /**
+     * Check if character has any abilities.
+     */
+    public boolean hasAbilities() {
+        return abilities != null && !abilities.isEmpty();
+    }
+
     /**
      * Add an item to the inventory. If an identical item already exists (by name and type),
      * increase its quantity instead of adding a duplicate.
@@ -621,12 +785,22 @@ public class CharSheet {
     }
 
     /**
-     * Remove an item from the inventory completely.
+     * Remove an item from the inventory completely (matches by name and type).
      */
     public void removeItem(Item item) {
         if (item == null) return;
-        inventory.remove(item);
-        save();
+        Item toRemove = null;
+        for (Item existing : inventory) {
+            if (existing.getName().equals(item.getName()) && 
+                existing.getClass().equals(item.getClass())) {
+                toRemove = existing;
+                break;
+            }
+        }
+        if (toRemove != null) {
+            inventory.remove(toRemove);
+            save();
+        }
     }
 
     /**
@@ -661,7 +835,7 @@ public class CharSheet {
         String dir = "saves/entities/party";
         new File(dir).mkdirs();
         String filePath = dir + "/" + name.replaceAll("[^a-zA-Z0-9]", "_") + ".json";
-        Gson gson = new Gson();
+        Gson gson = ItemTypeAdapter.createGson();
         try (FileWriter writer = new FileWriter(filePath)) {
             gson.toJson(this, writer);
         } catch (IOException e) {
@@ -673,24 +847,74 @@ public class CharSheet {
         String folder = isParty ? "party" : "nonparty";
         String dir = "saves/entities/" + folder;
         String filePath = dir + "/" + name.replaceAll("[^a-zA-Z0-9]", "_") + ".json";
-        Gson gson = new Gson();
+        Gson gson = ItemTypeAdapter.createGson();
         try (FileReader reader = new FileReader(filePath)) {
             CharSheet sheet = gson.fromJson(reader, CharSheet.class);
             if (sheet == null) {
                 return null;
             }
-            // Initialize missing arrays for older save files
-            if (sheet.tempAttributes == null) {
-                sheet.tempAttributes = new int[sheet.baseAttributes != null ? sheet.baseAttributes.length : 4];
+            // Migrate attribute arrays - remove ITV (old index 2), keep STR, DEX, MOB, INT
+            // Old 5-element: [STR, DEX, ITV, MOB, INT] -> [STR, DEX, MOB, INT]
+            // Old 4-element: [STR, DEX, ITV, MOB] -> [STR, DEX, MOB, 0]
+            if (sheet.baseAttributes != null && sheet.baseAttributes.length > 4) {
+                int[] newBase = new int[4];
+                newBase[0] = sheet.baseAttributes[0]; // STR
+                newBase[1] = sheet.baseAttributes[1]; // DEX
+                newBase[2] = sheet.baseAttributes[3]; // MOB (was index 3)
+                newBase[3] = sheet.baseAttributes.length > 4 ? sheet.baseAttributes[4] : 0; // INT
+                sheet.baseAttributes = newBase;
+            } else if (sheet.baseAttributes != null && sheet.baseAttributes.length == 4) {
+                // Old 4-element array [STR, DEX, ITV, MOB] -> [STR, DEX, MOB, 0]
+                int[] newBase = new int[4];
+                newBase[0] = sheet.baseAttributes[0]; // STR
+                newBase[1] = sheet.baseAttributes[1]; // DEX
+                newBase[2] = sheet.baseAttributes[3]; // MOB (was index 3)
+                newBase[3] = 0; // INT (new)
+                sheet.baseAttributes = newBase;
             }
-            if (sheet.totalAttributes == null) {
-                sheet.totalAttributes = new int[sheet.baseAttributes != null ? sheet.baseAttributes.length : 4];
+            // Initialize missing arrays for older save files
+            if (sheet.tempAttributes == null || sheet.tempAttributes.length != 4) {
+                int[] newTemp = new int[4];
+                if (sheet.tempAttributes != null) {
+                    newTemp[0] = sheet.tempAttributes.length > 0 ? sheet.tempAttributes[0] : 0;
+                    newTemp[1] = sheet.tempAttributes.length > 1 ? sheet.tempAttributes[1] : 0;
+                    newTemp[2] = sheet.tempAttributes.length > 3 ? sheet.tempAttributes[3] : 0; // MOB
+                    newTemp[3] = sheet.tempAttributes.length > 4 ? sheet.tempAttributes[4] : 0; // INT
+                }
+                sheet.tempAttributes = newTemp;
+            }
+            if (sheet.totalAttributes == null || sheet.totalAttributes.length != 4) {
+                int[] newTotal = new int[4];
+                if (sheet.totalAttributes != null) {
+                    newTotal[0] = sheet.totalAttributes.length > 0 ? sheet.totalAttributes[0] : 0;
+                    newTotal[1] = sheet.totalAttributes.length > 1 ? sheet.totalAttributes[1] : 0;
+                    newTotal[2] = sheet.totalAttributes.length > 3 ? sheet.totalAttributes[3] : 0; // MOB
+                    newTotal[3] = sheet.totalAttributes.length > 4 ? sheet.totalAttributes[4] : 0; // INT
+                }
+                sheet.totalAttributes = newTotal;
             }
             if (sheet.baseAttributes == null) {
                 sheet.baseAttributes = new int[4];
             }
             if (sheet.status == null) {
                 sheet.status = new ArrayList<Status>();
+            }
+            // Initialize armor class for older saves
+            if (sheet.armorClass == 0) {
+                sheet.armorClass = 10;
+            }
+            // Initialize equipment arrays for older saves
+            if (sheet.weapons == null) {
+                sheet.weapons = new Weapon[2];
+            }
+            if (sheet.accessories == null) {
+                sheet.accessories = new Accessory[3];
+            }
+            if (sheet.inventory == null) {
+                sheet.inventory = new ArrayList<Item>();
+            }
+            if (sheet.abilities == null) {
+                sheet.abilities = new ArrayList<ItemAbility>();
             }
             // Recalculate attributes in case they were corrupted
             sheet.updateAttributes();
@@ -705,7 +929,7 @@ public class CharSheet {
      * Deep copy the CharSheet to create an independent instance for non-party entities
      */
     public CharSheet deepCopy() {
-        Gson gson = new Gson();
+        Gson gson = ItemTypeAdapter.createGson();
         String json = gson.toJson(this);
         CharSheet copy = gson.fromJson(json, CharSheet.class);
         return copy;

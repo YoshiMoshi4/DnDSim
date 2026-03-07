@@ -344,7 +344,7 @@ public class CardUtils {
         addDetailRow(stats, "Damage", String.valueOf(weapon.getDamage()));
         
         int[] attrs = weapon.getModifiedAttributes();
-        String[] attrNames = {"STR", "DEX", "ITV", "MOB"};
+        String[] attrNames = {"STR", "DEX", "MOB", "INT"};
         for (int i = 0; i < attrs.length && i < attrNames.length; i++) {
             if (attrs[i] != 0) {
                 addDetailRow(stats, attrNames[i], (attrs[i] > 0 ? "+" : "") + attrs[i]);
@@ -386,7 +386,7 @@ public class CardUtils {
         addDetailRow(stats, "Defense", "+" + armor.getDefense());
         
         int[] attrs = armor.getModifiedAttributes();
-        String[] attrNames = {"STR", "DEX", "ITV", "MOB"};
+        String[] attrNames = {"STR", "DEX", "MOB", "INT"};
         for (int i = 0; i < attrs.length && i < attrNames.length; i++) {
             if (attrs[i] != 0) {
                 addDetailRow(stats, attrNames[i], (attrs[i] > 0 ? "+" : "") + attrs[i]);

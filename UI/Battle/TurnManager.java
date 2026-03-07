@@ -2,6 +2,7 @@ package UI.Battle;
 
 import Objects.*;
 import EntityRes.CharSheet;
+import EntityRes.ItemAbility;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -291,9 +292,11 @@ public class TurnManager {
         return null;
     }
 
-    public void nextTurn() {
+    public List<String> nextTurn() {
+        List<String> abilityMessages = new ArrayList<>();
+        
         if (turnOrder.isEmpty()) {
-            return;
+            return abilityMessages;
         }
         
         currentIndex++;
@@ -307,11 +310,15 @@ public class TurnManager {
             }
         }
         
-        // Process status effects for the entity whose turn is starting
+        // Process status effects and abilities for the entity whose turn is starting
         GridObject current = getCurrentCombatant();
         if (current instanceof Entity e) {
             e.getCharSheet().procStatus();
+            // Process ON_TURN_START abilities (e.g., Plasmoid Core regeneration)
+            abilityMessages.addAll(e.getCharSheet().processEquippedAbilities(ItemAbility.ON_TURN_START));
         }
+        
+        return abilityMessages;
     }
 
     public void removeDeadCombatants() {

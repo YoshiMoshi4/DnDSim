@@ -10,7 +10,7 @@ public class ItemDatabase {
 
     private static ItemDatabase instance;
     private Map<String, Weapon> weapons;
-    private Map<String, Armor> armors;
+    private Map<String, Accessory> accessories;
     private Map<String, Consumable> consumables;
     private Map<String, Ammunition> ammunition;
     private Map<String, CraftingItem> craftingItems;
@@ -18,7 +18,7 @@ public class ItemDatabase {
 
     private ItemDatabase() {
         weapons = new HashMap<>();
-        armors = new HashMap<>();
+        accessories = new HashMap<>();
         consumables = new HashMap<>();
         ammunition = new HashMap<>();
         craftingItems = new HashMap<>();
@@ -52,15 +52,15 @@ public class ItemDatabase {
             }
         }
         
-        // Load armors from saves/items/armors/
-        File armorsDir = new File("saves/items/armors");
-        if (armorsDir.exists() && armorsDir.isDirectory()) {
-            File[] files = armorsDir.listFiles((dir, name) -> name.endsWith(".json"));
+        // Load accessories from saves/items/accessories/
+        File accessoriesDir = new File("saves/items/accessories");
+        if (accessoriesDir.exists() && accessoriesDir.isDirectory()) {
+            File[] files = accessoriesDir.listFiles((dir, name) -> name.endsWith(".json"));
             if (files != null) {
                 for (File file : files) {
                     try (FileReader reader = new FileReader(file)) {
-                        Armor armor = gson.fromJson(reader, Armor.class);
-                        armors.put(armor.getName(), armor);
+                        Accessory accessory = gson.fromJson(reader, Accessory.class);
+                        accessories.put(accessory.getName(), accessory);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -133,7 +133,7 @@ public class ItemDatabase {
         }
 
         // If no items loaded, add some defaults
-        if (weapons.isEmpty() && armors.isEmpty() && consumables.isEmpty()) {
+        if (weapons.isEmpty() && accessories.isEmpty() && consumables.isEmpty()) {
             addDefaultItems();
         }
     }
@@ -150,9 +150,9 @@ public class ItemDatabase {
         if (item instanceof Weapon) {
             dir = "saves/items/weapons";
             weapons.put(item.getName(), (Weapon) item);
-        } else if (item instanceof Armor) {
-            dir = "saves/items/armors";
-            armors.put(item.getName(), (Armor) item);
+        } else if (item instanceof Accessory) {
+            dir = "saves/items/accessories";
+            accessories.put(item.getName(), (Accessory) item);
         } else if (item instanceof Ammunition) {
             dir = "saves/items/ammunition";
             ammunition.put(item.getName(), (Ammunition) item);
@@ -182,9 +182,9 @@ public class ItemDatabase {
         if (item instanceof Weapon) {
             dir = "saves/items/weapons";
             weapons.remove(item.getName());
-        } else if (item instanceof Armor) {
-            dir = "saves/items/armors";
-            armors.remove(item.getName());
+        } else if (item instanceof Accessory) {
+            dir = "saves/items/accessories";
+            accessories.remove(item.getName());
         } else if (item instanceof Ammunition) {
             dir = "saves/items/ammunition";
             ammunition.remove(item.getName());
@@ -210,8 +210,8 @@ public class ItemDatabase {
         return weapons.get(name);
     }
 
-    public Armor getArmor(String name) {
-        return armors.get(name);
+    public Accessory getAccessory(String name) {
+        return accessories.get(name);
     }
 
     public Consumable getConsumable(String name) {
@@ -234,8 +234,8 @@ public class ItemDatabase {
         return weapons;
     }
 
-    public Map<String, Armor> getAllArmors() {
-        return armors;
+    public Map<String, Accessory> getAllAccessories() {
+        return accessories;
     }
 
     public Map<String, Consumable> getAllConsumables() {

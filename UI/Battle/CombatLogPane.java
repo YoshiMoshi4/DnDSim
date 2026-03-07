@@ -211,6 +211,13 @@ public class CombatLogPane extends VBox {
     }
 
     /**
+     * Logs an item ability activation.
+     */
+    public void logAbility(String name, String abilityEffect) {
+        log("✨ " + name + " - " + abilityEffect, LogType.INFO);
+    }
+
+    /**
      * Logs terrain damage.
      */
     public void logTerrainDamage(String attacker, int damage, int remainingHp) {

@@ -24,7 +24,7 @@ public class Item {
     private static int getDefaultColorForType(String type) {
         switch (type.toLowerCase()) {
             case "weapon": return 4; // Red
-            case "armor": return 9; // Blue
+            case "accessory": return 9; // Blue
             case "consumable": return 7; // Lime
             case "unarmed": return 1; // Gray
             default: return 8; // Green

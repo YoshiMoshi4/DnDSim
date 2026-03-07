@@ -25,17 +25,16 @@ public class AssetEditorView {
     
     // Item data
     private ArrayList<Weapon> weapons = new ArrayList<>();
-    private ArrayList<Armor> armors = new ArrayList<>();
+    private ArrayList<Accessory> accessories = new ArrayList<>();
     private ArrayList<Consumable> consumables = new ArrayList<>();
     private ArrayList<Ammunition> ammunition = new ArrayList<>();
     private ArrayList<CraftingItem> craftingItems = new ArrayList<>();
     private ArrayList<KeyItem> keyItems = new ArrayList<>();
     
-    private static final String[] ATTRIBUTE_NAMES = {"STR", "DEX", "ITV", "MOB"};
-    private static final String[] ARMOR_TYPES = {"Head", "Torso", "Legs"};
+    private static final String[] ATTRIBUTE_NAMES = {"STR", "DEX", "MOB", "INT"};
     private static final String[] CRAFTING_CATEGORIES = {"Material", "Component", "Reagent", "Miscellaneous"};
     private static final String[] DICE_TYPES = {"d4", "d6", "d8", "d10", "d12", "d20"};
-    private static final String[] STAT_TYPES = {"STRENGTH", "DEXTERITY"};
+    private static final String[] STAT_TYPES = {"STRENGTH", "DEXTERITY", "INTELLIGENCE"};
 
     public AssetEditorView(AppController appController) {
         this.appController = appController;
@@ -103,9 +102,9 @@ public class AssetEditorView {
         addWeaponBtn.getStyleClass().add("button-primary");
         addWeaponBtn.setOnAction(e -> addNewWeapon());
         
-        Button addArmorBtn = new Button("+ Armor");
-        addArmorBtn.getStyleClass().add("button-primary");
-        addArmorBtn.setOnAction(e -> addNewArmor());
+        Button addAccessoryBtn = new Button("+ Accessory");
+        addAccessoryBtn.getStyleClass().add("button-primary");
+        addAccessoryBtn.setOnAction(e -> addNewAccessory());
         
         Button addConsumableBtn = new Button("+ Consumable");
         addConsumableBtn.getStyleClass().add("button-primary");
@@ -123,7 +122,7 @@ public class AssetEditorView {
         addKeyItemBtn.getStyleClass().add("button-primary");
         addKeyItemBtn.setOnAction(e -> addNewKeyItem());
         
-        panel.getChildren().addAll(addWeaponBtn, addArmorBtn, addConsumableBtn, 
+        panel.getChildren().addAll(addWeaponBtn, addAccessoryBtn, addConsumableBtn, 
                                    addAmmoBtn, addCraftingBtn, addKeyItemBtn);
         return panel;
     }
@@ -159,14 +158,14 @@ public class AssetEditorView {
     private void loadItems() {
         ItemDatabase db = ItemDatabase.getInstance();
         weapons.clear();
-        armors.clear();
+        accessories.clear();
         consumables.clear();
         ammunition.clear();
         craftingItems.clear();
         keyItems.clear();
         
         weapons.addAll(db.getAllWeapons().values());
-        armors.addAll(db.getAllArmors().values());
+        accessories.addAll(db.getAllAccessories().values());
         consumables.addAll(db.getAllConsumables().values());
         ammunition.addAll(db.getAllAmmunition().values());
         craftingItems.addAll(db.getAllCraftingItems().values());
@@ -181,13 +180,32 @@ public class AssetEditorView {
         itemTabs.getTabs().clear();
         
         itemTabs.getTabs().add(new Tab("Weapons", createItemPanel(weapons, this::createWeaponCard)));
-        itemTabs.getTabs().add(new Tab("Armor", createItemPanel(armors, this::createArmorCard)));
-        itemTabs.getTabs().add(new Tab("Consumables", createItemPanel(consumables, this::createConsumableCard)));
-        itemTabs.getTabs().add(new Tab("Ammunition", createItemPanel(ammunition, this::createAmmunitionCard)));
-        itemTabs.getTabs().add(new Tab("Crafting", createItemPanel(craftingItems, this::createCraftingCard)));
+        itemTabs.getTabs().add(new Tab("Accessories", createItemPanel(accessories, this::createAccessoryCard)));
+        itemTabs.getTabs().add(new Tab("Consumables", createConsumablesPanel()));
         itemTabs.getTabs().add(new Tab("Key Items", createItemPanel(keyItems, this::createKeyItemCard)));
         
         itemTabs.getSelectionModel().select(selectedIndex);
+    }
+
+    private ScrollPane createConsumablesPanel() {
+        FlowPane flowPane = new FlowPane(10, 10);
+        flowPane.setPadding(new Insets(10));
+        flowPane.getStyleClass().add("panel");
+        
+        for (Consumable c : consumables) {
+            flowPane.getChildren().add(createConsumableCard(c));
+        }
+        for (Ammunition a : ammunition) {
+            flowPane.getChildren().add(createAmmunitionCard(a));
+        }
+        for (CraftingItem ci : craftingItems) {
+            flowPane.getChildren().add(createCraftingCard(ci));
+        }
+        
+        ScrollPane scroll = new ScrollPane(flowPane);
+        scroll.setFitToWidth(true);
+        scroll.getStyleClass().add("panel");
+        return scroll;
     }
 
     @FunctionalInterface
@@ -230,12 +248,31 @@ public class AssetEditorView {
         statLabel.setStyle("-fx-text-fill: #aaaaaa;");
         card.getChildren().add(statLabel);
         
+        // Show ammo type if ranged
+        if (weapon.isRanged()) {
+            Label ammoLabel = new Label("Ammo: " + weapon.getAmmoType());
+            ammoLabel.setStyle("-fx-text-fill: #f39c12;");
+            card.getChildren().add(ammoLabel);
+        }
+        
         int[] attrs = weapon.getModifiedAttributes();
         for (int i = 0; i < attrs.length && i < ATTRIBUTE_NAMES.length; i++) {
             if (attrs[i] != 0) {
                 Label attrLabel = new Label(ATTRIBUTE_NAMES[i] + ": " + (attrs[i] > 0 ? "+" : "") + attrs[i]);
                 attrLabel.setStyle("-fx-text-fill: #aaaaaa;");
                 card.getChildren().add(attrLabel);
+            }
+        }
+        
+        // Display abilities
+        if (weapon.hasAbilities()) {
+            Label abilityHeader = new Label("Abilities:");
+            abilityHeader.setStyle("-fx-text-fill: #dcdcaa; -fx-font-weight: bold;");
+            card.getChildren().add(abilityHeader);
+            for (ItemAbility ability : weapon.getAbilities()) {
+                Label abilityLabel = new Label("  " + ability.getFormattedDescription());
+                abilityLabel.setStyle("-fx-text-fill: #9cdcfe; -fx-font-size: 11px;");
+                card.getChildren().add(abilityLabel);
             }
         }
         
@@ -252,23 +289,20 @@ public class AssetEditorView {
         return card;
     }
 
-    private VBox createArmorCard(Armor armor) {
+    private VBox createAccessoryCard(Accessory accessory) {
         VBox card = new VBox(5);
         card.setPadding(new Insets(10));
         card.setPrefWidth(180);
         card.setStyle(getCardStyle());
         
-        Label nameLabel = new Label(armor.getName());
+        Label nameLabel = new Label(accessory.getName());
         nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: white;");
         card.getChildren().add(nameLabel);
         
-        Label typeLabel = new Label("Type: " + ARMOR_TYPES[armor.getArmorType()]);
-        typeLabel.setStyle("-fx-text-fill: #cccccc;");
-        card.getChildren().add(typeLabel);
-        Label defLabel = new Label("Defense: " + armor.getDefense());
+        Label defLabel = new Label("Defense: " + accessory.getDefense());
         defLabel.setStyle("-fx-text-fill: #cccccc;");
         card.getChildren().add(defLabel);
-        int[] attrs = armor.getModifiedAttributes();
+        int[] attrs = accessory.getModifiedAttributes();
         for (int i = 0; i < attrs.length && i < ATTRIBUTE_NAMES.length; i++) {
             if (attrs[i] != 0) {
                 Label attrLabel = new Label(ATTRIBUTE_NAMES[i] + ": " + (attrs[i] > 0 ? "+" : "") + attrs[i]);
@@ -277,13 +311,25 @@ public class AssetEditorView {
             }
         }
         
+        // Display abilities
+        if (accessory.hasAbilities()) {
+            Label abilityHeader = new Label("Abilities:");
+            abilityHeader.setStyle("-fx-text-fill: #dcdcaa; -fx-font-weight: bold;");
+            card.getChildren().add(abilityHeader);
+            for (ItemAbility ability : accessory.getAbilities()) {
+                Label abilityLabel = new Label("  " + ability.getFormattedDescription());
+                abilityLabel.setStyle("-fx-text-fill: #9cdcfe; -fx-font-size: 11px;");
+                card.getChildren().add(abilityLabel);
+            }
+        }
+        
         HBox btnBox = new HBox(5);
         Button editBtn = new Button("Edit");
         editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> editArmor(armor));
+        editBtn.setOnAction(e -> editAccessory(accessory));
         Button deleteBtn = new Button("Delete");
         deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteItem(armor));
+        deleteBtn.setOnAction(e -> deleteItem(accessory));
         btnBox.getChildren().addAll(editBtn, deleteBtn);
         card.getChildren().add(btnBox);
         
@@ -327,12 +373,9 @@ public class AssetEditorView {
         nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: white;");
         card.getChildren().add(nameLabel);
         
-        Label dmgLabel = new Label("Damage +" + item.getDamageBonus());
-        dmgLabel.setStyle("-fx-text-fill: #cccccc;");
-        card.getChildren().add(dmgLabel);
-        Label forLabel = new Label("For: " + item.getCompatibleWeaponType());
-        forLabel.setStyle("-fx-text-fill: #cccccc;");
-        card.getChildren().add(forLabel);
+        Label typeLabel = new Label("Type: " + item.getAmmoType());
+        typeLabel.setStyle("-fx-text-fill: #cccccc;");
+        card.getChildren().add(typeLabel);
         
         HBox btnBox = new HBox(5);
         Button editBtn = new Button("Edit");
@@ -470,7 +513,7 @@ public class AssetEditorView {
     // ==================== ITEM DIALOGS ====================
 
     private void addNewWeapon() {
-        Stage dialog = createDialog("Add Weapon", 380, 450);
+        Stage dialog = createDialog("Add Weapon", 400, 650);
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField();
@@ -493,10 +536,18 @@ public class AssetEditorView {
         statCombo.getItems().addAll(STAT_TYPES);
         statCombo.getSelectionModel().selectFirst();
         
+        // Ammo type (empty for melee)
+        TextField ammoTypeField = new TextField();
+        ammoTypeField.setPromptText("Leave empty for melee");
+        
         TextField strField = new TextField("0");
         TextField dexField = new TextField("0");
-        TextField itvField = new TextField("0");
         TextField mobField = new TextField("0");
+        TextField intField = new TextField("0");
+        
+        // Abilities list
+        ArrayList<ItemAbility> weaponAbilities = new ArrayList<>();
+        VBox abilityEditor = createAbilityEditorSection(weaponAbilities);
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
@@ -504,65 +555,71 @@ public class AssetEditorView {
         grid.add(new Label("Tier 2 Die:"), 0, row); grid.add(tier2Combo, 1, row++);
         grid.add(new Label("Tier 3 Die:"), 0, row); grid.add(tier3Combo, 1, row++);
         grid.add(new Label("Stat Type:"), 0, row); grid.add(statCombo, 1, row++);
+        grid.add(new Label("Ammo Type:"), 0, row); grid.add(ammoTypeField, 1, row++);
         grid.add(new Label("STR Mod:"), 0, row); grid.add(strField, 1, row++);
         grid.add(new Label("DEX Mod:"), 0, row); grid.add(dexField, 1, row++);
-        grid.add(new Label("ITV Mod:"), 0, row); grid.add(itvField, 1, row++);
         grid.add(new Label("MOB Mod:"), 0, row); grid.add(mobField, 1, row++);
+        grid.add(new Label("INT Mod:"), 0, row); grid.add(intField, 1, row++);
+        grid.add(abilityEditor, 0, row++, 2, 1);
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
             String[] damageDice = {tier1Combo.getValue(), tier2Combo.getValue(), tier3Combo.getValue()};
             String statType = statCombo.getValue();
-            int[] attrs = {parseInt(strField), parseInt(dexField), parseInt(itvField), parseInt(mobField)};
+            String ammoType = ammoTypeField.getText().trim();
+            int[] attrs = {parseInt(strField), parseInt(dexField), parseInt(mobField), parseInt(intField)};
             if (!name.isEmpty()) {
-                Weapon weapon = new Weapon(name, "Weapon", damageDice, statType, attrs);
+                Weapon weapon = new Weapon(name, "Weapon", damageDice, statType, 
+                        ammoType.isEmpty() ? null : ammoType, attrs);
+                weapon.setAbilities(weaponAbilities);
                 ItemDatabase.getInstance().saveItem(weapon);
                 return true;
             }
             return false;
         }, this::refreshItemDisplay);
         
-        dialog.setScene(createDialogScene(grid, 380, 450));
+        dialog.setScene(createDialogScene(grid, 400, 650));
         dialog.showAndWait();
     }
 
-    private void addNewArmor() {
-        Stage dialog = createDialog("Add Armor", 350, 350);
+    private void addNewAccessory() {
+        Stage dialog = createDialog("Add Accessory", 380, 500);
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField();
-        ComboBox<String> typeCombo = new ComboBox<>();
-        typeCombo.getItems().addAll(ARMOR_TYPES);
-        typeCombo.getSelectionModel().selectFirst();
         TextField defenseField = new TextField("1");
         TextField strField = new TextField("0");
         TextField dexField = new TextField("0");
-        TextField itvField = new TextField("0");
         TextField mobField = new TextField("0");
+        TextField intField = new TextField("0");
+        
+        // Abilities list
+        ArrayList<ItemAbility> accessoryAbilities = new ArrayList<>();
+        VBox abilityEditor = createAbilityEditorSection(accessoryAbilities);
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
-        grid.add(new Label("Type:"), 0, row); grid.add(typeCombo, 1, row++);
         grid.add(new Label("Defense:"), 0, row); grid.add(defenseField, 1, row++);
         grid.add(new Label("STR Mod:"), 0, row); grid.add(strField, 1, row++);
         grid.add(new Label("DEX Mod:"), 0, row); grid.add(dexField, 1, row++);
-        grid.add(new Label("ITV Mod:"), 0, row); grid.add(itvField, 1, row++);
         grid.add(new Label("MOB Mod:"), 0, row); grid.add(mobField, 1, row++);
+        grid.add(new Label("INT Mod:"), 0, row); grid.add(intField, 1, row++);
+        grid.add(abilityEditor, 0, row++, 2, 1);
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
-            int armorType = typeCombo.getSelectionModel().getSelectedIndex();
             int defense = Integer.parseInt(defenseField.getText());
-            int[] attrs = {parseInt(strField), parseInt(dexField), parseInt(itvField), parseInt(mobField)};
+            int[] attrs = {parseInt(strField), parseInt(dexField), parseInt(mobField), parseInt(intField)};
             if (!name.isEmpty()) {
-                Armor armor = new Armor(name, "Armor", armorType, defense, attrs);
-                ItemDatabase.getInstance().saveItem(armor);
+                Accessory accessory = new Accessory(name, "Accessory", defense, attrs);
+                accessory.setAbilities(accessoryAbilities);
+                ItemDatabase.getInstance().saveItem(accessory);
                 return true;
             }
             return false;
         }, this::refreshItemDisplay);
         
-        dialog.setScene(createDialogScene(grid, 350, 350));
+        dialog.setScene(createDialogScene(grid, 380, 500));
         dialog.showAndWait();
     }
 
@@ -593,31 +650,27 @@ public class AssetEditorView {
     }
 
     private void addNewAmmunition() {
-        Stage dialog = createDialog("Add Ammunition", 320, 180);
+        Stage dialog = createDialog("Add Ammunition", 320, 150);
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField();
-        TextField damageBonusField = new TextField("0");
-        TextField compatibleField = new TextField("Any");
+        TextField ammoTypeField = new TextField("12 Gauge");
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
-        grid.add(new Label("Damage Bonus:"), 0, row); grid.add(damageBonusField, 1, row++);
-        grid.add(new Label("Compatible:"), 0, row); grid.add(compatibleField, 1, row++);
+        grid.add(new Label("Ammo Type:"), 0, row); grid.add(ammoTypeField, 1, row++);
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
-            int damageBonus = Integer.parseInt(damageBonusField.getText());
             if (!name.isEmpty()) {
-                Ammunition item = new Ammunition(name, "Ammunition", 0, 
-                        damageBonus, compatibleField.getText());
+                Ammunition item = new Ammunition(name, "Ammunition", 5, ammoTypeField.getText());
                 ItemDatabase.getInstance().saveItem(item);
                 return true;
             }
             return false;
         }, this::refreshItemDisplay);
         
-        dialog.setScene(createDialogScene(grid, 320, 180));
+        dialog.setScene(createDialogScene(grid, 320, 150));
         dialog.showAndWait();
     }
 
@@ -682,7 +735,7 @@ public class AssetEditorView {
     // ===== EDIT DIALOGS =====
 
     private void editWeapon(Weapon weapon) {
-        Stage dialog = createDialog("Edit Weapon", 380, 450);
+        Stage dialog = createDialog("Edit Weapon", 400, 650);
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField(weapon.getName());
@@ -708,11 +761,19 @@ public class AssetEditorView {
         statCombo.getItems().addAll(STAT_TYPES);
         statCombo.getSelectionModel().select(weapon.getStatType());
         
+        // Ammo type
+        TextField ammoTypeField = new TextField(weapon.getAmmoType() != null ? weapon.getAmmoType() : "");
+        ammoTypeField.setPromptText("Leave empty for melee");
+        
         int[] attrs = weapon.getModifiedAttributes();
         TextField strField = new TextField(String.valueOf(attrs[0]));
         TextField dexField = new TextField(String.valueOf(attrs[1]));
-        TextField itvField = new TextField(String.valueOf(attrs[2]));
-        TextField mobField = new TextField(String.valueOf(attrs[3]));
+        TextField mobField = new TextField(String.valueOf(attrs[2]));
+        TextField intField = new TextField(String.valueOf(attrs.length > 3 ? attrs[3] : 0));
+        
+        // Abilities list - copy existing abilities
+        ArrayList<ItemAbility> weaponAbilities = new ArrayList<>(weapon.getAbilities());
+        VBox abilityEditor = createAbilityEditorSection(weaponAbilities);
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
@@ -720,71 +781,77 @@ public class AssetEditorView {
         grid.add(new Label("Tier 2 Die:"), 0, row); grid.add(tier2Combo, 1, row++);
         grid.add(new Label("Tier 3 Die:"), 0, row); grid.add(tier3Combo, 1, row++);
         grid.add(new Label("Stat Type:"), 0, row); grid.add(statCombo, 1, row++);
+        grid.add(new Label("Ammo Type:"), 0, row); grid.add(ammoTypeField, 1, row++);
         grid.add(new Label("STR Mod:"), 0, row); grid.add(strField, 1, row++);
         grid.add(new Label("DEX Mod:"), 0, row); grid.add(dexField, 1, row++);
-        grid.add(new Label("ITV Mod:"), 0, row); grid.add(itvField, 1, row++);
         grid.add(new Label("MOB Mod:"), 0, row); grid.add(mobField, 1, row++);
+        grid.add(new Label("INT Mod:"), 0, row); grid.add(intField, 1, row++);
+        grid.add(abilityEditor, 0, row++, 2, 1);
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
             String[] damageDice = {tier1Combo.getValue(), tier2Combo.getValue(), tier3Combo.getValue()};
             String statType = statCombo.getValue();
-            int[] newAttrs = {parseInt(strField), parseInt(dexField), parseInt(itvField), parseInt(mobField)};
+            String ammoType = ammoTypeField.getText().trim();
+            int[] newAttrs = {parseInt(strField), parseInt(dexField), parseInt(mobField), parseInt(intField)};
             if (!name.isEmpty()) {
                 weapon.setName(name);
                 weapon.setDamageDice(damageDice);
                 weapon.setStatType(statType);
+                weapon.setAmmoType(ammoType.isEmpty() ? null : ammoType);
                 weapon.setModifiedAttributes(newAttrs);
+                weapon.setAbilities(weaponAbilities);
                 ItemDatabase.getInstance().saveItem(weapon);
                 return true;
             }
             return false;
         }, this::refreshItemDisplay);
         
-        dialog.setScene(createDialogScene(grid, 380, 450));
+        dialog.setScene(createDialogScene(grid, 400, 650));
         dialog.showAndWait();
     }
 
-    private void editArmor(Armor armor) {
-        Stage dialog = createDialog("Edit Armor", 350, 350);
+    private void editAccessory(Accessory accessory) {
+        Stage dialog = createDialog("Edit Accessory", 380, 500);
         GridPane grid = createDialogGrid();
         
-        TextField nameField = new TextField(armor.getName());
-        ComboBox<String> typeCombo = new ComboBox<>();
-        typeCombo.getItems().addAll(ARMOR_TYPES);
-        typeCombo.getSelectionModel().select(armor.getArmorType());
-        TextField defenseField = new TextField(String.valueOf(armor.getDefense()));
-        int[] attrs = armor.getModifiedAttributes();
+        TextField nameField = new TextField(accessory.getName());
+        TextField defenseField = new TextField(String.valueOf(accessory.getDefense()));
+        int[] attrs = accessory.getModifiedAttributes();
         TextField strField = new TextField(String.valueOf(attrs[0]));
         TextField dexField = new TextField(String.valueOf(attrs[1]));
-        TextField itvField = new TextField(String.valueOf(attrs[2]));
-        TextField mobField = new TextField(String.valueOf(attrs[3]));
+        TextField mobField = new TextField(String.valueOf(attrs[2]));
+        TextField intField = new TextField(String.valueOf(attrs.length > 3 ? attrs[3] : 0));
+        
+        // Abilities list - copy existing abilities
+        ArrayList<ItemAbility> accessoryAbilities = new ArrayList<>(accessory.getAbilities());
+        VBox abilityEditor = createAbilityEditorSection(accessoryAbilities);
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
-        grid.add(new Label("Type:"), 0, row); grid.add(typeCombo, 1, row++);
         grid.add(new Label("Defense:"), 0, row); grid.add(defenseField, 1, row++);
         grid.add(new Label("STR Mod:"), 0, row); grid.add(strField, 1, row++);
         grid.add(new Label("DEX Mod:"), 0, row); grid.add(dexField, 1, row++);
-        grid.add(new Label("ITV Mod:"), 0, row); grid.add(itvField, 1, row++);
         grid.add(new Label("MOB Mod:"), 0, row); grid.add(mobField, 1, row++);
+        grid.add(new Label("INT Mod:"), 0, row); grid.add(intField, 1, row++);
+        grid.add(abilityEditor, 0, row++, 2, 1);
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
             int defense = Integer.parseInt(defenseField.getText());
-            int[] newAttrs = {parseInt(strField), parseInt(dexField), parseInt(itvField), parseInt(mobField)};
+            int[] newAttrs = {parseInt(strField), parseInt(dexField), parseInt(mobField), parseInt(intField)};
             if (!name.isEmpty()) {
-                armor.setName(name);
-                armor.setArmorType(typeCombo.getSelectionModel().getSelectedIndex());
-                armor.setDefense(defense);
-                armor.setModifiedAttributes(newAttrs);
-                ItemDatabase.getInstance().saveItem(armor);
+                accessory.setName(name);
+                accessory.setDefense(defense);
+                accessory.setModifiedAttributes(newAttrs);
+                accessory.setAbilities(accessoryAbilities);
+                ItemDatabase.getInstance().saveItem(accessory);
                 return true;
             }
             return false;
         }, this::refreshItemDisplay);
         
-        dialog.setScene(createDialogScene(grid, 350, 350));
+        dialog.setScene(createDialogScene(grid, 380, 500));
         dialog.showAndWait();
     }
 
@@ -816,32 +883,28 @@ public class AssetEditorView {
     }
 
     private void editAmmunition(Ammunition item) {
-        Stage dialog = createDialog("Edit Ammunition", 320, 180);
+        Stage dialog = createDialog("Edit Ammunition", 320, 150);
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField(item.getName());
-        TextField damageBonusField = new TextField(String.valueOf(item.getDamageBonus()));
-        TextField compatibleField = new TextField(item.getCompatibleWeaponType() != null ? item.getCompatibleWeaponType() : "Any");
+        TextField ammoTypeField = new TextField(item.getAmmoType());
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
-        grid.add(new Label("Damage Bonus:"), 0, row); grid.add(damageBonusField, 1, row++);
-        grid.add(new Label("Compatible:"), 0, row); grid.add(compatibleField, 1, row++);
+        grid.add(new Label("Ammo Type:"), 0, row); grid.add(ammoTypeField, 1, row++);
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
-            int damageBonus = Integer.parseInt(damageBonusField.getText());
             if (!name.isEmpty()) {
                 item.setName(name);
-                item.setDamageBonus(damageBonus);
-                item.setCompatibleWeaponType(compatibleField.getText());
+                item.setAmmoType(ammoTypeField.getText());
                 ItemDatabase.getInstance().saveItem(item);
                 return true;
             }
             return false;
         }, this::refreshItemDisplay);
         
-        dialog.setScene(createDialogScene(grid, 320, 180));
+        dialog.setScene(createDialogScene(grid, 320, 150));
         dialog.showAndWait();
     }
 
@@ -1008,6 +1071,134 @@ public class AssetEditorView {
     }
 
     // ==================== HELPERS ====================
+
+    /**
+     * Creates an ability editor section with a list of abilities and add/edit/remove buttons.
+     * @param abilities The list of abilities to edit (will be modified in place)
+     * @return A VBox containing the ability editor UI
+     */
+    private VBox createAbilityEditorSection(ArrayList<ItemAbility> abilities) {
+        VBox container = new VBox(5);
+        container.setPadding(new Insets(5));
+        
+        Label header = new Label("Abilities");
+        header.setStyle("-fx-font-weight: bold; -fx-text-fill: #dcdcaa;");
+        
+        ListView<ItemAbility> abilityList = new ListView<>();
+        abilityList.setPrefHeight(100);
+        abilityList.getItems().addAll(abilities);
+        abilityList.setCellFactory(lv -> new ListCell<>() {
+            @Override
+            protected void updateItem(ItemAbility item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.toString());
+            }
+        });
+        
+        HBox buttons = new HBox(5);
+        Button addBtn = new Button("+");
+        addBtn.getStyleClass().add("button");
+        addBtn.setOnAction(e -> {
+            showAbilityDialog(null, ability -> {
+                abilities.add(ability);
+                abilityList.getItems().add(ability);
+            });
+        });
+        
+        Button editBtn = new Button("Edit");
+        editBtn.getStyleClass().add("button");
+        editBtn.setOnAction(e -> {
+            ItemAbility selected = abilityList.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                int index = abilities.indexOf(selected);
+                showAbilityDialog(selected, ability -> {
+                    abilities.set(index, ability);
+                    abilityList.getItems().set(index, ability);
+                });
+            }
+        });
+        
+        Button removeBtn = new Button("-");
+        removeBtn.getStyleClass().add("button");
+        removeBtn.setOnAction(e -> {
+            ItemAbility selected = abilityList.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                abilities.remove(selected);
+                abilityList.getItems().remove(selected);
+            }
+        });
+        
+        buttons.getChildren().addAll(addBtn, editBtn, removeBtn);
+        container.getChildren().addAll(header, abilityList, buttons);
+        
+        return container;
+    }
+    
+    /**
+     * Shows a dialog to create or edit an ability.
+     * @param existing The existing ability to edit, or null for a new ability
+     * @param onSave Called when the ability is saved
+     */
+    private void showAbilityDialog(ItemAbility existing, java.util.function.Consumer<ItemAbility> onSave) {
+        Stage dialog = createDialog(existing == null ? "Add Ability" : "Edit Ability", 350, 350);
+        GridPane grid = createDialogGrid();
+        
+        TextField nameField = new TextField(existing != null ? existing.getName() : "");
+        TextField descField = new TextField(existing != null ? existing.getDescription() : "");
+        
+        ComboBox<String> triggerCombo = new ComboBox<>();
+        triggerCombo.getItems().addAll(ItemAbility.TRIGGER_TYPES);
+        triggerCombo.getSelectionModel().select(existing != null ? existing.getTriggerType() : ItemAbility.ON_TURN_START);
+        
+        ComboBox<String> effectCombo = new ComboBox<>();
+        effectCombo.getItems().addAll(ItemAbility.EFFECT_TYPES);
+        effectCombo.getSelectionModel().select(existing != null ? existing.getEffectType() : ItemAbility.EFFECT_HEAL);
+        
+        Spinner<Integer> magnitudeSpinner = new Spinner<>(-100, 100, existing != null ? existing.getMagnitude() : 1);
+        magnitudeSpinner.setEditable(true);
+        FormUtils.styleSpinner(magnitudeSpinner);
+        
+        ComboBox<String> targetAttrCombo = new ComboBox<>();
+        targetAttrCombo.getItems().addAll("STR", "DEX", "MOB", "INT");
+        targetAttrCombo.getSelectionModel().select(existing != null ? existing.getTargetAttribute() : 0);
+        
+        int row = 0;
+        grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
+        grid.add(new Label("Description:"), 0, row); grid.add(descField, 1, row++);
+        grid.add(new Label("Trigger:"), 0, row); grid.add(triggerCombo, 1, row++);
+        grid.add(new Label("Effect:"), 0, row); grid.add(effectCombo, 1, row++);
+        grid.add(new Label("Magnitude:"), 0, row); grid.add(magnitudeSpinner, 1, row++);
+        grid.add(new Label("Target Attr:"), 0, row); grid.add(targetAttrCombo, 1, row++);
+        
+        HBox btnBox = new HBox(10);
+        Button okBtn = new Button("OK");
+        okBtn.getStyleClass().add("button-primary");
+        okBtn.setOnAction(e -> {
+            String name = nameField.getText().isEmpty() ? "Unnamed" : nameField.getText();
+            ItemAbility ability = new ItemAbility(
+                name,
+                descField.getText(),
+                triggerCombo.getValue(),
+                effectCombo.getValue(),
+                magnitudeSpinner.getValue(),
+                targetAttrCombo.getSelectionModel().getSelectedIndex(),
+                null
+            );
+            onSave.accept(ability);
+            dialog.close();
+        });
+        
+        Button cancelBtn = new Button("Cancel");
+        cancelBtn.getStyleClass().add("button");
+        cancelBtn.setOnAction(e -> dialog.close());
+        
+        btnBox.getChildren().addAll(okBtn, cancelBtn);
+        grid.add(btnBox, 0, row);
+        GridPane.setColumnSpan(btnBox, 2);
+        
+        dialog.setScene(createDialogScene(grid, 350, 350));
+        dialog.showAndWait();
+    }
 
     private void deleteItem(Item item) {
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);

@@ -12,8 +12,8 @@ public class Status {
     // Target attribute constants (for STAT_MODIFIER)
     public static final int STRENGTH = 0;
     public static final int DEXTERITY = 1;
-    public static final int INITIATIVE = 2;
-    public static final int MOBILITY = 3;
+    public static final int MOBILITY = 2;
+    public static final int INTELLIGENCE = 3;
 
     // Available status types
     public static final String[] AVAILABLE_STATUSES = {

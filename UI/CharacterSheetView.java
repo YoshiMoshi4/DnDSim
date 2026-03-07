@@ -468,9 +468,15 @@ public class CharacterSheetView {
         statsGrid.setPadding(new Insets(15, 0, 15, 0));
         
         addStatRow(statsGrid, 0, "Health", enemy.getMaxHealth() + " HP", IconUtils.Icon.HEART, "#e74c3c");
-        addStatRow(statsGrid, 1, "Mobility", String.valueOf(enemy.getMovement()), IconUtils.Icon.MOVE, "#3498db");
-        addStatRow(statsGrid, 2, "Attack", String.valueOf(enemy.getAttackPower()), IconUtils.Icon.TARGET, "#e67e22");
-        addStatRow(statsGrid, 3, "Initiative", String.valueOf(enemy.getInitiative()), IconUtils.Icon.LIGHTNING, "#9b59b6");
+        addStatRow(statsGrid, 1, "Armor Class", String.valueOf(enemy.getAC()), IconUtils.Icon.SHIELD, "#3498db");
+        addStatRow(statsGrid, 2, "Mobility", String.valueOf(enemy.getMovement()), IconUtils.Icon.MOVE, "#2ecc71");
+        addStatRow(statsGrid, 3, "Dexterity", String.valueOf(enemy.getDexterity()), IconUtils.Icon.TARGET, "#e67e22");
+        
+        // Damage dice tiers
+        String[] dice = enemy.getDamageDice();
+        addStatRow(statsGrid, 4, "Tier 1 Die", dice[0], IconUtils.Icon.DICE, "#f39c12");
+        addStatRow(statsGrid, 5, "Tier 2 Die", dice[1], IconUtils.Icon.DICE, "#e74c3c");
+        addStatRow(statsGrid, 6, "Tier 3 Die", dice[2], IconUtils.Icon.DICE, "#8e44ad");
         
         // Action buttons
         HBox btnBox = new HBox(10);
@@ -576,6 +582,11 @@ public class CharacterSheetView {
         TextField hpField = new TextField("20");
         grid.add(hpField, 1, row++);
         
+        // AC
+        grid.add(new Label("Armor Class:"), 0, row);
+        TextField acField = new TextField("10");
+        grid.add(acField, 1, row++);
+        
         // Attributes
         grid.add(new Label("STR:"), 0, row);
         TextField strField = new TextField("5");
@@ -585,13 +596,13 @@ public class CharacterSheetView {
         TextField dexField = new TextField("5");
         grid.add(dexField, 1, row++);
         
-        grid.add(new Label("ITV:"), 0, row);
-        TextField itvField = new TextField("5");
-        grid.add(itvField, 1, row++);
-        
         grid.add(new Label("MOB:"), 0, row);
         TextField mobField = new TextField("5");
         grid.add(mobField, 1, row++);
+        
+        grid.add(new Label("INT:"), 0, row);
+        TextField intField = new TextField("5");
+        grid.add(intField, 1, row++);
         
         // Equipment
         ItemDatabase db = ItemDatabase.getInstance();
@@ -603,35 +614,26 @@ public class CharacterSheetView {
         weaponCombo.getSelectionModel().select("None");
         grid.add(weaponCombo, 1, row++);
         
-        grid.add(new Label("Head:"), 0, row);
-        ComboBox<String> headCombo = new ComboBox<>();
-        headCombo.getItems().add("None");
-        for (String name : db.getAllArmors().keySet()) {
-            Armor armor = db.getArmor(name);
-            if (armor != null && armor.getArmorType() == 0) headCombo.getItems().add(name);
-        }
-        headCombo.getSelectionModel().select("None");
-        grid.add(headCombo, 1, row++);
+        grid.add(new Label("Accessory 1:"), 0, row);
+        ComboBox<String> accessory1Combo = new ComboBox<>();
+        accessory1Combo.getItems().add("None");
+        accessory1Combo.getItems().addAll(db.getAllAccessories().keySet());
+        accessory1Combo.getSelectionModel().select("None");
+        grid.add(accessory1Combo, 1, row++);
         
-        grid.add(new Label("Torso:"), 0, row);
-        ComboBox<String> torsoCombo = new ComboBox<>();
-        torsoCombo.getItems().add("None");
-        for (String name : db.getAllArmors().keySet()) {
-            Armor armor = db.getArmor(name);
-            if (armor != null && armor.getArmorType() == 1) torsoCombo.getItems().add(name);
-        }
-        torsoCombo.getSelectionModel().select("None");
-        grid.add(torsoCombo, 1, row++);
+        grid.add(new Label("Accessory 2:"), 0, row);
+        ComboBox<String> accessory2Combo = new ComboBox<>();
+        accessory2Combo.getItems().add("None");
+        accessory2Combo.getItems().addAll(db.getAllAccessories().keySet());
+        accessory2Combo.getSelectionModel().select("None");
+        grid.add(accessory2Combo, 1, row++);
         
-        grid.add(new Label("Legs:"), 0, row);
-        ComboBox<String> legsCombo = new ComboBox<>();
-        legsCombo.getItems().add("None");
-        for (String name : db.getAllArmors().keySet()) {
-            Armor armor = db.getArmor(name);
-            if (armor != null && armor.getArmorType() == 2) legsCombo.getItems().add(name);
-        }
-        legsCombo.getSelectionModel().select("None");
-        grid.add(legsCombo, 1, row++);
+        grid.add(new Label("Accessory 3:"), 0, row);
+        ComboBox<String> accessory3Combo = new ComboBox<>();
+        accessory3Combo.getItems().add("None");
+        accessory3Combo.getItems().addAll(db.getAllAccessories().keySet());
+        accessory3Combo.getSelectionModel().select("None");
+        grid.add(accessory3Combo, 1, row++);
         
         // Buttons
         HBox btnBox = new HBox(10);
@@ -640,15 +642,17 @@ public class CharacterSheetView {
         createBtn.setOnAction(e -> {
             try {
                 int hp = Integer.parseInt(hpField.getText());
+                int ac = Integer.parseInt(acField.getText());
                 int[] attr = {
                     Integer.parseInt(strField.getText()),
                     Integer.parseInt(dexField.getText()),
-                    Integer.parseInt(itvField.getText()),
-                    Integer.parseInt(mobField.getText())
+                    Integer.parseInt(mobField.getText()),
+                    Integer.parseInt(intField.getText())
                 };
                 
                 CharSheet newSheet = new CharSheet(nameField.getText(), true, hp, attr,
                         colorCombo.getSelectionModel().getSelectedIndex());
+                newSheet.setArmorClass(ac);
                 
                 // Equip items (only if not "None")
                 String weaponName = weaponCombo.getSelectionModel().getSelectedItem();
@@ -660,30 +664,30 @@ public class CharacterSheetView {
                     }
                 }
                 
-                String headName = headCombo.getSelectionModel().getSelectedItem();
-                if (headName != null && !headName.equals("None")) {
-                    Armor head = db.getArmor(headName);
-                    if (head != null) {
-                        newSheet.equipHead(head);
-                        newSheet.getInventory().add(head);
+                String accessory1Name = accessory1Combo.getSelectionModel().getSelectedItem();
+                if (accessory1Name != null && !accessory1Name.equals("None")) {
+                    Accessory acc1 = db.getAccessory(accessory1Name);
+                    if (acc1 != null) {
+                        newSheet.equipAccessory(0, acc1);
+                        newSheet.getInventory().add(acc1);
                     }
                 }
                 
-                String torsoName = torsoCombo.getSelectionModel().getSelectedItem();
-                if (torsoName != null && !torsoName.equals("None")) {
-                    Armor torso = db.getArmor(torsoName);
-                    if (torso != null) {
-                        newSheet.equipTorso(torso);
-                        newSheet.getInventory().add(torso);
+                String accessory2Name = accessory2Combo.getSelectionModel().getSelectedItem();
+                if (accessory2Name != null && !accessory2Name.equals("None")) {
+                    Accessory acc2 = db.getAccessory(accessory2Name);
+                    if (acc2 != null) {
+                        newSheet.equipAccessory(1, acc2);
+                        newSheet.getInventory().add(acc2);
                     }
                 }
                 
-                String legsName = legsCombo.getSelectionModel().getSelectedItem();
-                if (legsName != null && !legsName.equals("None")) {
-                    Armor legs = db.getArmor(legsName);
-                    if (legs != null) {
-                        newSheet.equipLegs(legs);
-                        newSheet.getInventory().add(legs);
+                String accessory3Name = accessory3Combo.getSelectionModel().getSelectedItem();
+                if (accessory3Name != null && !accessory3Name.equals("None")) {
+                    Accessory acc3 = db.getAccessory(accessory3Name);
+                    if (acc3 != null) {
+                        newSheet.equipAccessory(2, acc3);
+                        newSheet.getInventory().add(acc3);
                     }
                 }
                 
@@ -718,6 +722,8 @@ public class CharacterSheetView {
         showEnemyDialog(null);
     }
 
+    private static final String[] DICE_OPTIONS = {"d4", "d6", "d8", "d10", "d12", "d20"};
+
     private void showEnemyDialog(Enemy existing) {
         Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
@@ -747,20 +753,36 @@ public class CharacterSheetView {
         mobSpinner.setEditable(true);
         grid.add(mobSpinner, 1, row++);
         
-        grid.add(new Label("Attack:"), 0, row);
-        Spinner<Integer> atkSpinner = new Spinner<>(0, 999, existing != null ? existing.getAttackPower() : 5);
-        atkSpinner.setEditable(true);
-        grid.add(atkSpinner, 1, row++);
-        
-        grid.add(new Label("Initiative:"), 0, row);
-        Spinner<Integer> initSpinner = new Spinner<>(0, 99, existing != null ? existing.getInitiative() : 5);
-        initSpinner.setEditable(true);
-        grid.add(initSpinner, 1, row++);
+        grid.add(new Label("Armor Class:"), 0, row);
+        Spinner<Integer> acSpinner = new Spinner<>(0, 99, existing != null ? existing.getAC() : 10);
+        acSpinner.setEditable(true);
+        grid.add(acSpinner, 1, row++);
         
         grid.add(new Label("Dexterity:"), 0, row);
         Spinner<Integer> dexSpinner = new Spinner<>(-10, 99, existing != null ? existing.getDexterity() : 2);
         dexSpinner.setEditable(true);
         grid.add(dexSpinner, 1, row++);
+        
+        // Get existing dice values
+        String[] existingDice = existing != null ? existing.getDamageDice() : new String[]{"d4", "d4", "d6"};
+        
+        grid.add(new Label("Tier 1 Die:"), 0, row);
+        ComboBox<String> tier1Combo = new ComboBox<>();
+        tier1Combo.getItems().addAll(DICE_OPTIONS);
+        tier1Combo.getSelectionModel().select(existingDice[0]);
+        grid.add(tier1Combo, 1, row++);
+        
+        grid.add(new Label("Tier 2 Die:"), 0, row);
+        ComboBox<String> tier2Combo = new ComboBox<>();
+        tier2Combo.getItems().addAll(DICE_OPTIONS);
+        tier2Combo.getSelectionModel().select(existingDice[1]);
+        grid.add(tier2Combo, 1, row++);
+        
+        grid.add(new Label("Tier 3 Die:"), 0, row);
+        ComboBox<String> tier3Combo = new ComboBox<>();
+        tier3Combo.getItems().addAll(DICE_OPTIONS);
+        tier3Combo.getSelectionModel().select(existingDice[2]);
+        grid.add(tier3Combo, 1, row++);
         
         grid.add(new Label("Color:"), 0, row);
         ComboBox<String> colorCombo = new ComboBox<>();
@@ -787,8 +809,10 @@ public class CharacterSheetView {
         saveBtn.setOnAction(e -> {
             String name = nameField.getText().trim();
             if (!name.isEmpty()) {
+                String[] damageDice = {tier1Combo.getValue(), tier2Combo.getValue(), tier3Combo.getValue()};
                 Enemy enemy = new Enemy(0, 0, name, hpSpinner.getValue(), mobSpinner.getValue(),
-                        atkSpinner.getValue(), initSpinner.getValue(), dexSpinner.getValue(),
+                        acSpinner.getValue(), damageDice,
+                        dexSpinner.getValue(), dexSpinner.getValue(),
                         colorCombo.getSelectionModel().getSelectedIndex());
                 enemy.setSpritePath(spritePath[0]);
                 enemy.save();

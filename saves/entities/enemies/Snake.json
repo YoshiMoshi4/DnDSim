@@ -1,0 +1,21 @@
+{
+  "name": "Snake",
+  "health": 14,
+  "maxHealth": 14,
+  "mobility": 5,
+  "armorClass": 10,
+  "attackModifier": 0,
+  "damageDice": [
+    "d4",
+    "d4",
+    "d4"
+  ],
+  "initiative": 7,
+  "dexterity": 7,
+  "color": 8,
+  "instanceNumber": 0,
+  "baseName": "Snake",
+  "attackDamage": 0,
+  "row": 0,
+  "col": 0
+}
