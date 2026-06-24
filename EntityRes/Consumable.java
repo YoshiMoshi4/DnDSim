@@ -5,10 +5,14 @@ public class Consumable extends Item {
     private int healAmount;
     private Status effect;
 
-    public Consumable(String name, String type, int color, int healAmount, Status effect) {
+    public Consumable(String name, String type, String color, int healAmount, Status effect) {
         super(name, type, color);
         this.healAmount = healAmount;
         this.effect = effect;
+    }
+
+    public Consumable(String name, String type, int color, int healAmount, Status effect) {
+        this(name, type, ColorUtils.fromLegacyIndex(color), healAmount, effect);
     }
 
     public Consumable(String name, String type, int healAmount, Status effect) {

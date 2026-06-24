@@ -35,6 +35,7 @@ public class AppController {
         primaryStage.setScene(scene);
         primaryStage.setMinWidth(800);
         primaryStage.setMinHeight(600);
+        primaryStage.setMaximized(true);
     }
 
     public static void initialize(Stage primaryStage) {

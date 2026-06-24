@@ -9,6 +9,7 @@ import javafx.scene.control.*;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 
 import java.util.Optional;
@@ -99,6 +100,13 @@ public class BattleGridCanvas extends Pane {
     }
 
     private void handleKeyPressed(javafx.scene.input.KeyEvent e) {
+        // Handle ESCAPE for object placement mode
+        if (battleView.isObjectPlacementMode() && e.getCode() == javafx.scene.input.KeyCode.ESCAPE) {
+            battleView.cancelObjectPlacement();
+            e.consume();
+            return;
+        }
+        
         // Handle shortcuts when entity is selected
         if (battleStarted && selectedObject != null) {
             if (selectedObject instanceof Entity entity && entity.isParty()) {
@@ -246,14 +254,110 @@ public class BattleGridCanvas extends Pane {
     }
 
     private void useConsumable(Entity entity, Consumable consumable) {
+        // Show d10 roll dialog for efficacy
+        showEfficacyRollDialog(entity, consumable);
+    }
+    
+    /**
+     * Show a dialog to roll d10 for item efficacy.
+     * Roll determines healing percentage: 1-10 = 10%-100%
+     */
+    private void showEfficacyRollDialog(Entity entity, Consumable consumable) {
+        Dialog<Integer> dialog = new Dialog<>();
+        dialog.setTitle("Item Efficacy Roll");
+        dialog.setHeaderText("Roll d10 for " + consumable.getName() + " efficacy");
+        
+        VBox content = new VBox(12);
+        content.setPadding(new javafx.geometry.Insets(15));
+        content.setAlignment(javafx.geometry.Pos.CENTER);
+        
+        // Info about the item
+        Label itemInfo = new Label("Base healing: " + consumable.getHealAmount() + " HP");
+        itemInfo.setStyle("-fx-font-size: 13px; -fx-text-fill: #e0e0e0;");
+        
+        Label rollInfo = new Label("Roll determines efficacy (1=10%, 10=100%)");
+        rollInfo.setStyle("-fx-font-size: 11px; -fx-text-fill: #888;");
+        
+        // Input field
+        TextField rollInput = new TextField();
+        rollInput.setPromptText("Enter d10 roll (1-10)");
+        rollInput.setPrefWidth(150);
+        rollInput.setStyle("-fx-font-size: 14px; -fx-alignment: center;");
+        
+        // Preview label for showing calculated heal
+        Label previewLabel = new Label("");
+        previewLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #4CAF50;");
+        
+        // Update preview as user types
+        rollInput.textProperty().addListener((obs, oldVal, newVal) -> {
+            try {
+                int roll = Integer.parseInt(newVal.trim());
+                if (roll >= 1 && roll <= 10) {
+                    int efficacyPercent = roll * 10;
+                    int healAmount = (int) Math.ceil(consumable.getHealAmount() * efficacyPercent / 100.0);
+                    previewLabel.setText("Heals " + healAmount + " HP (" + efficacyPercent + "% efficacy)");
+                    previewLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #4CAF50;");
+                } else {
+                    previewLabel.setText("Enter 1-10");
+                    previewLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #F44336;");
+                }
+            } catch (NumberFormatException e) {
+                previewLabel.setText("");
+            }
+        });
+        
+        content.getChildren().addAll(itemInfo, rollInfo, rollInput, previewLabel);
+        
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        
+        // Disable OK until valid input
+        Button okBtn = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
+        okBtn.setDisable(true);
+        
+        rollInput.textProperty().addListener((obs, oldVal, newVal) -> {
+            try {
+                int roll = Integer.parseInt(newVal.trim());
+                okBtn.setDisable(roll < 1 || roll > 10);
+            } catch (NumberFormatException e) {
+                okBtn.setDisable(true);
+            }
+        });
+        
+        dialog.setResultConverter(buttonType -> {
+            if (buttonType == ButtonType.OK) {
+                try {
+                    return Integer.parseInt(rollInput.getText().trim());
+                } catch (NumberFormatException e) {
+                    return null;
+                }
+            }
+            return null;
+        });
+        
+        dialog.showAndWait().ifPresent(roll -> {
+            applyConsumableWithEfficacy(entity, consumable, roll);
+        });
+    }
+    
+    /**
+     * Apply consumable effect with the rolled efficacy.
+     */
+    private void applyConsumableWithEfficacy(Entity entity, Consumable consumable, int roll) {
+        int efficacyPercent = roll * 10;
+        
         if (consumable.getHealAmount() > 0) {
-            entity.getCharSheet().addCurrentHP(consumable.getHealAmount());
-            combatLogPane.logHeal(entity.getName(), consumable.getHealAmount());
+            int healAmount = (int) Math.ceil(consumable.getHealAmount() * efficacyPercent / 100.0);
+            entity.getCharSheet().addCurrentHP(healAmount);
+            combatLogPane.log(entity.getName() + " used " + consumable.getName() + 
+                " (d10=" + roll + ", " + efficacyPercent + "% efficacy)", CombatLogPane.LogType.INFO);
+            combatLogPane.logHeal(entity.getName(), healAmount);
         }
         if (consumable.getEffect() != null) {
             entity.getCharSheet().addStatus(consumable.getEffect());
+            combatLogPane.log("Applied effect: " + consumable.getEffect().getName(), CombatLogPane.LogType.INFO);
         }
-        combatLogPane.logItemUse(entity.getName(), consumable.getName());
+        
         if (consumable.getQuantity() > 1) {
             consumable.decQuantity();
         } else {
@@ -388,6 +492,19 @@ public class BattleGridCanvas extends Pane {
             }
             return;
         }
+        
+        // Handle object placement mode (enemies, terrain, pickups)
+        if (battleView.isObjectPlacementMode()) {
+            if (clicked == null && !grid.isBlocked(row, col)) {
+                // Place the object at clicked location
+                battleView.objectPlaced(row, col);
+                return;
+            } else {
+                // Invalid placement location
+                combatLogPane.log("Cannot place here - tile is occupied", CombatLogPane.LogType.INFO);
+                return;
+            }
+        }
 
         // Handle pickup mode for Entity
         if (pickupMode && pickupEntity != null) {
@@ -431,7 +548,7 @@ public class BattleGridCanvas extends Pane {
         if (moveMode && movingEntity != null) {
             if (clicked == null && !grid.isBlocked(row, col)) {
                 int dist = Math.abs(movingEntity.getRow() - row) + Math.abs(movingEntity.getCol() - col);
-                int mobilityLimit = movingEntity.getCharSheet().getTotalAttribute(2);
+                int mobilityLimit = movingEntity.getMovement();
 
                 if (dist <= mobilityLimit) {
                     Entity movedEntity = movingEntity;
@@ -610,6 +727,11 @@ public class BattleGridCanvas extends Pane {
         if (outcome.hit) {
             // Apply damage
             CombatManager.applyDamage(target, outcome.totalDamage);
+
+            // Natural 20 critical tag in combat log.
+            if (outcome.d20Roll == 20) {
+                combatLogPane.log("CRIT! Natural 20 -> x1.5 damage", CombatLogPane.LogType.ATTACK);
+            }
             
             // Log the attack with detailed info
             combatLogPane.logAttackRoll(
@@ -686,7 +808,7 @@ public class BattleGridCanvas extends Pane {
             int dist = Math.abs(e.getRow() - row) + Math.abs(e.getCol() - col);
 
             if (battleStarted) {
-                int mobilityLimit = e.getCharSheet().getTotalAttribute(2);
+                int mobilityLimit = e.getMovement();
                 if (dist > mobilityLimit) return;
             }
         }
@@ -753,7 +875,7 @@ public class BattleGridCanvas extends Pane {
 
         // Movement range highlight for Entity
         if (moveMode && movingEntity != null) {
-            int mobilityLimit = movingEntity.getCharSheet().getTotalAttribute(2);
+            int mobilityLimit = movingEntity.getMovement();
             int entityRow = movingEntity.getRow();
             int entityCol = movingEntity.getCol();
 
@@ -877,7 +999,8 @@ public class BattleGridCanvas extends Pane {
             double y = offsetY + p.getRow() * cellSize;
             double circleSize = cellSize * 0.35;
             double offset = (cellSize - circleSize) / 2;
-            gc.setFill(Color.BLACK);
+            String pickupColor = p.getItem() != null ? p.getItem().getColor() : EntityRes.ColorUtils.DEFAULT_COLOR;
+            gc.setFill(Color.web(pickupColor));
             gc.fillOval(x + offset, y + offset, circleSize, circleSize);
         }
 
@@ -916,7 +1039,7 @@ public class BattleGridCanvas extends Pane {
             double centerY = y + cellSize / 2;
             
             // Get fallback color
-            Color fallbackColor = getEnemyColor(en.getColor());
+            Color fallbackColor = Color.web(en.getColor());
             
             // Draw sprite or fallback (enemies use squares as fallback)
             String spritePath = en.getSpritePath();
@@ -937,28 +1060,6 @@ public class BattleGridCanvas extends Pane {
                 gc.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
             }
         }
-    }
-
-    private Color getEnemyColor(int colorIndex) {
-        return switch (colorIndex) {
-            case 0 -> Color.BLACK;
-            case 1 -> Color.DARKBLUE;
-            case 2 -> Color.DARKGREEN;
-            case 3 -> Color.DARKCYAN;
-            case 4 -> Color.DARKRED;
-            case 5 -> Color.DARKMAGENTA;
-            case 6 -> Color.OLIVE;
-            case 7 -> Color.GRAY;
-            case 8 -> Color.DARKGRAY;
-            case 9 -> Color.BLUE;
-            case 10 -> Color.GREEN;
-            case 11 -> Color.CYAN;
-            case 12 -> Color.RED;
-            case 13 -> Color.MAGENTA;
-            case 14 -> Color.YELLOW;
-            case 15 -> Color.WHITE;
-            default -> Color.PURPLE;
-        };
     }
 
     private void showAlert(Alert.AlertType type, String title, String content) {

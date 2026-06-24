@@ -70,7 +70,8 @@ public class Entity extends GridObject {
     }
 
     public int getMovement() {
-        return charSheet.getAttribute(2);
+        int totalDex = charSheet.getTotalAttribute(CharSheet.DEXTERITY);
+        return 1 +((totalDex + 1) / 2);
     }
 
     public int getHealth() {

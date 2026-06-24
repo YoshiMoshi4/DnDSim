@@ -37,6 +37,17 @@ public class TurnManager {
      * @return List of roll result strings for combat log
      */
     public List<String> calculateInitiativeOrder() {
+        return calculateInitiativeOrder(null);
+    }
+
+    /**
+     * Calculate initiative for all combatants, using optional manual d20 rolls for party members.
+     * Enemies always roll randomly.
+     *
+     * @param partyRollInputs Optional map of party entities to d20 roll inputs (1-20)
+     * @return List of roll result strings for combat log
+     */
+    public List<String> calculateInitiativeOrder(Map<Entity, Integer> partyRollInputs) {
         List<String> logMessages = new ArrayList<>();
         initiativeRolls.clear();
         rollBreakdown.clear();
@@ -48,7 +59,15 @@ public class TurnManager {
         
         // Roll initiative for everyone
         for (GridObject obj : turnOrder) {
-            int d20 = random.nextInt(20) + 1;
+            int d20;
+            boolean manualRoll = false;
+            if (obj instanceof Entity entity && entity.isParty() && partyRollInputs != null && partyRollInputs.containsKey(entity)) {
+                d20 = Math.max(1, Math.min(20, partyRollInputs.get(entity)));
+                manualRoll = true;
+            } else {
+                d20 = random.nextInt(20) + 1;
+            }
+
             int dexMod = getDexterity(obj);
             int total = d20 + dexMod;
             
@@ -61,8 +80,13 @@ public class TurnManager {
             rollBreakdown.put(obj, new int[]{d20, dexMod});
             
             String name = getName(obj);
-            logMessages.add(name + " rolls initiative: " + (total > 100 ? total - 100 : total) + 
-                          " (d20: " + d20 + " + DEX: " + dexMod + ")");
+            if (manualRoll) {
+                logMessages.add(name + " initiative (manual): " + (total > 100 ? total - 100 : total) +
+                        " (d20: " + d20 + " + DEX: " + dexMod + ")");
+            } else {
+                logMessages.add(name + " rolls initiative: " + (total > 100 ? total - 100 : total) +
+                        " (d20: " + d20 + " + DEX: " + dexMod + ")");
+            }
         }
         
         // Sort by initiative (highest first)

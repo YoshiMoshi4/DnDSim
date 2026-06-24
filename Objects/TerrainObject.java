@@ -1,34 +1,44 @@
 package Objects;
 
+import EntityRes.ColorUtils;
+
 public class TerrainObject extends GridObject {
 
     protected String type;
     protected int health;
-    protected int color; // 0-15 representing different colors
+    protected String color;
     protected boolean blocksMovement = true;
     protected String spritePath; // Optional sprite image path
 
-    public TerrainObject(int row, int col, String type, int health, int color, boolean blocksMovement) {
+    public TerrainObject(int row, int col, String type, int health, String color, boolean blocksMovement) {
         super(row, col);
         this.type = type;
         this.health = health;
-        this.color = color;
+        this.color = ColorUtils.normalizeHex(color, ColorUtils.fromLegacyIndex(8));
         this.blocksMovement = blocksMovement;
     }
 
-    public TerrainObject(int row, int col, String type, int health, int color) {
+    public TerrainObject(int row, int col, String type, int health, int color, boolean blocksMovement) {
+        this(row, col, type, health, ColorUtils.fromLegacyIndex(color), blocksMovement);
+    }
+
+    public TerrainObject(int row, int col, String type, int health, String color) {
         this(row, col, type, health, color, true); // Default blocks movement
     }
 
+    public TerrainObject(int row, int col, String type, int health, int color) {
+        this(row, col, type, health, ColorUtils.fromLegacyIndex(color), true);
+    }
+
     public TerrainObject(int row, int col, String type, int health) {
-        this(row, col, type, health, 8); // Default to green
+        this(row, col, type, health, ColorUtils.fromLegacyIndex(8));
     }
 
     public TerrainObject(int row, int col, int health) {
         super(row, col);
         this.type = "Generic";
         this.health = health;
-        this.color = 8; // Default to green
+        this.color = ColorUtils.fromLegacyIndex(8);
     }
 
     public int getHealth() {
@@ -43,12 +53,17 @@ public class TerrainObject extends GridObject {
         return blocksMovement;
     }
 
-    public int getColor() {
+    public String getColor() {
+        color = ColorUtils.normalizeHex(color, ColorUtils.fromLegacyIndex(8));
         return color;
     }
 
+    public void setColor(String color) {
+        this.color = ColorUtils.normalizeHex(color, ColorUtils.fromLegacyIndex(8));
+    }
+
     public void setColor(int color) {
-        this.color = Math.max(0, Math.min(15, color));
+        setColor(ColorUtils.fromLegacyIndex(color));
     }
 
     public void setBlocksMovement(boolean blocksMovement) {
@@ -64,25 +79,7 @@ public class TerrainObject extends GridObject {
     }
 
     public java.awt.Color getDisplayColor() {
-        switch (color) {
-            case 0: return java.awt.Color.BLACK;
-            case 1: return java.awt.Color.GRAY;
-            case 2: return java.awt.Color.WHITE;
-            case 3: return java.awt.Color.RED.darker();
-            case 4: return java.awt.Color.RED;
-            case 5: return java.awt.Color.ORANGE;
-            case 6: return java.awt.Color.YELLOW;
-            case 7: return java.awt.Color.GREEN.brighter();
-            case 8: return java.awt.Color.GREEN;
-            case 9: return java.awt.Color.BLUE;
-            case 10: return java.awt.Color.BLUE.darker();
-            case 11: return new java.awt.Color(200, 162, 200); // Lilac
-            case 12: return new java.awt.Color(128, 0, 128); // Purple
-            case 13: return java.awt.Color.PINK;
-            case 14: return new java.awt.Color(245, 245, 220); // Beige
-            case 15: return new java.awt.Color(139, 69, 19); // Brown
-            default: return java.awt.Color.GREEN;
-        }
+        return ColorUtils.toAwtColor(color, ColorUtils.fromLegacyIndex(8));
     }
 
     public void takeDamage(int dmg) {

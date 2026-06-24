@@ -1,0 +1,21 @@
+{
+  "name": "Dummy",
+  "health": 18,
+  "maxHealth": 18,
+  "mobility": 5,
+  "armorClass": 13,
+  "attackModifier": 0,
+  "damageDice": [
+    "d4",
+    "d6",
+    "d10"
+  ],
+  "initiative": 3,
+  "dexterity": 3,
+  "color": 0,
+  "instanceNumber": 0,
+  "baseName": "Dummy",
+  "attackDamage": 0,
+  "row": 0,
+  "col": 0
+}

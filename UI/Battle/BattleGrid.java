@@ -152,6 +152,27 @@ public class BattleGrid {
     public void addEntity(Entity entity) {
         entities.add(entity);
     }
+    
+    /**
+     * Add a terrain object at its current position.
+     */
+    public void addTerrain(TerrainObject terrain) {
+        terrainObjects.add(terrain);
+    }
+    
+    /**
+     * Add a pickup at its current position.
+     */
+    public void addPickup(Pickup pickup) {
+        pickups.add(pickup);
+    }
+    
+    /**
+     * Add an enemy at its current position.
+     */
+    public void addEnemy(Enemy enemy) {
+        enemies.add(enemy);
+    }
 
     public void addTerrainAtNextAvailable(TerrainObject terrain) {
         for (int r = 0; r < rows; r++) {

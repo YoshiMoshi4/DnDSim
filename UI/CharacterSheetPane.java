@@ -26,7 +26,7 @@ public class CharacterSheetPane extends BorderPane {
     private ProgressBar hpBar;
     private MenuButton statusMenu;
     private Map<String, CheckMenuItem> statusMenuItems;
-    private ComboBox<String> colorCombo;
+    private ColorPicker colorPicker;
     
     private ComboBox<String> primaryWeapon;
     private ComboBox<String> secondaryWeapon;
@@ -38,10 +38,16 @@ public class CharacterSheetPane extends BorderPane {
     private Label strTemp, strTotal;
     private Spinner<Integer> dexBase;
     private Label dexTemp, dexTotal;
-    private Spinner<Integer> mobBase;
-    private Label mobTemp, mobTotal;
+    private Spinner<Integer> conBase;
+    private Label conTemp, conTotal;
     private Spinner<Integer> intBase;
     private Label intTemp, intTotal;
+    private Spinner<Integer> wisBase;
+    private Label wisTemp, wisTotal;
+    private Spinner<Integer> chaBase;
+    private Label chaTemp, chaTotal;
+    private Spinner<Integer> levelSpinner;
+    private Label pointsLabel;
     
     private ListView<Item> consumablesList;
     private ListView<Item> craftingList;
@@ -212,16 +218,14 @@ public class CharacterSheetPane extends BorderPane {
         Label colorLabel = new Label("Color:");
         colorLabel.getStyleClass().add("form-label");
         grid.add(colorLabel, 0, row);
-        colorCombo = new ComboBox<>();
-        colorCombo.getItems().addAll(CharSheet.getColorNames());
-        colorCombo.setPrefWidth(150);
-        colorCombo.getStyleClass().add("styled-combo-box");
-        colorCombo.setOnAction(e -> {
+        colorPicker = new ColorPicker(Color.web(sheet.getColor()));
+        colorPicker.setPrefWidth(150);
+        colorPicker.setOnAction(e -> {
             if (updatingDisplay) return;
-            sheet.setColor(colorCombo.getSelectionModel().getSelectedIndex());
+            sheet.setColor(toHexColor(colorPicker.getValue()));
             sheet.save();
         });
-        grid.add(colorCombo, 1, row++);
+        grid.add(colorPicker, 1, row++);
         
         // Combine sprite and form
         mainBox.getChildren().addAll(spriteBox, grid);
@@ -344,82 +348,148 @@ public class CharacterSheetPane extends BorderPane {
         totalHeader.getStyleClass().add("label-header");
         totalHeader.setStyle("-fx-text-fill: #dcdcaa; -fx-font-weight: bold;");
         grid.add(totalHeader, 3, 0);
+
+        int row = 1;
+
+        // Level and soft point pool tracking
+        Label levelLabel = new Label("LVL");
+        levelLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #c586c0;");
+        grid.add(levelLabel, 0, row);
+        levelSpinner = new Spinner<>(1, 99, 1);
+        levelSpinner.setEditable(true);
+        levelSpinner.setPrefWidth(60);
+        FormUtils.styleSpinner(levelSpinner);
+        levelSpinner.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && !updatingDisplay) {
+                sheet.setLevel(newVal);
+                updateDisplay();
+            }
+        });
+        grid.add(levelSpinner, 1, row);
+        pointsLabel = new Label();
+        pointsLabel.setStyle("-fx-text-fill: #ce9178; -fx-font-weight: bold;");
+        grid.add(pointsLabel, 2, row);
+        GridPane.setColumnSpan(pointsLabel, 2);
+        row++;
         
         // STR
         Label strLabel = new Label("STR");
         strLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #d75f5f;");
-        grid.add(strLabel, 0, 1);
+        grid.add(strLabel, 0, row);
         strBase = new Spinner<>(0, 99, 5);
         strBase.setEditable(true);
         strBase.setPrefWidth(60);
         FormUtils.styleSpinner(strBase);
         strBase.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null && !updatingDisplay) {
-                sheet.setAttribute(0, newVal);
+                sheet.setAttribute(CharSheet.STRENGTH, newVal);
                 sheet.updateAttributes();
                 updateDisplay();
             }
         });
-        grid.add(strBase, 1, 1);
-        strTemp = new Label(); strTemp.setMinWidth(40); grid.add(strTemp, 2, 1);
-        strTotal = new Label(); strTotal.setMinWidth(40); strTotal.setStyle("-fx-font-weight: bold;"); grid.add(strTotal, 3, 1);
+        grid.add(strBase, 1, row);
+        strTemp = new Label(); strTemp.setMinWidth(40); grid.add(strTemp, 2, row);
+        strTotal = new Label(); strTotal.setMinWidth(40); strTotal.setStyle("-fx-font-weight: bold;"); grid.add(strTotal, 3, row);
+        row++;
         
         // DEX
         Label dexLabel = new Label("DEX");
         dexLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #4CAF50;");
-        grid.add(dexLabel, 0, 2);
+        grid.add(dexLabel, 0, row);
         dexBase = new Spinner<>(0, 99, 5);
         dexBase.setEditable(true);
         dexBase.setPrefWidth(60);
         FormUtils.styleSpinner(dexBase);
         dexBase.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null && !updatingDisplay) {
-                sheet.setAttribute(1, newVal);
+                sheet.setAttribute(CharSheet.DEXTERITY, newVal);
                 sheet.updateAttributes();
                 updateDisplay();
             }
         });
-        grid.add(dexBase, 1, 2);
-        dexTemp = new Label(); dexTemp.setMinWidth(40); grid.add(dexTemp, 2, 2);
-        dexTotal = new Label(); dexTotal.setMinWidth(40); dexTotal.setStyle("-fx-font-weight: bold;"); grid.add(dexTotal, 3, 2);
+        grid.add(dexBase, 1, row);
+        dexTemp = new Label(); dexTemp.setMinWidth(40); grid.add(dexTemp, 2, row);
+        dexTotal = new Label(); dexTotal.setMinWidth(40); dexTotal.setStyle("-fx-font-weight: bold;"); grid.add(dexTotal, 3, row);
+        row++;
         
-        // MOB
-        Label mobLabel = new Label("MOB");
-        mobLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #2196F3;");
-        grid.add(mobLabel, 0, 3);
-        mobBase = new Spinner<>(0, 99, 5);
-        mobBase.setEditable(true);
-        mobBase.setPrefWidth(60);
-        FormUtils.styleSpinner(mobBase);
-        mobBase.valueProperty().addListener((obs, oldVal, newVal) -> {
+        // CON
+        Label conLabel = new Label("CON");
+        conLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #2196F3;");
+        grid.add(conLabel, 0, row);
+        conBase = new Spinner<>(0, 99, 5);
+        conBase.setEditable(true);
+        conBase.setPrefWidth(60);
+        FormUtils.styleSpinner(conBase);
+        conBase.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null && !updatingDisplay) {
-                sheet.setAttribute(2, newVal);
+                sheet.setAttribute(CharSheet.CONSTITUTION, newVal);
                 sheet.updateAttributes();
                 updateDisplay();
             }
         });
-        grid.add(mobBase, 1, 3);
-        mobTemp = new Label(); mobTemp.setMinWidth(40); grid.add(mobTemp, 2, 3);
-        mobTotal = new Label(); mobTotal.setMinWidth(40); mobTotal.setStyle("-fx-font-weight: bold;"); grid.add(mobTotal, 3, 3);
+        grid.add(conBase, 1, row);
+        conTemp = new Label(); conTemp.setMinWidth(40); grid.add(conTemp, 2, row);
+        conTotal = new Label(); conTotal.setMinWidth(40); conTotal.setStyle("-fx-font-weight: bold;"); grid.add(conTotal, 3, row);
+        row++;
         
         // INT
         Label intLabel = new Label("INT");
         intLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #FF9800;");
-        grid.add(intLabel, 0, 4);
+        grid.add(intLabel, 0, row);
         intBase = new Spinner<>(0, 99, 5);
         intBase.setEditable(true);
         intBase.setPrefWidth(60);
         FormUtils.styleSpinner(intBase);
         intBase.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null && !updatingDisplay) {
-                sheet.setAttribute(3, newVal);
+                sheet.setAttribute(CharSheet.INTELLIGENCE, newVal);
                 sheet.updateAttributes();
                 updateDisplay();
             }
         });
-        grid.add(intBase, 1, 4);
-        intTemp = new Label(); intTemp.setMinWidth(40); grid.add(intTemp, 2, 4);
-        intTotal = new Label(); intTotal.setMinWidth(40); intTotal.setStyle("-fx-font-weight: bold;"); grid.add(intTotal, 3, 4);
+        grid.add(intBase, 1, row);
+        intTemp = new Label(); intTemp.setMinWidth(40); grid.add(intTemp, 2, row);
+        intTotal = new Label(); intTotal.setMinWidth(40); intTotal.setStyle("-fx-font-weight: bold;"); grid.add(intTotal, 3, row);
+        row++;
+
+        // WIS
+        Label wisLabel = new Label("WIS");
+        wisLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #4ec9b0;");
+        grid.add(wisLabel, 0, row);
+        wisBase = new Spinner<>(0, 99, 5);
+        wisBase.setEditable(true);
+        wisBase.setPrefWidth(60);
+        FormUtils.styleSpinner(wisBase);
+        wisBase.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && !updatingDisplay) {
+                sheet.setAttribute(CharSheet.WISDOM, newVal);
+                sheet.updateAttributes();
+                updateDisplay();
+            }
+        });
+        grid.add(wisBase, 1, row);
+        wisTemp = new Label(); wisTemp.setMinWidth(40); grid.add(wisTemp, 2, row);
+        wisTotal = new Label(); wisTotal.setMinWidth(40); wisTotal.setStyle("-fx-font-weight: bold;"); grid.add(wisTotal, 3, row);
+        row++;
+
+        // CHA
+        Label chaLabel = new Label("CHA");
+        chaLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #c586c0;");
+        grid.add(chaLabel, 0, row);
+        chaBase = new Spinner<>(0, 99, 5);
+        chaBase.setEditable(true);
+        chaBase.setPrefWidth(60);
+        FormUtils.styleSpinner(chaBase);
+        chaBase.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && !updatingDisplay) {
+                sheet.setAttribute(CharSheet.CHARISMA, newVal);
+                sheet.updateAttributes();
+                updateDisplay();
+            }
+        });
+        grid.add(chaBase, 1, row);
+        chaTemp = new Label(); chaTemp.setMinWidth(40); grid.add(chaTemp, 2, row);
+        chaTotal = new Label(); chaTotal.setMinWidth(40); chaTotal.setStyle("-fx-font-weight: bold;"); grid.add(chaTotal, 3, row);
         
         TitledPane pane = new TitledPane("Attributes", grid);
         pane.getStyleClass().add("form-section");
@@ -536,7 +606,7 @@ public class CharacterSheetPane extends BorderPane {
         FormUtils.styleSpinner(magnitudeSpinner);
         
         ComboBox<String> targetAttrCombo = new ComboBox<>();
-        targetAttrCombo.getItems().addAll("STR", "DEX", "MOB", "INT");
+        targetAttrCombo.getItems().addAll("STR", "DEX", "CON", "INT", "WIS", "CHA");
         targetAttrCombo.getSelectionModel().select(0);
         targetAttrCombo.getStyleClass().add("styled-combo-box");
         targetAttrCombo.setDisable(true);
@@ -928,7 +998,7 @@ public class CharacterSheetPane extends BorderPane {
         try {
             nameField.setText(sheet.getName());
             classField.setText(sheet.getCharacterClass() != null ? sheet.getCharacterClass() : "");
-            colorCombo.getSelectionModel().select(sheet.getColor());
+            colorPicker.setValue(Color.web(sheet.getColor()));
         
         // Update HP spinners without triggering listeners
         currentHpSpinner.getValueFactory().setValue(sheet.getCurrentHP());
@@ -1026,18 +1096,32 @@ public class CharacterSheetPane extends BorderPane {
         }
         
         // Attributes
-        strBase.getValueFactory().setValue(sheet.getAttribute(0));
-        updateBonusLabel(strTemp, sheet.getTempAttribute(0));
-        strTotal.setText(String.valueOf(sheet.getTotalAttribute(0)));
-        dexBase.getValueFactory().setValue(sheet.getAttribute(1));
-        updateBonusLabel(dexTemp, sheet.getTempAttribute(1));
-        dexTotal.setText(String.valueOf(sheet.getTotalAttribute(1)));
-        mobBase.getValueFactory().setValue(sheet.getAttribute(2));
-        updateBonusLabel(mobTemp, sheet.getTempAttribute(2));
-        mobTotal.setText(String.valueOf(sheet.getTotalAttribute(2)));
-        intBase.getValueFactory().setValue(sheet.getAttribute(3));
-        updateBonusLabel(intTemp, sheet.getTempAttribute(3));
-        intTotal.setText(String.valueOf(sheet.getTotalAttribute(3)));
+        strBase.getValueFactory().setValue(sheet.getAttribute(CharSheet.STRENGTH));
+        updateBonusLabel(strTemp, sheet.getTempAttribute(CharSheet.STRENGTH));
+        strTotal.setText(String.valueOf(sheet.getTotalAttribute(CharSheet.STRENGTH)));
+
+        dexBase.getValueFactory().setValue(sheet.getAttribute(CharSheet.DEXTERITY));
+        updateBonusLabel(dexTemp, sheet.getTempAttribute(CharSheet.DEXTERITY));
+        dexTotal.setText(String.valueOf(sheet.getTotalAttribute(CharSheet.DEXTERITY)));
+
+        conBase.getValueFactory().setValue(sheet.getAttribute(CharSheet.CONSTITUTION));
+        updateBonusLabel(conTemp, sheet.getTempAttribute(CharSheet.CONSTITUTION));
+        conTotal.setText(String.valueOf(sheet.getTotalAttribute(CharSheet.CONSTITUTION)));
+
+        intBase.getValueFactory().setValue(sheet.getAttribute(CharSheet.INTELLIGENCE));
+        updateBonusLabel(intTemp, sheet.getTempAttribute(CharSheet.INTELLIGENCE));
+        intTotal.setText(String.valueOf(sheet.getTotalAttribute(CharSheet.INTELLIGENCE)));
+
+        wisBase.getValueFactory().setValue(sheet.getAttribute(CharSheet.WISDOM));
+        updateBonusLabel(wisTemp, sheet.getTempAttribute(CharSheet.WISDOM));
+        wisTotal.setText(String.valueOf(sheet.getTotalAttribute(CharSheet.WISDOM)));
+
+        chaBase.getValueFactory().setValue(sheet.getAttribute(CharSheet.CHARISMA));
+        updateBonusLabel(chaTemp, sheet.getTempAttribute(CharSheet.CHARISMA));
+        chaTotal.setText(String.valueOf(sheet.getTotalAttribute(CharSheet.CHARISMA)));
+
+        levelSpinner.getValueFactory().setValue(sheet.getLevel());
+        pointsLabel.setText("Points: " + sheet.getSpentStatPoints() + " / " + sheet.getAvailableStatPoints());
         
         // Inventory - populate ListViews
         consumablesData.clear();
@@ -1198,6 +1282,13 @@ public class CharacterSheetPane extends BorderPane {
     private void save() {
         sheet.save();
         updateDisplay();
+    }
+
+    private String toHexColor(Color color) {
+        int red = (int) Math.round(color.getRed() * 255.0);
+        int green = (int) Math.round(color.getGreen() * 255.0);
+        int blue = (int) Math.round(color.getBlue() * 255.0);
+        return String.format("#%02X%02X%02X", red, green, blue);
     }
 
     public CharSheet getCharSheet() {

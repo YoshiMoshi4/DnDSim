@@ -15,6 +15,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 
 import java.util.*;
+import java.util.function.Supplier;
 
 public class BattleView {
 
@@ -40,6 +41,8 @@ public class BattleView {
     private Button swapBtn;
     private Button pickupBtn;
     private Button endTurnBtn;
+    private ProgressBar healthBar;
+    private Label healthTextLabel;
     private final Map<String, Integer> enemyInstanceCounts = new HashMap<>();
     
     // Dice roll panel for combat
@@ -53,11 +56,17 @@ public class BattleView {
     // Surprise round toggle
     private CheckBox surpriseRoundCheckbox;
     
-    // Placement mode
+    // Placement mode (party)
     private boolean placementMode = false;
     private final Queue<CharSheet> partyToPlace = new LinkedList<>();
     private CharSheet currentPlacing = null;
     private javafx.beans.property.BooleanProperty placementModeProperty = new javafx.beans.property.SimpleBooleanProperty(false);
+    
+    // Object placement mode (enemies, terrain, pickups)
+    private boolean objectPlacementMode = false;
+    private Supplier<Object> pendingObjectSupplier = null;
+    private String pendingObjectKey = null;
+    private String pendingObjectName = null;
 
     public BattleView(int rows, int cols, CharacterSheetView sheetView, AppController appController) {
         this.appController = appController;
@@ -231,6 +240,88 @@ public class BattleView {
     public CharSheet getCurrentPlacing() {
         return currentPlacing;
     }
+    
+    /**
+     * Check if in object placement mode.
+     */
+    public boolean isObjectPlacementMode() {
+        return objectPlacementMode;
+    }
+    
+    /**
+     * Check whether a specific add-objects menu item is currently selected for placement.
+     */
+    public boolean isPlacementSelectionActive(String key) {
+        return objectPlacementMode && key != null && key.equals(pendingObjectKey);
+    }
+    
+    /**
+     * Start object placement mode with the given object.
+     */
+    public void startObjectPlacement(Supplier<Object> supplier, String key, String name) {
+        // Clicking the same menu item toggles placement selection off.
+        if (objectPlacementMode && key != null && key.equals(pendingObjectKey)) {
+            cancelObjectPlacement();
+            addStatusLabel.setText("Deselected: " + name);
+            return;
+        }
+
+        objectPlacementMode = true;
+        pendingObjectSupplier = supplier;
+        pendingObjectKey = key;
+        pendingObjectName = name;
+        addStatusLabel.setText("Selected: " + name + " (click grid to place, click same item again to deselect)");
+        refreshAddObjectsPanels();
+        gridCanvas.redraw();
+    }
+    
+    /**
+     * Called when an object is placed on the grid.
+     */
+    public void objectPlaced(int row, int col) {
+        if (pendingObjectSupplier == null) {
+            return;
+        }
+
+        Object pendingObject = pendingObjectSupplier.get();
+        if (pendingObject == null) {
+            addStatusLabel.setText("Failed to create object for placement");
+            cancelObjectPlacement();
+            return;
+        }
+
+        if (pendingObject instanceof Enemy enemy) {
+            enemy.setRow(row);
+            enemy.setCol(col);
+            grid.addEnemy(enemy);
+            addEnemy(enemy);
+            addStatusLabel.setText("Placed: " + enemy.getName() + " (still placing " + pendingObjectName + ")");
+        } else if (pendingObject instanceof TerrainObject terrain) {
+            terrain.setRow(row);
+            terrain.setCol(col);
+            grid.addTerrain(terrain);
+            addStatusLabel.setText("Placed: " + terrain.getType() + " (still placing " + pendingObjectName + ")");
+        } else if (pendingObject instanceof Pickup pickup) {
+            pickup.setRow(row);
+            pickup.setCol(col);
+            grid.addPickup(pickup);
+            addStatusLabel.setText("Placed: " + pickup.getItem().getName() + " (still placing " + pendingObjectName + ")");
+        }
+        gridCanvas.redraw();
+    }
+    
+    /**
+     * Cancel object placement mode.
+     */
+    public void cancelObjectPlacement() {
+        objectPlacementMode = false;
+        pendingObjectSupplier = null;
+        pendingObjectKey = null;
+        pendingObjectName = null;
+        addStatusLabel.setText("Placement cancelled");
+        refreshAddObjectsPanels();
+        gridCanvas.redraw();
+    }
 
     private VBox createAddObjectsPanel() {
         VBox panel = new VBox(10);
@@ -357,6 +448,36 @@ public class BattleView {
         secondaryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
         secondaryLabel.setWrapText(true);
         
+        // Health section with progress bar and adjustment buttons
+        Label healthLabel = new Label("Health");
+        healthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
+        
+        HBox healthRow = new HBox(5);
+        healthRow.setAlignment(Pos.CENTER_LEFT);
+        
+        Button healthMinusBtn = new Button("-");
+        healthMinusBtn.setStyle("-fx-min-width: 25px; -fx-min-height: 20px; -fx-font-size: 12px;");
+        healthMinusBtn.setOnAction(e -> adjustHealth(-1));
+        
+        StackPane healthPane = new StackPane();
+        healthPane.setAlignment(Pos.CENTER);
+        
+        healthBar = new ProgressBar(0);
+        healthBar.setPrefWidth(100);
+        healthBar.setPrefHeight(20);
+        healthBar.setStyle("-fx-accent: #F44336;");
+        
+        healthTextLabel = new Label("-- / --");
+        healthTextLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: white; -fx-font-weight: bold;");
+        
+        healthPane.getChildren().addAll(healthBar, healthTextLabel);
+        
+        Button healthPlusBtn = new Button("+");
+        healthPlusBtn.setStyle("-fx-min-width: 25px; -fx-min-height: 20px; -fx-font-size: 12px;");
+        healthPlusBtn.setOnAction(e -> adjustHealth(1));
+        
+        healthRow.getChildren().addAll(healthMinusBtn, healthPane, healthPlusBtn);
+        
         Separator sep = new Separator();
         sep.setStyle("-fx-background-color: #505052;");
         
@@ -419,7 +540,8 @@ public class BattleView {
         panel.getChildren().addAll(
             selectLabel, selectedEntityLabel,
             attrLabel, attrRow1, attrRow2,
-            weapLabel, primaryLabel, secondaryLabel, sep,
+            weapLabel, primaryLabel, secondaryLabel,
+            healthLabel, healthRow, sep,
             actionsLabel, moveBtn, attackBtn, useItemBtn, swapBtn, pickupBtn, sep2,
             endTurnBtn, roundLabel
         );
@@ -454,6 +576,8 @@ public class BattleView {
             if (mobLabel != null) mobLabel.setText("MOB: --");
             if (primaryLabel != null) primaryLabel.setText("1: --");
             if (secondaryLabel != null) secondaryLabel.setText("2: --");
+            healthBar.setProgress(0);
+            healthTextLabel.setText("-- / --");
             moveBtn.setDisable(true);
             attackBtn.setDisable(true);
             useItemBtn.setDisable(true);
@@ -464,12 +588,22 @@ public class BattleView {
             if (strLabel != null) strLabel.setText("STR: " + e.getCharSheet().getTotalAttribute(0));
             if (dexLabel != null) dexLabel.setText("DEX: " + e.getCharSheet().getTotalAttribute(1));
             if (intLabel != null) intLabel.setText("INT: " + e.getCharSheet().getTotalAttribute(3));
-            if (mobLabel != null) mobLabel.setText("MOB: " + e.getCharSheet().getTotalAttribute(2));
+            if (mobLabel != null) mobLabel.setText("MOB: " + e.getMovement());
             
             Weapon primary = e.getCharSheet().getEquippedWeapon();
             Weapon secondary = e.getCharSheet().getEquippedSecondary();
-            if (primaryLabel != null) primaryLabel.setText("1: " + (primary != null ? primary.getName() : "None"));
-            if (secondaryLabel != null) secondaryLabel.setText("2: " + (secondary != null ? secondary.getName() : "None"));
+            if (primaryLabel != null) {
+                primaryLabel.setText("1: " + formatWeaponWithAmmoCount(e, primary));
+            }
+            if (secondaryLabel != null) {
+                secondaryLabel.setText("2: " + formatWeaponWithAmmoCount(e, secondary));
+            }
+            
+            // Update health bar
+            int maxHP = e.getCharSheet().getTotalHP();
+            int currentHP = e.getCharSheet().getCurrentHP();
+            healthBar.setProgress(maxHP > 0 ? (double) currentHP / maxHP : 0);
+            healthTextLabel.setText(currentHP + " / " + maxHP);
             
             boolean canAct = e.isParty() && battleState.isBattleStarted();
             moveBtn.setDisable(!canAct);
@@ -486,6 +620,12 @@ public class BattleView {
             if (primaryLabel != null) primaryLabel.setText("ATK: " + en.getAttackPower());
             if (secondaryLabel != null) secondaryLabel.setText("");
             
+            // Update health bar for enemy
+            int maxHP = en.getMaxHealth();
+            int currentHP = en.getHealth();
+            healthBar.setProgress(maxHP > 0 ? (double) currentHP / maxHP : 0);
+            healthTextLabel.setText(currentHP + " / " + maxHP);
+            
             boolean canAct = battleState.isBattleStarted();
             moveBtn.setDisable(!canAct);
             attackBtn.setDisable(!canAct);
@@ -497,6 +637,50 @@ public class BattleView {
         // Keep focus on grid canvas for keyboard shortcuts
         if (obj != null) {
             gridCanvas.requestFocus();
+        }
+    }
+
+    /**
+     * Format a weapon name with ammo count when the weapon is ranged.
+     */
+    private String formatWeaponWithAmmoCount(Entity entity, Weapon weapon) {
+        if (weapon == null) {
+            return "None";
+        }
+
+        if (!weapon.isRanged()) {
+            return weapon.getName();
+        }
+
+        int ammoCount = 0;
+        for (Item item : entity.getCharSheet().getInventory()) {
+            if (item instanceof Ammunition ammo && ammo.isCompatibleWith(weapon)) {
+                ammoCount += Math.max(0, ammo.getQuantity());
+            }
+        }
+
+        return weapon.getName() + " (x" + ammoCount + ")";
+    }
+    
+    private void adjustHealth(int delta) {
+        if (selectedEntity == null) return;
+        
+        if (selectedEntity instanceof Entity e) {
+            int maxHP = e.getCharSheet().getTotalHP();
+            int currentHP = e.getCharSheet().getCurrentHP();
+            int newHP = Math.max(0, Math.min(maxHP, currentHP + delta));
+            e.getCharSheet().setCurrentHP(newHP);
+            e.getCharSheet().save();
+            refreshPartyHealth();
+            gridCanvas.redraw();
+            updateSelectedEntity(e);
+        } else if (selectedEntity instanceof Enemy en) {
+            int maxHP = en.getMaxHealth();
+            int currentHP = en.getHealth();
+            int newHP = Math.max(0, Math.min(maxHP, currentHP + delta));
+            en.setHealth(newHP);
+            gridCanvas.redraw();
+            updateSelectedEntity(en);
         }
     }
 
@@ -571,6 +755,12 @@ public class BattleView {
             return;
         }
 
+        Map<Entity, Integer> partyRollInputs = promptPartyInitiativeRolls();
+        if (partyRollInputs == null) {
+            // User cancelled manual initiative entry.
+            return;
+        }
+
         battleState.setBattleStarted(true);
         turnManager.setBattleStarted(true);
         
@@ -579,7 +769,7 @@ public class BattleView {
         
         // Calculate initiative and get log messages
         combatLogPane.clear();
-        List<String> initiativeMessages = turnManager.calculateInitiativeOrder();
+        List<String> initiativeMessages = turnManager.calculateInitiativeOrder(partyRollInputs);
         
         // Log all initiative rolls
         for (String msg : initiativeMessages) {
@@ -615,6 +805,68 @@ public class BattleView {
         partyHealthPane.refresh(grid.getEntities());
         updateActionPanel();
         gridCanvas.redraw();
+    }
+
+    /**
+     * Prompt the player for initiative d20 rolls for each party member currently on the field.
+     * Enemy initiatives remain randomized.
+     *
+     * @return Map of party entity to manual d20 roll; null when cancelled.
+     */
+    private Map<Entity, Integer> promptPartyInitiativeRolls() {
+        List<Entity> partyMembers = new ArrayList<>();
+        for (Entity entity : grid.getEntities()) {
+            if (entity.isParty()) {
+                partyMembers.add(entity);
+            }
+        }
+
+        if (partyMembers.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        Dialog<Map<Entity, Integer>> dialog = new Dialog<>();
+        dialog.setTitle("Party Initiative Rolls");
+        dialog.setHeaderText("Enter each party member's d20 initiative roll (1-20)");
+
+        VBox content = new VBox(8);
+        content.setPadding(new Insets(10));
+
+        Map<Entity, Spinner<Integer>> rollInputs = new LinkedHashMap<>();
+        for (Entity member : partyMembers) {
+            HBox row = new HBox(10);
+            row.setAlignment(Pos.CENTER_LEFT);
+
+            Label nameLabel = new Label(member.getName() + ":");
+            nameLabel.setMinWidth(140);
+
+            Spinner<Integer> rollSpinner = new Spinner<>(1, 20, 10);
+            rollSpinner.setEditable(true);
+            rollSpinner.setPrefWidth(80);
+            rollInputs.put(member, rollSpinner);
+
+            row.getChildren().addAll(nameLabel, rollSpinner);
+            content.getChildren().add(row);
+        }
+
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        dialog.setResultConverter(buttonType -> {
+            if (buttonType == ButtonType.OK) {
+                Map<Entity, Integer> result = new HashMap<>();
+                for (Map.Entry<Entity, Spinner<Integer>> entry : rollInputs.entrySet()) {
+                    Integer value = entry.getValue().getValue();
+                    int roll = value != null ? value : 1;
+                    result.put(entry.getKey(), Math.max(1, Math.min(20, roll)));
+                }
+                return result;
+            }
+            return null;
+        });
+
+        Optional<Map<Entity, Integer>> result = dialog.showAndWait();
+        return result.orElse(null);
     }
 
     private void handleNextTurn() {
@@ -1020,19 +1272,21 @@ public class BattleView {
         for (String enemyName : enemyNames) {
             Enemy template = Enemy.load(enemyName);
             if (template != null) {
-                HBox card = createEnemySelectionCard(template);
+                final String key = "enemy:" + enemyName;
+                final String displayName = template.getName();
+                HBox card = createEnemySelectionCard(template, isPlacementSelectionActive(key));
                 final String name = enemyName;
                 card.setOnMouseClicked(e -> {
-                    Enemy newEnemy = Enemy.load(name);
-                    if (newEnemy != null) {
+                    startObjectPlacement(() -> {
+                        Enemy newEnemy = Enemy.load(name);
+                        if (newEnemy == null) {
+                            return null;
+                        }
                         int instanceNum = enemyInstanceCounts.getOrDefault(name, 0) + 1;
                         enemyInstanceCounts.put(name, instanceNum);
                         newEnemy.setInstanceNumber(instanceNum);
-                        grid.addEnemyAtNextAvailable(newEnemy);
-                        addEnemy(newEnemy);
-                        gridCanvas.redraw();
-                        addStatusLabel.setText("Added: " + name + " #" + instanceNum);
-                    }
+                        return newEnemy;
+                    }, key, displayName);
                 });
                 content.getChildren().add(card);
             }
@@ -1049,7 +1303,7 @@ public class BattleView {
         return scroll;
     }
     
-    private HBox createEnemySelectionCard(Enemy enemy) {
+    private HBox createEnemySelectionCard(Enemy enemy, boolean selected) {
         CardUtils.CardStyle style = CardUtils.CardStyle.ENEMY;
         
         HBox card = new HBox(10);
@@ -1061,6 +1315,10 @@ public class BattleView {
             "-fx-background-radius: 6; -fx-border-color: %s; -fx-border-radius: 6; -fx-border-width: 1;",
             style.bgColor, adjustBrightness(style.bgColor, -10), style.borderColor
         ));
+        if (selected) {
+            card.setStyle(card.getStyle().replace("-fx-border-color: " + style.borderColor,
+                "-fx-border-color: " + style.accentColor + "; -fx-border-width: 2"));
+        }
         
         // Icon
         Node avatar = IconUtils.createIcon(IconUtils.Icon.SKULL, 24, style.accentColor);
@@ -1125,14 +1383,19 @@ public class BattleView {
         } else {
             for (TerrainObject terrain : availableTerrains) {
                 String btnText = String.format("%s  |  HP: %d", terrain.getType(), terrain.getHealth());
+                String key = "terrain:" + terrain.getType();
                 Button btn = new Button(btnText);
                 btn.getStyleClass().add("button");
                 btn.setMaxWidth(Double.MAX_VALUE);
+                if (isPlacementSelectionActive(key)) {
+                    btn.setStyle("-fx-border-color: #daa520; -fx-border-width: 2;");
+                }
                 btn.setOnAction(e -> {
-                    TerrainObject newTerrain = new TerrainObject(0, 0, terrain.getType(), terrain.getHealth());
-                    grid.addTerrainAtNextAvailable(newTerrain);
-                    gridCanvas.redraw();
-                    addStatusLabel.setText("Added terrain: " + terrain.getType());
+                    startObjectPlacement(
+                        () -> new TerrainObject(0, 0, terrain.getType(), terrain.getHealth()),
+                        key,
+                        terrain.getType()
+                    );
                 });
                 content.getChildren().add(btn);
             }
@@ -1159,14 +1422,19 @@ public class BattleView {
 
             for (Weapon weapon : weapons.values()) {
                 String btnText = String.format("%s  |  DMG: %d", weapon.getName(), weapon.getDamage());
+                String key = "pickup:weapon:" + weapon.getName();
                 Button btn = new Button(btnText);
                 btn.getStyleClass().add("button");
                 btn.setMaxWidth(Double.MAX_VALUE);
+                if (isPlacementSelectionActive(key)) {
+                    btn.setStyle("-fx-border-color: #daa520; -fx-border-width: 2;");
+                }
                 btn.setOnAction(e -> {
-                    Pickup itemPickup = new Pickup(0, 0, weapon);
-                    grid.addPickupAtNextAvailable(itemPickup);
-                    gridCanvas.redraw();
-                    addStatusLabel.setText("Added pickup: " + weapon.getName());
+                    startObjectPlacement(
+                        () -> new Pickup(0, 0, weapon),
+                        key,
+                        weapon.getName()
+                    );
                 });
                 content.getChildren().add(btn);
             }
@@ -1180,14 +1448,19 @@ public class BattleView {
             for (Accessory accessory : accessories.values()) {
                 String btnText = String.format("%s  |  DEF: %d",
                         accessory.getName(), accessory.getDefense());
+                String key = "pickup:accessory:" + accessory.getName();
                 Button btn = new Button(btnText);
                 btn.getStyleClass().add("button");
                 btn.setMaxWidth(Double.MAX_VALUE);
+                if (isPlacementSelectionActive(key)) {
+                    btn.setStyle("-fx-border-color: #daa520; -fx-border-width: 2;");
+                }
                 btn.setOnAction(e -> {
-                    Pickup itemPickup = new Pickup(0, 0, accessory);
-                    grid.addPickupAtNextAvailable(itemPickup);
-                    gridCanvas.redraw();
-                    addStatusLabel.setText("Added pickup: " + accessory.getName());
+                    startObjectPlacement(
+                        () -> new Pickup(0, 0, accessory),
+                        key,
+                        accessory.getName()
+                    );
                 });
                 content.getChildren().add(btn);
             }
@@ -1203,14 +1476,19 @@ public class BattleView {
                 String effectName = (effect != null) ? effect.getName() : "Heal";
                 String btnText = String.format("%s  |  %s: %d",
                         consumable.getName(), effectName, consumable.getHealAmount());
+                String key = "pickup:consumable:" + consumable.getName();
                 Button btn = new Button(btnText);
                 btn.getStyleClass().add("button");
                 btn.setMaxWidth(Double.MAX_VALUE);
+                if (isPlacementSelectionActive(key)) {
+                    btn.setStyle("-fx-border-color: #daa520; -fx-border-width: 2;");
+                }
                 btn.setOnAction(e -> {
-                    Pickup itemPickup = new Pickup(0, 0, consumable);
-                    grid.addPickupAtNextAvailable(itemPickup);
-                    gridCanvas.redraw();
-                    addStatusLabel.setText("Added pickup: " + consumable.getName());
+                    startObjectPlacement(
+                        () -> new Pickup(0, 0, consumable),
+                        key,
+                        consumable.getName()
+                    );
                 });
                 content.getChildren().add(btn);
             }

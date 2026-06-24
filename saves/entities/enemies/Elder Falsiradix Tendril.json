@@ -1,0 +1,21 @@
+{
+  "name": "Elder Falsiradix Tendril",
+  "health": 5,
+  "maxHealth": 5,
+  "mobility": 10,
+  "armorClass": 12,
+  "attackModifier": 0,
+  "damageDice": [
+    "d4",
+    "d4",
+    "d4"
+  ],
+  "initiative": 5,
+  "dexterity": 5,
+  "color": 6,
+  "instanceNumber": 0,
+  "baseName": "Elder Falsiradix Tendril",
+  "attackDamage": 0,
+  "row": 0,
+  "col": 0
+}

@@ -7,6 +7,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -31,10 +32,10 @@ public class AssetEditorView {
     private ArrayList<CraftingItem> craftingItems = new ArrayList<>();
     private ArrayList<KeyItem> keyItems = new ArrayList<>();
     
-    private static final String[] ATTRIBUTE_NAMES = {"STR", "DEX", "MOB", "INT"};
+    private static final String[] ATTRIBUTE_NAMES = {"STR", "DEX", "CON", "INT", "WIS", "CHA"};
     private static final String[] CRAFTING_CATEGORIES = {"Material", "Component", "Reagent", "Miscellaneous"};
     private static final String[] DICE_TYPES = {"d4", "d6", "d8", "d10", "d12", "d20"};
-    private static final String[] STAT_TYPES = {"STRENGTH", "DEXTERITY", "INTELLIGENCE"};
+    private static final String[] STAT_TYPES = {"STRENGTH", "DEXTERITY", "CONSTITUTION", "INTELLIGENCE", "WISDOM", "CHARISMA"};
 
     public AssetEditorView(AppController appController) {
         this.appController = appController;
@@ -517,6 +518,7 @@ public class AssetEditorView {
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField();
+        ColorPicker colorPicker = new ColorPicker(Color.web(ColorUtils.fromLegacyIndex(4)));
         
         // Dice tier combos
         ComboBox<String> tier1Combo = new ComboBox<>();
@@ -542,8 +544,10 @@ public class AssetEditorView {
         
         TextField strField = new TextField("0");
         TextField dexField = new TextField("0");
-        TextField mobField = new TextField("0");
+        TextField conField = new TextField("0");
         TextField intField = new TextField("0");
+        TextField wisField = new TextField("0");
+        TextField chaField = new TextField("0");
         
         // Abilities list
         ArrayList<ItemAbility> weaponAbilities = new ArrayList<>();
@@ -551,6 +555,7 @@ public class AssetEditorView {
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label("Tier 1 Die:"), 0, row); grid.add(tier1Combo, 1, row++);
         grid.add(new Label("Tier 2 Die:"), 0, row); grid.add(tier2Combo, 1, row++);
         grid.add(new Label("Tier 3 Die:"), 0, row); grid.add(tier3Combo, 1, row++);
@@ -558,8 +563,10 @@ public class AssetEditorView {
         grid.add(new Label("Ammo Type:"), 0, row); grid.add(ammoTypeField, 1, row++);
         grid.add(new Label("STR Mod:"), 0, row); grid.add(strField, 1, row++);
         grid.add(new Label("DEX Mod:"), 0, row); grid.add(dexField, 1, row++);
-        grid.add(new Label("MOB Mod:"), 0, row); grid.add(mobField, 1, row++);
+        grid.add(new Label("CON Mod:"), 0, row); grid.add(conField, 1, row++);
         grid.add(new Label("INT Mod:"), 0, row); grid.add(intField, 1, row++);
+        grid.add(new Label("WIS Mod:"), 0, row); grid.add(wisField, 1, row++);
+        grid.add(new Label("CHA Mod:"), 0, row); grid.add(chaField, 1, row++);
         grid.add(abilityEditor, 0, row++, 2, 1);
         
         addDialogButtons(grid, row, dialog, () -> {
@@ -567,10 +574,11 @@ public class AssetEditorView {
             String[] damageDice = {tier1Combo.getValue(), tier2Combo.getValue(), tier3Combo.getValue()};
             String statType = statCombo.getValue();
             String ammoType = ammoTypeField.getText().trim();
-            int[] attrs = {parseInt(strField), parseInt(dexField), parseInt(mobField), parseInt(intField)};
+            int[] attrs = {parseInt(strField), parseInt(dexField), parseInt(conField), parseInt(intField), parseInt(wisField), parseInt(chaField)};
             if (!name.isEmpty()) {
                 Weapon weapon = new Weapon(name, "Weapon", damageDice, statType, 
                         ammoType.isEmpty() ? null : ammoType, attrs);
+                weapon.setColor(toHexColor(colorPicker.getValue()));
                 weapon.setAbilities(weaponAbilities);
                 ItemDatabase.getInstance().saveItem(weapon);
                 return true;
@@ -587,11 +595,14 @@ public class AssetEditorView {
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField();
+        ColorPicker colorPicker = new ColorPicker(Color.web(ColorUtils.fromLegacyIndex(9)));
         TextField defenseField = new TextField("1");
         TextField strField = new TextField("0");
         TextField dexField = new TextField("0");
-        TextField mobField = new TextField("0");
+        TextField conField = new TextField("0");
         TextField intField = new TextField("0");
+        TextField wisField = new TextField("0");
+        TextField chaField = new TextField("0");
         
         // Abilities list
         ArrayList<ItemAbility> accessoryAbilities = new ArrayList<>();
@@ -599,19 +610,23 @@ public class AssetEditorView {
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label("Defense:"), 0, row); grid.add(defenseField, 1, row++);
         grid.add(new Label("STR Mod:"), 0, row); grid.add(strField, 1, row++);
         grid.add(new Label("DEX Mod:"), 0, row); grid.add(dexField, 1, row++);
-        grid.add(new Label("MOB Mod:"), 0, row); grid.add(mobField, 1, row++);
+        grid.add(new Label("CON Mod:"), 0, row); grid.add(conField, 1, row++);
         grid.add(new Label("INT Mod:"), 0, row); grid.add(intField, 1, row++);
+        grid.add(new Label("WIS Mod:"), 0, row); grid.add(wisField, 1, row++);
+        grid.add(new Label("CHA Mod:"), 0, row); grid.add(chaField, 1, row++);
         grid.add(abilityEditor, 0, row++, 2, 1);
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
             int defense = Integer.parseInt(defenseField.getText());
-            int[] attrs = {parseInt(strField), parseInt(dexField), parseInt(mobField), parseInt(intField)};
+            int[] attrs = {parseInt(strField), parseInt(dexField), parseInt(conField), parseInt(intField), parseInt(wisField), parseInt(chaField)};
             if (!name.isEmpty()) {
                 Accessory accessory = new Accessory(name, "Accessory", defense, attrs);
+                accessory.setColor(toHexColor(colorPicker.getValue()));
                 accessory.setAbilities(accessoryAbilities);
                 ItemDatabase.getInstance().saveItem(accessory);
                 return true;
@@ -628,17 +643,19 @@ public class AssetEditorView {
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField();
+        ColorPicker colorPicker = new ColorPicker(Color.web(ColorUtils.fromLegacyIndex(7)));
         TextField healField = new TextField("10");
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label("Heal Amount:"), 0, row); grid.add(healField, 1, row++);
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
             int healAmount = Integer.parseInt(healField.getText());
             if (!name.isEmpty()) {
-                Consumable item = new Consumable(name, "Consumable", 0, healAmount, null);
+                Consumable item = new Consumable(name, "Consumable", toHexColor(colorPicker.getValue()), healAmount, null);
                 ItemDatabase.getInstance().saveItem(item);
                 return true;
             }
@@ -654,16 +671,18 @@ public class AssetEditorView {
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField();
+        ColorPicker colorPicker = new ColorPicker(Color.web(ColorUtils.fromLegacyIndex(5)));
         TextField ammoTypeField = new TextField("12 Gauge");
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label("Ammo Type:"), 0, row); grid.add(ammoTypeField, 1, row++);
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
             if (!name.isEmpty()) {
-                Ammunition item = new Ammunition(name, "Ammunition", 5, ammoTypeField.getText());
+                Ammunition item = new Ammunition(name, "Ammunition", toHexColor(colorPicker.getValue()), ammoTypeField.getText());
                 ItemDatabase.getInstance().saveItem(item);
                 return true;
             }
@@ -679,6 +698,7 @@ public class AssetEditorView {
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField();
+        ColorPicker colorPicker = new ColorPicker(Color.web(ColorUtils.fromLegacyIndex(14)));
         ComboBox<String> categoryCombo = new ComboBox<>();
         categoryCombo.getItems().addAll(CRAFTING_CATEGORIES);
         categoryCombo.getSelectionModel().selectFirst();
@@ -686,13 +706,14 @@ public class AssetEditorView {
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label("Category:"), 0, row); grid.add(categoryCombo, 1, row++);
         grid.add(new Label("Description:"), 0, row); grid.add(descField, 1, row++);
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
             if (!name.isEmpty()) {
-                CraftingItem item = new CraftingItem(name, "Crafting", 0,
+                CraftingItem item = new CraftingItem(name, "Crafting", toHexColor(colorPicker.getValue()),
                         categoryCombo.getSelectionModel().getSelectedItem(), descField.getText());
                 ItemDatabase.getInstance().saveItem(item);
                 return true;
@@ -709,18 +730,20 @@ public class AssetEditorView {
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField();
+        ColorPicker colorPicker = new ColorPicker(Color.web(ColorUtils.fromLegacyIndex(6)));
         TextField descField = new TextField();
         CheckBox questCheck = new CheckBox("Quest Related");
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label("Description:"), 0, row); grid.add(descField, 1, row++);
         grid.add(new Label(""), 0, row); grid.add(questCheck, 1, row++);
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
             if (!name.isEmpty()) {
-                KeyItem item = new KeyItem(name, "Key Item", 0,
+                KeyItem item = new KeyItem(name, "Key Item", toHexColor(colorPicker.getValue()),
                         descField.getText(), questCheck.isSelected());
                 ItemDatabase.getInstance().saveItem(item);
                 return true;
@@ -739,6 +762,7 @@ public class AssetEditorView {
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField(weapon.getName());
+        ColorPicker colorPicker = new ColorPicker(Color.web(weapon.getColor()));
         
         // Get existing dice values
         String[] dice = weapon.getDamageDice();
@@ -768,8 +792,10 @@ public class AssetEditorView {
         int[] attrs = weapon.getModifiedAttributes();
         TextField strField = new TextField(String.valueOf(attrs[0]));
         TextField dexField = new TextField(String.valueOf(attrs[1]));
-        TextField mobField = new TextField(String.valueOf(attrs[2]));
+        TextField conField = new TextField(String.valueOf(attrs.length > 2 ? attrs[2] : 0));
         TextField intField = new TextField(String.valueOf(attrs.length > 3 ? attrs[3] : 0));
+        TextField wisField = new TextField(String.valueOf(attrs.length > 4 ? attrs[4] : 0));
+        TextField chaField = new TextField(String.valueOf(attrs.length > 5 ? attrs[5] : 0));
         
         // Abilities list - copy existing abilities
         ArrayList<ItemAbility> weaponAbilities = new ArrayList<>(weapon.getAbilities());
@@ -777,6 +803,7 @@ public class AssetEditorView {
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label("Tier 1 Die:"), 0, row); grid.add(tier1Combo, 1, row++);
         grid.add(new Label("Tier 2 Die:"), 0, row); grid.add(tier2Combo, 1, row++);
         grid.add(new Label("Tier 3 Die:"), 0, row); grid.add(tier3Combo, 1, row++);
@@ -784,8 +811,10 @@ public class AssetEditorView {
         grid.add(new Label("Ammo Type:"), 0, row); grid.add(ammoTypeField, 1, row++);
         grid.add(new Label("STR Mod:"), 0, row); grid.add(strField, 1, row++);
         grid.add(new Label("DEX Mod:"), 0, row); grid.add(dexField, 1, row++);
-        grid.add(new Label("MOB Mod:"), 0, row); grid.add(mobField, 1, row++);
+        grid.add(new Label("CON Mod:"), 0, row); grid.add(conField, 1, row++);
         grid.add(new Label("INT Mod:"), 0, row); grid.add(intField, 1, row++);
+        grid.add(new Label("WIS Mod:"), 0, row); grid.add(wisField, 1, row++);
+        grid.add(new Label("CHA Mod:"), 0, row); grid.add(chaField, 1, row++);
         grid.add(abilityEditor, 0, row++, 2, 1);
         
         addDialogButtons(grid, row, dialog, () -> {
@@ -793,12 +822,13 @@ public class AssetEditorView {
             String[] damageDice = {tier1Combo.getValue(), tier2Combo.getValue(), tier3Combo.getValue()};
             String statType = statCombo.getValue();
             String ammoType = ammoTypeField.getText().trim();
-            int[] newAttrs = {parseInt(strField), parseInt(dexField), parseInt(mobField), parseInt(intField)};
+            int[] newAttrs = {parseInt(strField), parseInt(dexField), parseInt(conField), parseInt(intField), parseInt(wisField), parseInt(chaField)};
             if (!name.isEmpty()) {
                 weapon.setName(name);
                 weapon.setDamageDice(damageDice);
                 weapon.setStatType(statType);
                 weapon.setAmmoType(ammoType.isEmpty() ? null : ammoType);
+                weapon.setColor(toHexColor(colorPicker.getValue()));
                 weapon.setModifiedAttributes(newAttrs);
                 weapon.setAbilities(weaponAbilities);
                 ItemDatabase.getInstance().saveItem(weapon);
@@ -816,12 +846,15 @@ public class AssetEditorView {
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField(accessory.getName());
+        ColorPicker colorPicker = new ColorPicker(Color.web(accessory.getColor()));
         TextField defenseField = new TextField(String.valueOf(accessory.getDefense()));
         int[] attrs = accessory.getModifiedAttributes();
         TextField strField = new TextField(String.valueOf(attrs[0]));
         TextField dexField = new TextField(String.valueOf(attrs[1]));
-        TextField mobField = new TextField(String.valueOf(attrs[2]));
+        TextField conField = new TextField(String.valueOf(attrs.length > 2 ? attrs[2] : 0));
         TextField intField = new TextField(String.valueOf(attrs.length > 3 ? attrs[3] : 0));
+        TextField wisField = new TextField(String.valueOf(attrs.length > 4 ? attrs[4] : 0));
+        TextField chaField = new TextField(String.valueOf(attrs.length > 5 ? attrs[5] : 0));
         
         // Abilities list - copy existing abilities
         ArrayList<ItemAbility> accessoryAbilities = new ArrayList<>(accessory.getAbilities());
@@ -829,20 +862,24 @@ public class AssetEditorView {
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label("Defense:"), 0, row); grid.add(defenseField, 1, row++);
         grid.add(new Label("STR Mod:"), 0, row); grid.add(strField, 1, row++);
         grid.add(new Label("DEX Mod:"), 0, row); grid.add(dexField, 1, row++);
-        grid.add(new Label("MOB Mod:"), 0, row); grid.add(mobField, 1, row++);
+        grid.add(new Label("CON Mod:"), 0, row); grid.add(conField, 1, row++);
         grid.add(new Label("INT Mod:"), 0, row); grid.add(intField, 1, row++);
+        grid.add(new Label("WIS Mod:"), 0, row); grid.add(wisField, 1, row++);
+        grid.add(new Label("CHA Mod:"), 0, row); grid.add(chaField, 1, row++);
         grid.add(abilityEditor, 0, row++, 2, 1);
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
             int defense = Integer.parseInt(defenseField.getText());
-            int[] newAttrs = {parseInt(strField), parseInt(dexField), parseInt(mobField), parseInt(intField)};
+            int[] newAttrs = {parseInt(strField), parseInt(dexField), parseInt(conField), parseInt(intField), parseInt(wisField), parseInt(chaField)};
             if (!name.isEmpty()) {
                 accessory.setName(name);
                 accessory.setDefense(defense);
+                accessory.setColor(toHexColor(colorPicker.getValue()));
                 accessory.setModifiedAttributes(newAttrs);
                 accessory.setAbilities(accessoryAbilities);
                 ItemDatabase.getInstance().saveItem(accessory);
@@ -860,10 +897,12 @@ public class AssetEditorView {
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField(item.getName());
+        ColorPicker colorPicker = new ColorPicker(Color.web(item.getColor()));
         TextField healField = new TextField(String.valueOf(item.getHealAmount()));
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label("Heal Amount:"), 0, row); grid.add(healField, 1, row++);
         
         addDialogButtons(grid, row, dialog, () -> {
@@ -871,6 +910,7 @@ public class AssetEditorView {
             int healAmount = Integer.parseInt(healField.getText());
             if (!name.isEmpty()) {
                 item.setName(name);
+                item.setColor(toHexColor(colorPicker.getValue()));
                 item.setHealAmount(healAmount);
                 ItemDatabase.getInstance().saveItem(item);
                 return true;
@@ -887,16 +927,19 @@ public class AssetEditorView {
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField(item.getName());
+        ColorPicker colorPicker = new ColorPicker(Color.web(item.getColor()));
         TextField ammoTypeField = new TextField(item.getAmmoType());
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label("Ammo Type:"), 0, row); grid.add(ammoTypeField, 1, row++);
         
         addDialogButtons(grid, row, dialog, () -> {
             String name = nameField.getText();
             if (!name.isEmpty()) {
                 item.setName(name);
+                item.setColor(toHexColor(colorPicker.getValue()));
                 item.setAmmoType(ammoTypeField.getText());
                 ItemDatabase.getInstance().saveItem(item);
                 return true;
@@ -913,6 +956,7 @@ public class AssetEditorView {
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField(item.getName());
+        ColorPicker colorPicker = new ColorPicker(Color.web(item.getColor()));
         ComboBox<String> categoryCombo = new ComboBox<>();
         categoryCombo.getItems().addAll(CRAFTING_CATEGORIES);
         for (int i = 0; i < CRAFTING_CATEGORIES.length; i++) {
@@ -925,6 +969,7 @@ public class AssetEditorView {
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label("Category:"), 0, row); grid.add(categoryCombo, 1, row++);
         grid.add(new Label("Description:"), 0, row); grid.add(descField, 1, row++);
         
@@ -932,6 +977,7 @@ public class AssetEditorView {
             String name = nameField.getText();
             if (!name.isEmpty()) {
                 item.setName(name);
+                item.setColor(toHexColor(colorPicker.getValue()));
                 item.setCraftingCategory(categoryCombo.getSelectionModel().getSelectedItem());
                 item.setDescription(descField.getText());
                 ItemDatabase.getInstance().saveItem(item);
@@ -949,12 +995,14 @@ public class AssetEditorView {
         GridPane grid = createDialogGrid();
         
         TextField nameField = new TextField(item.getName());
+        ColorPicker colorPicker = new ColorPicker(Color.web(item.getColor()));
         TextField descField = new TextField(item.getDescription() != null ? item.getDescription() : "");
         CheckBox questCheck = new CheckBox("Quest Related");
         questCheck.setSelected(item.isQuestRelated());
         
         int row = 0;
         grid.add(new Label("Name:"), 0, row); grid.add(nameField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label("Description:"), 0, row); grid.add(descField, 1, row++);
         grid.add(new Label(""), 0, row); grid.add(questCheck, 1, row++);
         
@@ -962,6 +1010,7 @@ public class AssetEditorView {
             String name = nameField.getText();
             if (!name.isEmpty()) {
                 item.setName(name);
+                item.setColor(toHexColor(colorPicker.getValue()));
                 item.setDescription(descField.getText());
                 item.setQuestRelated(questCheck.isSelected());
                 ItemDatabase.getInstance().saveItem(item);
@@ -982,6 +1031,7 @@ public class AssetEditorView {
         
         TextField typeField = new TextField();
         TextField hpField = new TextField("10");
+        ColorPicker colorPicker = new ColorPicker(Color.web(ColorUtils.fromLegacyIndex(0)));
         CheckBox blocksCheck = new CheckBox("Blocks Movement");
         blocksCheck.setSelected(true);
         
@@ -990,7 +1040,7 @@ public class AssetEditorView {
         javafx.scene.layout.HBox spritePicker = SpritePickerUtils.createCompactSpritePicker(
             null,
             "terrain",
-            0,
+            toHexColor(colorPicker.getValue()),
             false,
             newPath -> spritePath[0] = newPath,
             dialog
@@ -999,6 +1049,7 @@ public class AssetEditorView {
         int row = 0;
         grid.add(new Label("Type:"), 0, row); grid.add(typeField, 1, row++);
         grid.add(new Label("HP:"), 0, row); grid.add(hpField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label(""), 0, row); grid.add(blocksCheck, 1, row++);
         grid.add(new Label("Sprite:"), 0, row); grid.add(spritePicker, 1, row++);
         
@@ -1007,7 +1058,7 @@ public class AssetEditorView {
             int hp = Integer.parseInt(hpField.getText());
             boolean blocks = blocksCheck.isSelected();
             if (!type.isEmpty()) {
-                TerrainObject newTerrain = new TerrainObject(0, 0, type, hp, 0, blocks);
+                TerrainObject newTerrain = new TerrainObject(0, 0, type, hp, toHexColor(colorPicker.getValue()), blocks);
                 newTerrain.setSpritePath(spritePath[0]);
                 TerrainDatabase.getInstance().addTerrain(newTerrain);
                 return true;
@@ -1025,6 +1076,7 @@ public class AssetEditorView {
         
         TextField typeField = new TextField(terrain.getType());
         TextField hpField = new TextField(String.valueOf(terrain.getHealth()));
+        ColorPicker colorPicker = new ColorPicker(Color.web(terrain.getColor()));
         CheckBox blocksCheck = new CheckBox("Blocks Movement");
         blocksCheck.setSelected(terrain.blocksMovement());
         
@@ -1042,11 +1094,13 @@ public class AssetEditorView {
         int row = 0;
         grid.add(new Label("Type:"), 0, row); grid.add(typeField, 1, row++);
         grid.add(new Label("HP:"), 0, row); grid.add(hpField, 1, row++);
+        grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label(""), 0, row); grid.add(blocksCheck, 1, row++);
         grid.add(new Label("Sprite:"), 0, row); grid.add(spritePicker, 1, row++);
         
         addDialogButtons(grid, row, dialog, () -> {
             terrain.setBlocksMovement(blocksCheck.isSelected());
+            terrain.setColor(toHexColor(colorPicker.getValue()));
             terrain.setSpritePath(spritePath[0]);
             TerrainDatabase.getInstance().saveTerrain(terrain);
             return true;
@@ -1159,7 +1213,7 @@ public class AssetEditorView {
         FormUtils.styleSpinner(magnitudeSpinner);
         
         ComboBox<String> targetAttrCombo = new ComboBox<>();
-        targetAttrCombo.getItems().addAll("STR", "DEX", "MOB", "INT");
+        targetAttrCombo.getItems().addAll("STR", "DEX", "CON", "INT", "WIS", "CHA");
         targetAttrCombo.getSelectionModel().select(existing != null ? existing.getTargetAttribute() : 0);
         
         int row = 0;
@@ -1269,6 +1323,13 @@ public class AssetEditorView {
 
     private int parseInt(TextField field) {
         return Integer.parseInt(field.getText());
+    }
+
+    private String toHexColor(Color color) {
+        int red = (int) Math.round(color.getRed() * 255.0);
+        int green = (int) Math.round(color.getGreen() * 255.0);
+        int blue = (int) Math.round(color.getBlue() * 255.0);
+        return String.format("#%02X%02X%02X", red, green, blue);
     }
 
     private void handleBack() {

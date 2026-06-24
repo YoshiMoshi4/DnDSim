@@ -1,5 +1,6 @@
 package Objects;
 
+import EntityRes.ColorUtils;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.io.*;
@@ -15,7 +16,7 @@ public class Enemy extends GridObject {
     private String[] damageDice;      // Damage dice per tier [tier1, tier2, tier3]
     private int initiative;
     private int dexterity;
-    private int color;
+    private String color;
     private int instanceNumber = 0;
     private String baseName;
     private String spritePath; // Path to enemy sprite image (e.g., "sprites/enemies/spider.png")
@@ -23,8 +24,8 @@ public class Enemy extends GridObject {
     // Legacy field for backward compatibility
     private int attackDamage;
 
-    public Enemy(int row, int col, String name, int maxHealth, int mobility, int armorClass, 
-                 String[] damageDice, int initiative, int dexterity, int color) {
+    public Enemy(int row, int col, String name, int maxHealth, int mobility, int armorClass,
+                 String[] damageDice, int initiative, int dexterity, String color) {
         super(row, col);
         this.name = name;
         this.baseName = name;
@@ -35,11 +36,18 @@ public class Enemy extends GridObject {
         this.damageDice = damageDice != null ? damageDice : new String[]{"d4", "d4", "d6"};
         this.initiative = initiative;
         this.dexterity = dexterity;
-        this.color = color;
+        this.color = ColorUtils.normalizeHex(color, ColorUtils.DEFAULT_COLOR);
+    }
+
+    public Enemy(int row, int col, String name, int maxHealth, int mobility, int armorClass,
+                 String[] damageDice, int initiative, int dexterity, int color) {
+        this(row, col, name, maxHealth, mobility, armorClass, damageDice, initiative, dexterity,
+                ColorUtils.fromLegacyIndex(color));
     }
     
     // Legacy constructor for backward compatibility
-    public Enemy(int row, int col, String name, int maxHealth, int mobility, int attackDamage, int initiative, int dexterity, int color) {
+    public Enemy(int row, int col, String name, int maxHealth, int mobility, int attackDamage, int initiative,
+                 int dexterity, String color) {
         super(row, col);
         this.name = name;
         this.baseName = name;
@@ -52,7 +60,13 @@ public class Enemy extends GridObject {
         this.damageDice = convertLegacyDamage(attackDamage);
         this.initiative = initiative;
         this.dexterity = dexterity;
-        this.color = color;
+        this.color = ColorUtils.normalizeHex(color, ColorUtils.DEFAULT_COLOR);
+    }
+
+    public Enemy(int row, int col, String name, int maxHealth, int mobility, int attackDamage, int initiative,
+                 int dexterity, int color) {
+        this(row, col, name, maxHealth, mobility, attackDamage, initiative, dexterity,
+                ColorUtils.fromLegacyIndex(color));
     }
 
     // Copy constructor for creating instances
@@ -180,7 +194,8 @@ public class Enemy extends GridObject {
         return dexterity;
     }
 
-    public int getColor() {
+    public String getColor() {
+        color = ColorUtils.normalizeHex(color, ColorUtils.DEFAULT_COLOR);
         return color;
     }
 
@@ -203,6 +218,10 @@ public class Enemy extends GridObject {
     public void moveTo(int r, int c) {
         row = r;
         col = c;
+    }
+
+    public void setHealth(int hp) {
+        this.health = Math.max(0, Math.min(hp, maxHealth));
     }
 
     public void takeDamage(int dmg) {

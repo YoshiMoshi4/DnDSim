@@ -11,14 +11,18 @@ public class CraftingItem extends Item {
     private String craftingCategory;
     private String description;
 
-    public CraftingItem(String name, String type, int color, String craftingCategory, String description) {
+    public CraftingItem(String name, String type, String color, String craftingCategory, String description) {
         super(name, type, color);
         this.craftingCategory = craftingCategory;
         this.description = description;
     }
 
+    public CraftingItem(String name, String type, int color, String craftingCategory, String description) {
+        this(name, type, ColorUtils.fromLegacyIndex(color), craftingCategory, description);
+    }
+
     public CraftingItem(String name, String craftingCategory, String description) {
-        super(name, "Crafting", 14);  // Default beige color for crafting items
+        super(name, "Crafting", ColorUtils.fromLegacyIndex(14));
         this.craftingCategory = craftingCategory;
         this.description = description;
     }

@@ -8,13 +8,17 @@ public class Ammunition extends Item {
     private int damageBonus;
     private String compatibleWeaponType;
 
-    public Ammunition(String name, String type, int color, String ammoType) {
+    public Ammunition(String name, String type, String color, String ammoType) {
         super(name, type, color);
         this.ammoType = ammoType;
     }
 
+    public Ammunition(String name, String type, int color, String ammoType) {
+        this(name, type, ColorUtils.fromLegacyIndex(color), ammoType);
+    }
+
     public Ammunition(String name, String ammoType) {
-        super(name, "Ammunition", 5);  // Default orange color for ammo
+        super(name, "Ammunition", ColorUtils.fromLegacyIndex(5));
         this.ammoType = ammoType;
     }
 

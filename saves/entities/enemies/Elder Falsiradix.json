@@ -1,0 +1,21 @@
+{
+  "name": "Elder Falsiradix",
+  "health": 85,
+  "maxHealth": 85,
+  "mobility": 3,
+  "armorClass": 14,
+  "attackModifier": 0,
+  "damageDice": [
+    "d6",
+    "d6",
+    "d8"
+  ],
+  "initiative": 5,
+  "dexterity": 5,
+  "color": 5,
+  "instanceNumber": 0,
+  "baseName": "Elder Falsiradix",
+  "attackDamage": 0,
+  "row": 0,
+  "col": 0
+}

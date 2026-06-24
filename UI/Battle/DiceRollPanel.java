@@ -46,7 +46,6 @@ public class DiceRollPanel extends VBox {
     private int d20Result;
     private int margin;
     private int tier;
-    private int bonusDamage;
     private List<String> diceToRoll;
     
     // UI Components
@@ -277,7 +276,6 @@ public class DiceRollPanel extends VBox {
         // Calculate margin and tier
         margin = CombatManager.calculateMargin(d20Result, attackModifier, targetAC);
         tier = CombatManager.getAttackTier(margin);
-        bonusDamage = CombatManager.getBonusDamage(margin);
         
         // Display result
         d20Input.setDisable(true);
@@ -285,7 +283,7 @@ public class DiceRollPanel extends VBox {
         int total = d20Result + attackModifier;
         String rollText = d20Result + " + " + attackModifier + " = " + total + " vs AC " + targetAC;
         
-        if (margin < 0) {
+        if (margin <= 0) {
             // Miss
             currentState = State.RESULT_MISS;
             resultLabel.setText("MISS! (" + rollText + ")");
@@ -299,17 +297,11 @@ public class DiceRollPanel extends VBox {
             resultLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #4CAF50;");
             
             String tierText = "Tier " + tier + " (margin: " + margin + ")";
-            if (bonusDamage > 0) {
-                tierText += " +" + bonusDamage + " bonus";
-            }
             tierLabel.setText(tierText);
             
             // Get dice to roll
             diceToRoll = CombatManager.getDiceForTier(damageDice, tier);
             String diceStr = CombatManager.formatDiceList(diceToRoll);
-            if (bonusDamage > 0) {
-                diceStr += " + " + bonusDamage;
-            }
             diceListLabel.setText("Roll: " + diceStr);
             diceListLabel.setVisible(true);
             
@@ -399,7 +391,7 @@ public class DiceRollPanel extends VBox {
     }
     
     private void processDamageRoll() {
-        int totalDamage = bonusDamage;
+        int totalDamage = 0;
         
         // Validate and sum all damage inputs
         for (int i = 0; i < damageInputs.size(); i++) {
@@ -426,6 +418,11 @@ public class DiceRollPanel extends VBox {
                 input.requestFocus();
                 return;
             }
+        }
+
+        // Critical hit rule: natural 20 on d20 multiplies final rolled damage by 1.5.
+        if (d20Result == 20) {
+            totalDamage = (int) Math.ceil(totalDamage * 1.5);
         }
         
         completeAttack(totalDamage);

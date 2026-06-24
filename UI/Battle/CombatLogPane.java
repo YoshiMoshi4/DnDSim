@@ -173,8 +173,8 @@ public class CombatLogPane extends VBox {
             case 3 -> "Tier 3";
             default -> "Hit";
         };
-        String hitMsg = String.format("⚔ %s HIT! %s (margin: %d) → %d damage to %s", 
-            tierName, margin >= 7 ? "(+" + (margin - 7) + " bonus)" : "", margin, damage, target);
+        String hitMsg = String.format("⚔ %s HIT! (margin: %d) → %d damage to %s", 
+            tierName, margin, damage, target);
         log(hitMsg, LogType.ATTACK);
     }
     

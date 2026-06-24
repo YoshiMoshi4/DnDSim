@@ -5,29 +5,36 @@ public class Item {
     // Fields
     private String name;
     private String type;
-    private int color; // 0-15 representing different colors
+    private String color;
     private int quantity;
 
     // Constructor
-    public Item(String name, String type, int color) {
+    public Item(String name, String type, String color) {
         this.name = name;
         this.type = type;
-        this.color = color;
+        this.color = ColorUtils.normalizeHex(color, getDefaultColorForTypeHex(type));
         this.quantity = 1;
+    }
+
+    public Item(String name, String type, int color) {
+        this(name, type, ColorUtils.fromLegacyIndex(color));
     }
 
     // Backward compatibility constructor
     public Item(String name, String type) {
-        this(name, type, getDefaultColorForType(type));
+        this(name, type, getDefaultColorForTypeHex(type));
     }
 
-    private static int getDefaultColorForType(String type) {
+    private static String getDefaultColorForTypeHex(String type) {
+        if (type == null) {
+            return ColorUtils.fromLegacyIndex(8);
+        }
         switch (type.toLowerCase()) {
-            case "weapon": return 4; // Red
-            case "accessory": return 9; // Blue
-            case "consumable": return 7; // Lime
-            case "unarmed": return 1; // Gray
-            default: return 8; // Green
+            case "weapon": return ColorUtils.fromLegacyIndex(4);
+            case "accessory": return ColorUtils.fromLegacyIndex(9);
+            case "consumable": return ColorUtils.fromLegacyIndex(7);
+            case "unarmed": return ColorUtils.fromLegacyIndex(1);
+            default: return ColorUtils.fromLegacyIndex(8);
         }
     }
 
@@ -68,33 +75,20 @@ public class Item {
         return quantity;
     }
 
-    public int getColor() {
+    public String getColor() {
+        color = ColorUtils.normalizeHex(color, getDefaultColorForTypeHex(type));
         return color;
     }
 
+    public void setColor(String color) {
+        this.color = ColorUtils.normalizeHex(color, getDefaultColorForTypeHex(type));
+    }
+
     public void setColor(int color) {
-        this.color = Math.max(0, Math.min(15, color));
+        setColor(ColorUtils.fromLegacyIndex(color));
     }
 
     public java.awt.Color getDisplayColor() {
-        switch (color) {
-            case 0: return java.awt.Color.BLACK;
-            case 1: return java.awt.Color.GRAY;
-            case 2: return java.awt.Color.WHITE;
-            case 3: return java.awt.Color.RED.darker();
-            case 4: return java.awt.Color.RED;
-            case 5: return java.awt.Color.ORANGE;
-            case 6: return java.awt.Color.YELLOW;
-            case 7: return java.awt.Color.GREEN.brighter();
-            case 8: return java.awt.Color.GREEN;
-            case 9: return java.awt.Color.BLUE;
-            case 10: return java.awt.Color.BLUE.darker();
-            case 11: return new java.awt.Color(200, 162, 200); // Lilac
-            case 12: return new java.awt.Color(128, 0, 128); // Purple
-            case 13: return java.awt.Color.PINK;
-            case 14: return new java.awt.Color(245, 245, 220); // Beige
-            case 15: return new java.awt.Color(139, 69, 19); // Brown
-            default: return java.awt.Color.GREEN;
-        }
+        return ColorUtils.toAwtColor(color, getDefaultColorForTypeHex(type));
     }
 }

@@ -5,6 +5,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 import EntityRes.CharSheet;
+import EntityRes.ColorUtils;
 import Objects.Enemy;
 
 import java.io.File;
@@ -118,14 +119,14 @@ public class SpriteUtils {
     
     /**
      * Create a fallback avatar when no sprite is available.
-     * Uses a styled circular region with a color based on the entity's color index.
+     * Uses a styled circular region with a color based on the entity's selected color.
      */
-    public static javafx.scene.Node createFallbackAvatar(int colorIndex, int size, boolean isParty) {
+    public static javafx.scene.Node createFallbackAvatar(String colorHex, int size, boolean isParty) {
         javafx.scene.layout.StackPane avatar = new javafx.scene.layout.StackPane();
         avatar.setMinSize(size, size);
         avatar.setMaxSize(size, size);
         
-        String hexColor = CharSheet.getColorHex(colorIndex);
+        String hexColor = ColorUtils.normalizeHex(colorHex, ColorUtils.DEFAULT_COLOR);
         String borderColor = isParty ? "#4CAF50" : "#d75f5f";
         
         avatar.setStyle(String.format(
@@ -234,12 +235,12 @@ public class SpriteUtils {
     /**
      * Create a fallback terrain display (colored square).
      */
-    public static javafx.scene.Node createTerrainFallback(int colorIndex, int size) {
+    public static javafx.scene.Node createTerrainFallback(String colorHex, int size) {
         javafx.scene.layout.StackPane square = new javafx.scene.layout.StackPane();
         square.setMinSize(size, size);
         square.setMaxSize(size, size);
         
-        String hexColor = EntityRes.CharSheet.getColorHex(colorIndex);
+        String normalizedHex = ColorUtils.normalizeHex(colorHex, ColorUtils.fromLegacyIndex(8));
         
         square.setStyle(String.format(
             "-fx-background-color: %s; " +
@@ -247,7 +248,7 @@ public class SpriteUtils {
             "-fx-border-color: #505052; " +
             "-fx-border-radius: 4; " +
             "-fx-border-width: 1;",
-            hexColor
+            normalizedHex
         ));
         
         return square;

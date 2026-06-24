@@ -36,15 +36,15 @@ public class SpritePickerUtils {
      * 
      * @param currentPath The current sprite path (relative to sprites folder)
      * @param subdirectory The subdirectory within sprites/ (e.g., "party", "enemies", "terrain")
-     * @param colorIndex The color index for fallback avatar
+    * @param colorHex The fallback color hex value for avatar previews
      * @param isParty Whether this is a party member (affects fallback styling)
      * @param onPathChanged Callback when sprite path changes
      * @param windowSupplier Supplier for the owner window (called lazily)
      * @return VBox containing the sprite picker UI
      */
     public static VBox createSpritePicker(String currentPath, String subdirectory, 
-            int colorIndex, boolean isParty, Consumer<String> onPathChanged, Supplier<Window> windowSupplier) {
-        return createSpritePicker(currentPath, subdirectory, colorIndex, isParty, onPathChanged, 
+            String colorHex, boolean isParty, Consumer<String> onPathChanged, Supplier<Window> windowSupplier) {
+        return createSpritePicker(currentPath, subdirectory, colorHex, isParty, onPathChanged,
             windowSupplier != null ? windowSupplier.get() : null, windowSupplier);
     }
 
@@ -53,7 +53,7 @@ public class SpritePickerUtils {
      * 
      * @param currentPath The current sprite path (relative to sprites folder)
      * @param subdirectory The subdirectory within sprites/ (e.g., "party", "enemies", "terrain")
-     * @param colorIndex The color index for fallback avatar
+    * @param colorHex The fallback color hex value for avatar previews
      * @param isParty Whether this is a party member (affects fallback styling)
      * @param onPathChanged Callback when sprite path changes
      * @param ownerWindow The owner window for the file dialog (can be null if windowSupplier provided)
@@ -61,7 +61,7 @@ public class SpritePickerUtils {
      * @return VBox containing the sprite picker UI
      */
     private static VBox createSpritePicker(String currentPath, String subdirectory, 
-            int colorIndex, boolean isParty, Consumer<String> onPathChanged, 
+            String colorHex, boolean isParty, Consumer<String> onPathChanged,
             Window ownerWindow, Supplier<Window> windowSupplier) {
         
         VBox container = new VBox(8);
@@ -90,7 +90,7 @@ public class SpritePickerUtils {
         );
         
         // Initial preview
-        updatePreview(previewContainer, currentPath, colorIndex, isParty);
+        updatePreview(previewContainer, currentPath, colorHex, isParty);
         
         // Label
         Label spriteLabel = new Label("Sprite");
@@ -131,7 +131,7 @@ public class SpritePickerUtils {
                 String newPath = handleFileSelection(selectedFile, subdirectory);
                 if (newPath != null) {
                     pathField.setText(getDisplayName(newPath));
-                    updatePreview(previewContainer, newPath, colorIndex, isParty);
+                    updatePreview(previewContainer, newPath, colorHex, isParty);
                     SpriteUtils.clearCache(); // Clear cache to reload new sprite
                     onPathChanged.accept(newPath);
                 }
@@ -143,7 +143,7 @@ public class SpritePickerUtils {
         clearBtn.setStyle("-fx-font-size: 10px; -fx-padding: 3 6; -fx-text-fill: #ff6b6b;");
         clearBtn.setOnAction(e -> {
             pathField.setText("");
-            updatePreview(previewContainer, null, colorIndex, isParty);
+            updatePreview(previewContainer, null, colorHex, isParty);
             onPathChanged.accept(null);
         });
         
@@ -220,7 +220,7 @@ public class SpritePickerUtils {
      * Update the preview container with the sprite or fallback avatar.
      * Sprites scaled to fit while preserving aspect ratio.
      */
-    private static void updatePreview(StackPane container, String spritePath, int colorIndex, boolean isParty) {
+    private static void updatePreview(StackPane container, String spritePath, String colorHex, boolean isParty) {
         container.getChildren().clear();
         
         if (spritePath != null && !spritePath.isEmpty()) {
@@ -237,7 +237,7 @@ public class SpritePickerUtils {
         }
         
         // Fallback avatar
-        Node fallback = SpriteUtils.createFallbackAvatar(colorIndex, 48, isParty);
+        Node fallback = SpriteUtils.createFallbackAvatar(colorHex, 48, isParty);
         container.getChildren().add(fallback);
     }
     
@@ -271,20 +271,20 @@ public class SpritePickerUtils {
      * Uses a Supplier for lazy window access.
      */
     public static HBox createCompactSpritePicker(String currentPath, String subdirectory,
-            int colorIndex, boolean isParty, Consumer<String> onPathChanged, Supplier<Window> windowSupplier) {
-        return createCompactSpritePickerImpl(currentPath, subdirectory, colorIndex, isParty, onPathChanged, null, windowSupplier);
+            String colorHex, boolean isParty, Consumer<String> onPathChanged, Supplier<Window> windowSupplier) {
+        return createCompactSpritePickerImpl(currentPath, subdirectory, colorHex, isParty, onPathChanged, null, windowSupplier);
     }
 
     /**
      * Create a compact sprite picker for use in dialogs (smaller footprint).
      */
     public static HBox createCompactSpritePicker(String currentPath, String subdirectory,
-            int colorIndex, boolean isParty, Consumer<String> onPathChanged, Window ownerWindow) {
-        return createCompactSpritePickerImpl(currentPath, subdirectory, colorIndex, isParty, onPathChanged, ownerWindow, null);
+            String colorHex, boolean isParty, Consumer<String> onPathChanged, Window ownerWindow) {
+        return createCompactSpritePickerImpl(currentPath, subdirectory, colorHex, isParty, onPathChanged, ownerWindow, null);
     }
     
     private static HBox createCompactSpritePickerImpl(String currentPath, String subdirectory,
-            int colorIndex, boolean isParty, Consumer<String> onPathChanged, 
+            String colorHex, boolean isParty, Consumer<String> onPathChanged,
             Window ownerWindow, Supplier<Window> windowSupplier) {
         
         HBox container = new HBox(8);
@@ -302,7 +302,7 @@ public class SpritePickerUtils {
             "-fx-border-radius: 4; " +
             "-fx-border-width: 1;"
         );
-        updateCompactPreview(previewContainer, currentPath, colorIndex, isParty);
+        updateCompactPreview(previewContainer, currentPath, colorHex, isParty);
         
         // Path field
         TextField pathField = new TextField();
@@ -335,7 +335,7 @@ public class SpritePickerUtils {
                 String newPath = handleFileSelection(selectedFile, subdirectory);
                 if (newPath != null) {
                     pathField.setText(getDisplayName(newPath));
-                    updateCompactPreview(previewContainer, newPath, colorIndex, isParty);
+                    updateCompactPreview(previewContainer, newPath, colorHex, isParty);
                     SpriteUtils.clearCache();
                     onPathChanged.accept(newPath);
                 }
@@ -347,7 +347,7 @@ public class SpritePickerUtils {
         clearBtn.setStyle("-fx-padding: 2 4; -fx-text-fill: #ff6b6b;");
         clearBtn.setOnAction(e -> {
             pathField.setText("");
-            updateCompactPreview(previewContainer, null, colorIndex, isParty);
+            updateCompactPreview(previewContainer, null, colorHex, isParty);
             onPathChanged.accept(null);
         });
         
@@ -359,7 +359,7 @@ public class SpritePickerUtils {
      * Update compact preview (smaller size).
      * Sprites scaled to fit while preserving aspect ratio.
      */
-    private static void updateCompactPreview(StackPane container, String spritePath, int colorIndex, boolean isParty) {
+    private static void updateCompactPreview(StackPane container, String spritePath, String colorHex, boolean isParty) {
         container.getChildren().clear();
         
         if (spritePath != null && !spritePath.isEmpty()) {
@@ -375,7 +375,7 @@ public class SpritePickerUtils {
             }
         }
         
-        Node fallback = SpriteUtils.createFallbackAvatar(colorIndex, 28, isParty);
+        Node fallback = SpriteUtils.createFallbackAvatar(colorHex, 28, isParty);
         container.getChildren().add(fallback);
     }
 }

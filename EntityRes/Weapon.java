@@ -6,7 +6,7 @@ public class Weapon extends Item {
 
     // Fields
     private String[] damageDice;  // Damage dice per tier [tier1, tier2, tier3], e.g. ["d6", "d6", "d10"]
-    private String statType;      // "STRENGTH" or "DEXTERITY" - which stat modifier to use
+    private String statType;      // Stat modifier type used for attack rolls
     private String ammoType;      // Ammo type required (null for melee weapons), e.g. "12 Gauge", "Arrow"
     private int[] modifiedAttributes;
     private ArrayList<ItemAbility> abilities;
@@ -76,13 +76,15 @@ public class Weapon extends Item {
     }
     
     /**
-     * Get the stat index for CharSheet (0=STR, 1=DEX)
+     * Get the stat index for CharSheet.
      */
     public int getStatIndex() {
-        if ("DEXTERITY".equalsIgnoreCase(statType)) {
-            return 1; // DEX
-        }
-        return 0; // STR default
+        if ("DEXTERITY".equalsIgnoreCase(statType)) return CharSheet.DEXTERITY;
+        if ("CONSTITUTION".equalsIgnoreCase(statType)) return CharSheet.CONSTITUTION;
+        if ("INTELLIGENCE".equalsIgnoreCase(statType)) return CharSheet.INTELLIGENCE;
+        if ("WISDOM".equalsIgnoreCase(statType)) return CharSheet.WISDOM;
+        if ("CHARISMA".equalsIgnoreCase(statType)) return CharSheet.CHARISMA;
+        return CharSheet.STRENGTH;
     }
     
     /**
@@ -133,20 +135,20 @@ public class Weapon extends Item {
     }
 
     public void setModifiedAttributes(int[] modifiedAttributes) {
-        // Always store as 4-element array
-        this.modifiedAttributes = new int[4];
+        // Always store as 6-element array
+        this.modifiedAttributes = new int[6];
         if (modifiedAttributes != null) {
-            for (int i = 0; i < modifiedAttributes.length && i < 4; i++) {
+            for (int i = 0; i < modifiedAttributes.length && i < 6; i++) {
                 this.modifiedAttributes[i] = modifiedAttributes[i];
             }
         }
     }
 
     public int[] getModifiedAttributes() {
-        // Always return 4-element array (padded with zeros for older items)
-        int[] ans = new int[4];
+        // Always return 6-element array (padded with zeros for older items)
+        int[] ans = new int[6];
         if (modifiedAttributes != null) {
-            for (int i = 0; i < modifiedAttributes.length && i < 4; i++) {
+            for (int i = 0; i < modifiedAttributes.length && i < 6; i++) {
                 ans[i] = modifiedAttributes[i];
             }
         }

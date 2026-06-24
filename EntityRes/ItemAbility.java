@@ -27,7 +27,7 @@ public class ItemAbility {
     private String triggerType;
     private String effectType;
     private int magnitude;
-    private int targetAttribute; // For STAT_BOOST: 0=STR, 1=DEX, 2=MOB, 3=INT
+    private int targetAttribute; // For STAT_BOOST: 0=STR, 1=DEX, 2=CON, 3=INT, 4=WIS, 5=CHA
     private String statusName;   // For STATUS effect: name of status to apply
     
     // Default constructor for Gson
@@ -146,7 +146,7 @@ public class ItemAbility {
                 sb.append("Deal ").append(magnitude).append(" damage");
                 break;
             case EFFECT_STAT_BOOST:
-                String[] attrs = {"STR", "DEX", "MOB", "INT"};
+                String[] attrs = {"STR", "DEX", "CON", "INT", "WIS", "CHA"};
                 String attr = (targetAttribute >= 0 && targetAttribute < attrs.length) ? attrs[targetAttribute] : "?";
                 sb.append(magnitude > 0 ? "+" : "").append(magnitude).append(" ").append(attr);
                 break;

@@ -5,14 +5,18 @@ public class KeyItem extends Item {
     private String description;
     private boolean questRelated;
 
-    public KeyItem(String name, String type, int color, String description, boolean questRelated) {
+    public KeyItem(String name, String type, String color, String description, boolean questRelated) {
         super(name, type, color);
         this.description = description;
         this.questRelated = questRelated;
     }
 
+    public KeyItem(String name, String type, int color, String description, boolean questRelated) {
+        this(name, type, ColorUtils.fromLegacyIndex(color), description, questRelated);
+    }
+
     public KeyItem(String name, String description, boolean questRelated) {
-        super(name, "Key Item", 6);  // Default yellow color for key items
+        super(name, "Key Item", ColorUtils.fromLegacyIndex(6));
         this.description = description;
         this.questRelated = questRelated;
     }

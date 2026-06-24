@@ -16,10 +16,9 @@ import java.util.List;
  * Attack Flow:
  * 1. Attacker rolls d20
  * 2. Calculate margin = (d20 + stat modifier) - target AC
- * 3. If margin < 0, attack misses
- * 4. Otherwise, determine tier: 0-3 = tier 1, 4-6 = tier 2, 7+ = tier 3
- * 5. For margin > 7, add bonus damage = margin - 7
- * 6. Roll damage dice based on tier (cumulative: tier 2 includes tier 1 dice, etc.)
+ * 3. If margin <= 0, attack misses
+ * 4. Otherwise, determine tier: 1-4 = tier 1, 5-9 = tier 2, 10+ = tier 3
+ * 5. Roll damage dice based on tier (cumulative: tier 2 includes tier 1 dice, etc.)
  */
 public class CombatManager {
 
@@ -33,7 +32,7 @@ public class CombatManager {
         public final int margin;
         public final boolean hit;
         public final int tier;        // 0 = miss, 1-3 = hit tier
-        public final int bonusDamage; // Extra damage for margin > 7
+        public final int bonusDamage; // Reserved for compatibility; always 0
         public final String[] diceToRoll;
         
         public AttackResult(int d20Roll, int modifier, int targetAC) {
@@ -41,16 +40,16 @@ public class CombatManager {
             this.modifier = modifier;
             this.targetAC = targetAC;
             this.margin = (d20Roll + modifier) - targetAC;
-            this.hit = margin >= 0;
+            this.hit = margin > 0;
             this.tier = hit ? calculateTier(margin) : 0;
-            this.bonusDamage = margin > 7 ? margin - 7 : 0;
+            this.bonusDamage = 0;
             this.diceToRoll = new String[0]; // Set separately when weapon is known
         }
         
         private static int calculateTier(int margin) {
-            if (margin < 0) return 0;
-            if (margin <= 3) return 1;
-            if (margin <= 6) return 2;
+            if (margin <= 0) return 0;
+            if (margin <= 4) return 1;
+            if (margin <= 9) return 2;
             return 3;
         }
     }
@@ -75,17 +74,18 @@ public class CombatManager {
      * @return 0 = miss, 1-3 = hit tier
      */
     public static int getAttackTier(int margin) {
-        if (margin < 0) return 0;
-        if (margin <= 3) return 1;
-        if (margin <= 6) return 2;
+        if (margin <= 0) return 0;
+        if (margin <= 4) return 1;
+        if (margin <= 9) return 2;
         return 3;
     }
     
     /**
-     * Get bonus damage for margin > 7
+     * Get bonus damage for high-margin hits.
+     * Reserved for compatibility with callers; margin no longer adds flat damage.
      */
     public static int getBonusDamage(int margin) {
-        return margin > 7 ? margin - 7 : 0;
+        return 0;
     }
     
     /**
@@ -276,12 +276,10 @@ public class CombatManager {
             return null; // No weapon or melee weapon
         }
         
-        String ammoType = weapon.getAmmoType();
-        
         // Find compatible ammunition in inventory
         for (Item item : e.getCharSheet().getInventory()) {
             if (item instanceof Ammunition ammo) {
-                if (ammo.getAmmoType().equals(ammoType)) {
+                if (ammo.getQuantity() > 0 && ammo.isCompatibleWith(weapon)) {
                     // Found compatible ammo - consume 1
                     e.getCharSheet().removeItemQuantity(ammo, 1);
                     return ammo.getName();
@@ -306,12 +304,10 @@ public class CombatManager {
             return true; // No weapon or melee weapon doesn't need ammo
         }
         
-        String ammoType = weapon.getAmmoType();
-        
         // Check for compatible ammunition
         for (Item item : e.getCharSheet().getInventory()) {
             if (item instanceof Ammunition ammo) {
-                if (ammo.getAmmoType().equals(ammoType) && ammo.getQuantity() > 0) {
+                if (ammo.getQuantity() > 0 && ammo.isCompatibleWith(weapon)) {
                     return true;
                 }
             }

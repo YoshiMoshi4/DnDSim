@@ -12,6 +12,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -448,7 +449,7 @@ public class CharacterSheetView {
         
         // Color swatch
         javafx.scene.shape.Rectangle colorSwatch = new javafx.scene.shape.Rectangle(30, 30);
-        String colorHex = CharSheet.getColorHex(enemy.getColor());
+        String colorHex = enemy.getColor();
         colorSwatch.setFill(javafx.scene.paint.Color.web(colorHex));
         colorSwatch.setArcWidth(6);
         colorSwatch.setArcHeight(6);
@@ -572,10 +573,8 @@ public class CharacterSheetView {
         
         // Color
         grid.add(new Label("Color:"), 0, row);
-        ComboBox<String> colorCombo = new ComboBox<>();
-        colorCombo.getItems().addAll(CharSheet.getColorNames());
-        colorCombo.getSelectionModel().selectFirst();
-        grid.add(colorCombo, 1, row++);
+        ColorPicker colorPicker = new ColorPicker(Color.web(EntityRes.ColorUtils.fromLegacyIndex(0)));
+        grid.add(colorPicker, 1, row++);
         
         // HP
         grid.add(new Label("Total HP:"), 0, row);
@@ -596,13 +595,21 @@ public class CharacterSheetView {
         TextField dexField = new TextField("5");
         grid.add(dexField, 1, row++);
         
-        grid.add(new Label("MOB:"), 0, row);
-        TextField mobField = new TextField("5");
-        grid.add(mobField, 1, row++);
+        grid.add(new Label("CON:"), 0, row);
+        TextField conField = new TextField("5");
+        grid.add(conField, 1, row++);
         
         grid.add(new Label("INT:"), 0, row);
         TextField intField = new TextField("5");
         grid.add(intField, 1, row++);
+
+        grid.add(new Label("WIS:"), 0, row);
+        TextField wisField = new TextField("4");
+        grid.add(wisField, 1, row++);
+
+        grid.add(new Label("CHA:"), 0, row);
+        TextField chaField = new TextField("3");
+        grid.add(chaField, 1, row++);
         
         // Equipment
         ItemDatabase db = ItemDatabase.getInstance();
@@ -646,12 +653,14 @@ public class CharacterSheetView {
                 int[] attr = {
                     Integer.parseInt(strField.getText()),
                     Integer.parseInt(dexField.getText()),
-                    Integer.parseInt(mobField.getText()),
-                    Integer.parseInt(intField.getText())
+                    Integer.parseInt(conField.getText()),
+                    Integer.parseInt(intField.getText()),
+                    Integer.parseInt(wisField.getText()),
+                    Integer.parseInt(chaField.getText())
                 };
                 
                 CharSheet newSheet = new CharSheet(nameField.getText(), true, hp, attr,
-                        colorCombo.getSelectionModel().getSelectedIndex());
+                    toHexColor(colorPicker.getValue()));
                 newSheet.setArmorClass(ac);
                 
                 // Equip items (only if not "None")
@@ -711,7 +720,7 @@ public class CharacterSheetView {
         grid.add(btnBox, 0, row++);
         GridPane.setColumnSpan(btnBox, 2);
         
-        Scene scene = new Scene(grid, 350, 520);
+        Scene scene = new Scene(grid, 350, 620);
         scene.getStylesheets().add(new java.io.File("resources/styles/dark-theme.css").toURI().toString());
         
         dialog.setScene(scene);
@@ -785,10 +794,8 @@ public class CharacterSheetView {
         grid.add(tier3Combo, 1, row++);
         
         grid.add(new Label("Color:"), 0, row);
-        ComboBox<String> colorCombo = new ComboBox<>();
-        colorCombo.getItems().addAll(CharSheet.getColorNames());
-        colorCombo.getSelectionModel().select(existing != null ? existing.getColor() : 0);
-        grid.add(colorCombo, 1, row++);
+        ColorPicker colorPicker = new ColorPicker(Color.web(existing != null ? existing.getColor() : ColorUtils.fromLegacyIndex(0)));
+        grid.add(colorPicker, 1, row++);
         
         // Sprite picker
         grid.add(new Label("Sprite:"), 0, row);
@@ -796,7 +803,7 @@ public class CharacterSheetView {
         javafx.scene.layout.HBox spritePicker = SpritePickerUtils.createCompactSpritePicker(
             spritePath[0],
             "enemies",
-            existing != null ? existing.getColor() : 0,
+            existing != null ? existing.getColor() : ColorUtils.fromLegacyIndex(0),
             false, // Not party
             newPath -> spritePath[0] = newPath,
             dialog
@@ -813,7 +820,7 @@ public class CharacterSheetView {
                 Enemy enemy = new Enemy(0, 0, name, hpSpinner.getValue(), mobSpinner.getValue(),
                         acSpinner.getValue(), damageDice,
                         dexSpinner.getValue(), dexSpinner.getValue(),
-                        colorCombo.getSelectionModel().getSelectedIndex());
+                    toHexColor(colorPicker.getValue()));
                 enemy.setSpritePath(spritePath[0]);
                 enemy.save();
                 loadEnemies();
@@ -855,5 +862,12 @@ public class CharacterSheetView {
         alert.setHeaderText(null);
         alert.setContentText(content);
         alert.showAndWait();
+    }
+
+    private String toHexColor(Color color) {
+        int red = (int) Math.round(color.getRed() * 255.0);
+        int green = (int) Math.round(color.getGreen() * 255.0);
+        int blue = (int) Math.round(color.getBlue() * 255.0);
+        return String.format("#%02X%02X%02X", red, green, blue);
     }
 }

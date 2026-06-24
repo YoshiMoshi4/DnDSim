@@ -6,12 +6,15 @@ import java.io.*;
 
 public class CharSheet {
 
+    private static final int ATTRIBUTE_COUNT = 6;
+
     // Meta
     private String name;
     private String characterClass;
-    private int color; // 0-15 representing different colors
+    private String color;
     private boolean isParty;
     private String spritePath; // Path to character sprite image (e.g., "sprites/party/henry.png")
+    private int level;
 
     // HP and Statuses
     private int totalHP;
@@ -25,8 +28,10 @@ public class CharSheet {
     private int[] totalAttributes;   // baseAttributes + tempAttributes
     public static final int STRENGTH = 0;
     public static final int DEXTERITY = 1;
-    public static final int MOBILITY = 2;
+    public static final int CONSTITUTION = 2;
     public static final int INTELLIGENCE = 3;
+    public static final int WISDOM = 4;
+    public static final int CHARISMA = 5;
 
     // Weapons
     private Weapon[] weapons;
@@ -44,29 +49,24 @@ public class CharSheet {
     private ArrayList<ItemAbility> abilities;
 
     //Constructor
-    public CharSheet(String name, boolean isParty, int totalHP, int[] baseAttributes, int color) {
+    public CharSheet(String name, boolean isParty, int totalHP, int[] baseAttributes, String color) {
         this.name = name;
         this.characterClass = "None";
-        this.color = color;
+        this.color = ColorUtils.normalizeHex(color, ColorUtils.DEFAULT_COLOR);
         this.isParty = isParty;
+        this.level = 1;
 
         this.totalHP = totalHP;
         currentHP = totalHP;
         armorClass = 10;
         status = new ArrayList<Status>();
 
-        this.baseAttributes = new int[baseAttributes.length];
-        this.tempAttributes = new int[baseAttributes.length];
-        this.totalAttributes = new int[baseAttributes.length];
-        if (baseAttributes.length == this.baseAttributes.length) {
-            for (int i = 0; i < baseAttributes.length; i++) {
-                this.baseAttributes[i] = baseAttributes[i];
-                this.tempAttributes[i] = 0;  // Start with no equipment bonuses
-                this.totalAttributes[i] = baseAttributes[i];  // Initially equal to base
-            }
-        } else {
-            // Temp exception
-            System.out.println("attributesLength Error");
+        this.baseAttributes = normalizeBaseAttributes(baseAttributes);
+        this.tempAttributes = new int[ATTRIBUTE_COUNT];
+        this.totalAttributes = new int[ATTRIBUTE_COUNT];
+        for (int i = 0; i < ATTRIBUTE_COUNT; i++) {
+            this.tempAttributes[i] = 0;
+            this.totalAttributes[i] = this.baseAttributes[i];
         }
 
         // Initialize empty equipment slots (null = nothing equipped)
@@ -83,6 +83,10 @@ public class CharSheet {
         updateAttributes();
         inventory = new ArrayList<Item>();
         abilities = new ArrayList<ItemAbility>();
+    }
+
+    public CharSheet(String name, boolean isParty, int totalHP, int[] baseAttributes, int color) {
+        this(name, isParty, totalHP, baseAttributes, ColorUtils.fromLegacyIndex(color));
     }
 
     // Methods
@@ -122,52 +126,22 @@ public class CharSheet {
         return spritePath;
     }
 
-    public void setColor(int color) {
-        this.color = Math.max(0, Math.min(15, color)); // Ensure color is between 0-15
+    public void setColor(String color) {
+        this.color = ColorUtils.normalizeHex(color, ColorUtils.DEFAULT_COLOR);
         this.save();
     }
 
-    public int getColor() {
+    public void setColor(int color) {
+        setColor(ColorUtils.fromLegacyIndex(color));
+    }
+
+    public String getColor() {
+        color = ColorUtils.normalizeHex(color, ColorUtils.DEFAULT_COLOR);
         return color;
     }
 
     public java.awt.Color getDisplayColor() {
-        switch (color) {
-            case 0:
-                return java.awt.Color.BLACK;
-            case 1:
-                return java.awt.Color.GRAY;
-            case 2:
-                return java.awt.Color.WHITE;
-            case 3:
-                return java.awt.Color.RED.darker();
-            case 4:
-                return java.awt.Color.RED;
-            case 5:
-                return java.awt.Color.ORANGE;
-            case 6:
-                return java.awt.Color.YELLOW;
-            case 7:
-                return java.awt.Color.GREEN.brighter();
-            case 8:
-                return java.awt.Color.GREEN;
-            case 9:
-                return java.awt.Color.BLUE;
-            case 10:
-                return java.awt.Color.BLUE.darker();
-            case 11:
-                return new java.awt.Color(200, 162, 200); // Lilac
-            case 12:
-                return new java.awt.Color(128, 0, 128); // Purple
-            case 13:
-                return java.awt.Color.PINK;
-            case 14:
-                return new java.awt.Color(245, 245, 220); // Beige
-            case 15:
-                return new java.awt.Color(139, 69, 19); // Brown
-            default:
-                return java.awt.Color.GRAY;
-        }
+        return ColorUtils.toAwtColor(color, ColorUtils.DEFAULT_COLOR);
     }
 
     public static String[] getColorNames() {
@@ -178,33 +152,37 @@ public class CharSheet {
     }
 
     public static String getColorHex(int colorId) {
-        switch (colorId) {
-            case 0:  return "#000000"; // Black
-            case 1:  return "#808080"; // Gray
-            case 2:  return "#FFFFFF"; // White
-            case 3:  return "#8B0000"; // Maroon
-            case 4:  return "#FF0000"; // Red
-            case 5:  return "#FFA500"; // Orange
-            case 6:  return "#FFFF00"; // Yellow
-            case 7:  return "#00FF00"; // Lime
-            case 8:  return "#008000"; // Green
-            case 9:  return "#0000FF"; // Blue
-            case 10: return "#4B0082"; // Indigo
-            case 11: return "#C8A2C8"; // Lilac
-            case 12: return "#800080"; // Purple
-            case 13: return "#FFC0CB"; // Pink
-            case 14: return "#F5F5DC"; // Beige
-            case 15: return "#8B4513"; // Brown
-            default: return "#808080"; // Gray
-        }
+        return ColorUtils.legacyHex(colorId);
     }
 
     public String getColorName() {
-        String[] names = getColorNames();
-        if (color >= 0 && color < names.length) {
-            return names[color];
+        return getColor();
+    }
+
+    public int getLevel() {
+        return Math.max(1, level);
+    }
+
+    public void setLevel(int level) {
+        this.level = Math.max(1, level);
+        this.save();
+    }
+
+    public void levelUp() {
+        this.level = Math.max(1, this.level) + 1;
+        this.save();
+    }
+
+    public int getAvailableStatPoints() {
+        return 27 + ((getLevel() - 1) * 2);
+    }
+
+    public int getSpentStatPoints() {
+        int sum = 0;
+        for (int value : baseAttributes) {
+            sum += value;
         }
-        return "Gray";
+        return sum;
     }
 
     public void setTotalHP(int newHP) {
@@ -449,10 +427,10 @@ public class CharSheet {
 
     public void updateAttributes() {
         // Calculate tempAttributes from equipped items (handle null slots)
-        int[] acc0Attr = accessories[0] != null ? accessories[0].getModifiedAttributes() : new int[]{0, 0, 0, 0};
-        int[] acc1Attr = accessories[1] != null ? accessories[1].getModifiedAttributes() : new int[]{0, 0, 0, 0};
-        int[] acc2Attr = accessories[2] != null ? accessories[2].getModifiedAttributes() : new int[]{0, 0, 0, 0};
-        int[] weapAttr = weapons[0] != null ? weapons[0].getModifiedAttributes() : new int[]{0, 0, 0, 0};
+        int[] acc0Attr = accessories[0] != null ? normalizeAttributeArray(accessories[0].getModifiedAttributes()) : new int[ATTRIBUTE_COUNT];
+        int[] acc1Attr = accessories[1] != null ? normalizeAttributeArray(accessories[1].getModifiedAttributes()) : new int[ATTRIBUTE_COUNT];
+        int[] acc2Attr = accessories[2] != null ? normalizeAttributeArray(accessories[2].getModifiedAttributes()) : new int[ATTRIBUTE_COUNT];
+        int[] weapAttr = weapons[0] != null ? normalizeAttributeArray(weapons[0].getModifiedAttributes()) : new int[ATTRIBUTE_COUNT];
         
         // Reset temp attributes to zero
         for (int i = 0; i < tempAttributes.length; i++) {
@@ -559,11 +537,34 @@ public class CharSheet {
     }
 
     public Weapon getEquippedWeapon() {
-        return weapons[PRIMARY];
+        return resolveEquippedWeapon(PRIMARY);
     }
 
     public Weapon getEquippedSecondary() {
-        return weapons[SECONDARY];
+        return resolveEquippedWeapon(SECONDARY);
+    }
+
+    /**
+     * Resolve equipped weapon from the item database by name so editor updates
+     * (dice/stat/ammo) are reflected without requiring manual re-equip.
+     */
+    private Weapon resolveEquippedWeapon(int slot) {
+        if (slot < 0 || slot >= weapons.length) {
+            return null;
+        }
+
+        Weapon equipped = weapons[slot];
+        if (equipped == null || equipped.getName() == null) {
+            return equipped;
+        }
+
+        Weapon latest = ItemDatabase.getInstance().getWeapon(equipped.getName());
+        if (latest != null) {
+            weapons[slot] = latest;
+            return latest;
+        }
+
+        return equipped;
     }
 
     public void unequipPrimaryWeapon() {
@@ -853,51 +854,14 @@ public class CharSheet {
             if (sheet == null) {
                 return null;
             }
-            // Migrate attribute arrays - remove ITV (old index 2), keep STR, DEX, MOB, INT
-            // Old 5-element: [STR, DEX, ITV, MOB, INT] -> [STR, DEX, MOB, INT]
-            // Old 4-element: [STR, DEX, ITV, MOB] -> [STR, DEX, MOB, 0]
-            if (sheet.baseAttributes != null && sheet.baseAttributes.length > 4) {
-                int[] newBase = new int[4];
-                newBase[0] = sheet.baseAttributes[0]; // STR
-                newBase[1] = sheet.baseAttributes[1]; // DEX
-                newBase[2] = sheet.baseAttributes[3]; // MOB (was index 3)
-                newBase[3] = sheet.baseAttributes.length > 4 ? sheet.baseAttributes[4] : 0; // INT
-                sheet.baseAttributes = newBase;
-            } else if (sheet.baseAttributes != null && sheet.baseAttributes.length == 4) {
-                // Old 4-element array [STR, DEX, ITV, MOB] -> [STR, DEX, MOB, 0]
-                int[] newBase = new int[4];
-                newBase[0] = sheet.baseAttributes[0]; // STR
-                newBase[1] = sheet.baseAttributes[1]; // DEX
-                newBase[2] = sheet.baseAttributes[3]; // MOB (was index 3)
-                newBase[3] = 0; // INT (new)
-                sheet.baseAttributes = newBase;
-            }
-            // Initialize missing arrays for older save files
-            if (sheet.tempAttributes == null || sheet.tempAttributes.length != 4) {
-                int[] newTemp = new int[4];
-                if (sheet.tempAttributes != null) {
-                    newTemp[0] = sheet.tempAttributes.length > 0 ? sheet.tempAttributes[0] : 0;
-                    newTemp[1] = sheet.tempAttributes.length > 1 ? sheet.tempAttributes[1] : 0;
-                    newTemp[2] = sheet.tempAttributes.length > 3 ? sheet.tempAttributes[3] : 0; // MOB
-                    newTemp[3] = sheet.tempAttributes.length > 4 ? sheet.tempAttributes[4] : 0; // INT
-                }
-                sheet.tempAttributes = newTemp;
-            }
-            if (sheet.totalAttributes == null || sheet.totalAttributes.length != 4) {
-                int[] newTotal = new int[4];
-                if (sheet.totalAttributes != null) {
-                    newTotal[0] = sheet.totalAttributes.length > 0 ? sheet.totalAttributes[0] : 0;
-                    newTotal[1] = sheet.totalAttributes.length > 1 ? sheet.totalAttributes[1] : 0;
-                    newTotal[2] = sheet.totalAttributes.length > 3 ? sheet.totalAttributes[3] : 0; // MOB
-                    newTotal[3] = sheet.totalAttributes.length > 4 ? sheet.totalAttributes[4] : 0; // INT
-                }
-                sheet.totalAttributes = newTotal;
-            }
-            if (sheet.baseAttributes == null) {
-                sheet.baseAttributes = new int[4];
-            }
+            sheet.baseAttributes = normalizeBaseAttributes(sheet.baseAttributes);
+            sheet.tempAttributes = normalizeAttributeArray(sheet.tempAttributes);
+            sheet.totalAttributes = normalizeAttributeArray(sheet.totalAttributes);
             if (sheet.status == null) {
                 sheet.status = new ArrayList<Status>();
+            }
+            if (sheet.level <= 0) {
+                sheet.level = 1;
             }
             // Initialize armor class for older saves
             if (sheet.armorClass == 0) {
@@ -923,6 +887,39 @@ public class CharSheet {
             e.printStackTrace();
             return null;
         }
+    }
+
+    private static int[] normalizeAttributeArray(int[] values) {
+        int[] normalized = new int[ATTRIBUTE_COUNT];
+        if (values != null) {
+            for (int i = 0; i < Math.min(ATTRIBUTE_COUNT, values.length); i++) {
+                normalized[i] = values[i];
+            }
+        }
+        return normalized;
+    }
+
+    private static int[] normalizeBaseAttributes(int[] values) {
+        int[] normalized = new int[ATTRIBUTE_COUNT];
+        if (values == null) {
+            return normalized;
+        }
+
+        // Legacy save format: [STR, DEX, MOB, INT] to [STR, DEX, CON, INT, WIS, CHA].
+        if (values.length == 4) {
+            normalized[STRENGTH] = values[0];
+            normalized[DEXTERITY] = values[1];
+            normalized[CONSTITUTION] = 0;
+            normalized[INTELLIGENCE] = values[3];
+            normalized[WISDOM] = 0;
+            normalized[CHARISMA] = 0;
+            return normalized;
+        }
+
+        for (int i = 0; i < Math.min(ATTRIBUTE_COUNT, values.length); i++) {
+            normalized[i] = values[i];
+        }
+        return normalized;
     }
     
     /**

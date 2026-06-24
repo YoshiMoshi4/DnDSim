@@ -30,20 +30,20 @@ public class Accessory extends Item {
     }
 
     public void setModifiedAttributes(int[] modifiedAttributes) {
-        // Always store as 4-element array
-        this.modifiedAttributes = new int[4];
+        // Always store as 6-element array
+        this.modifiedAttributes = new int[6];
         if (modifiedAttributes != null) {
-            for (int i = 0; i < modifiedAttributes.length && i < 4; i++) {
+            for (int i = 0; i < modifiedAttributes.length && i < 6; i++) {
                 this.modifiedAttributes[i] = modifiedAttributes[i];
             }
         }
     }
 
     public int[] getModifiedAttributes() {
-        // Always return 4-element array (padded with zeros for older items)
-        int[] ans = new int[4];
+        // Always return 6-element array (padded with zeros for older items)
+        int[] ans = new int[6];
         if (modifiedAttributes != null) {
-            for (int i = 0; i < modifiedAttributes.length && i < 4; i++) {
+            for (int i = 0; i < modifiedAttributes.length && i < 6; i++) {
                 ans[i] = modifiedAttributes[i];
             }
         }
