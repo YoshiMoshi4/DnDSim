@@ -16,7 +16,7 @@ import java.util.List;
  * Attack Flow:
  * 1. Attacker rolls d20
  * 2. Calculate margin = (d20 + stat modifier) - target AC
- * 3. If margin <= 0, attack misses
+ * 3. If margin < 0, attack misses (margin == 0 still hits, since meeting AC exactly succeeds)
  * 4. Otherwise, determine tier: 1-4 = tier 1, 5-9 = tier 2, 10+ = tier 3
  * 5. Roll damage dice based on tier (cumulative: tier 2 includes tier 1 dice, etc.)
  */
@@ -40,14 +40,14 @@ public class CombatManager {
             this.modifier = modifier;
             this.targetAC = targetAC;
             this.margin = (d20Roll + modifier) - targetAC;
-            this.hit = margin > 0;
+            this.hit = margin >= 0;
             this.tier = hit ? calculateTier(margin) : 0;
             this.bonusDamage = 0;
             this.diceToRoll = new String[0]; // Set separately when weapon is known
         }
-        
+
         private static int calculateTier(int margin) {
-            if (margin <= 0) return 0;
+            if (margin < 0) return 0;
             if (margin <= 4) return 1;
             if (margin <= 9) return 2;
             return 3;
@@ -63,7 +63,7 @@ public class CombatManager {
     
     /**
      * Calculate margin from attack roll
-     * @return margin value (negative = miss)
+     * @return margin value (negative = miss, 0 or positive = hit)
      */
     public static int calculateMargin(int d20Roll, int statModifier, int targetAC) {
         return (d20Roll + statModifier) - targetAC;
@@ -74,7 +74,7 @@ public class CombatManager {
      * @return 0 = miss, 1-3 = hit tier
      */
     public static int getAttackTier(int margin) {
-        if (margin <= 0) return 0;
+        if (margin < 0) return 0;
         if (margin <= 4) return 1;
         if (margin <= 9) return 2;
         return 3;

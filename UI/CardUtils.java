@@ -9,8 +9,6 @@ import javafx.scene.control.*;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
-import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
 
 /**
@@ -69,7 +67,7 @@ public class CardUtils {
         details.setPadding(new Insets(8, 0, 0, 0));
         
         if (item instanceof Weapon w) {
-            addDetailRow(details, "Damage", String.valueOf(w.getDamage()));
+            addDetailRow(details, "Damage Dice", formatDice(w.getDamageDice()));
         } else if (item instanceof Armor a) {
             addDetailRow(details, "Defense", "+" + a.getDefense());
         } else if (item instanceof Consumable c) {
@@ -341,7 +339,7 @@ public class CardUtils {
         // Stats
         VBox stats = new VBox(4);
         stats.setPadding(new Insets(8, 0, 0, 0));
-        addDetailRow(stats, "Damage", String.valueOf(weapon.getDamage()));
+        addDetailRow(stats, "Damage Dice", formatDice(weapon.getDamageDice()));
         
         int[] attrs = weapon.getModifiedAttributes();
         String[] attrNames = {"STR", "DEX", "CON", "INT", "WIS", "CHA"};
@@ -447,8 +445,7 @@ public class CardUtils {
         
         VBox stats = new VBox(4);
         stats.setPadding(new Insets(8, 0, 0, 0));
-        addDetailRow(stats, "Damage", "+" + item.getDamageBonus());
-        addDetailRow(stats, "For", item.getCompatibleWeaponType());
+        addDetailRow(stats, "Ammo", item.getAmmoType());
         
         HBox actions = createCardFooter(
             createActionButton("Edit", IconUtils.Icon.EDIT, false, onEdit),
@@ -535,20 +532,6 @@ public class CardUtils {
         return label;
     }
     
-    private static void addStatToGrid(GridPane grid, String label, String value, int col, int row) {
-        VBox stat = new VBox(2);
-        stat.setAlignment(Pos.CENTER);
-        
-        Label valueLabel = new Label(value);
-        valueLabel.setStyle("-fx-text-fill: #fff; -fx-font-weight: bold; -fx-font-size: 12px;");
-        
-        Label labelNode = new Label(label);
-        labelNode.setStyle("-fx-text-fill: #666; -fx-font-size: 9px;");
-        
-        stat.getChildren().addAll(valueLabel, labelNode);
-        grid.add(stat, col, row);
-    }
-    
     private static void addDetailRow(VBox container, String label, String value) {
         HBox row = new HBox(8);
         row.setAlignment(Pos.CENTER_LEFT);
@@ -564,31 +547,10 @@ public class CardUtils {
         container.getChildren().add(row);
     }
     
-    private static void styleHpBar(ProgressBar bar, int current, int max) {
-        double ratio = (double) current / max;
-        String color;
-        if (ratio > 0.5) color = "#4CAF50";
-        else if (ratio > 0.25) color = "#FF9800";
-        else color = "#F44336";
-        bar.setStyle("-fx-accent: " + color + ";");
-    }
-    
-    private static String getStatusColor(String status) {
-        return switch (status.toLowerCase()) {
-            case "poisoned" -> "#4CAF50";
-            case "burning" -> "#FF5722";
-            case "frozen" -> "#2196F3";
-            case "stunned" -> "#9C27B0";
-            case "blessed" -> "#FFD700";
-            case "cursed" -> "#8B0000";
-            default -> "#808080";
-        };
-    }
-    
     private static CardStyle getItemRarityStyle(Item item) {
         // Determine rarity based on item properties
         if (item instanceof Weapon w) {
-            int dmg = w.getDamage();
+            int dmg = estimateWeaponDamage(w.getDamageDice());
             if (dmg >= 20) return CardStyle.LEGENDARY;
             if (dmg >= 12) return CardStyle.RARE;
             if (dmg >= 6) return CardStyle.UNCOMMON;
@@ -626,5 +588,28 @@ public class CardUtils {
         int g = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(2, 4), 16) + amount));
         int b = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(4, 6), 16) + amount));
         return String.format("#%02x%02x%02x", r, g, b);
+    }
+
+    private static String formatDice(String[] dice) {
+        if (dice == null || dice.length == 0) {
+            return "--";
+        }
+        return String.join("/", dice);
+    }
+
+    private static int estimateWeaponDamage(String[] dice) {
+        if (dice == null || dice.length == 0 || dice[0] == null) {
+            return 4;
+        }
+
+        return switch (dice[0].toLowerCase()) {
+            case "d4" -> 2;
+            case "d6" -> 3;
+            case "d8" -> 4;
+            case "d10" -> 5;
+            case "d12" -> 6;
+            case "d20" -> 10;
+            default -> 4;
+        };
     }
 }

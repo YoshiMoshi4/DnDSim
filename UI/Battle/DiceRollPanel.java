@@ -1,8 +1,6 @@
 package UI.Battle;
 
 import Objects.GridObject;
-import Objects.Entity;
-import Objects.Enemy;
 import UI.IconUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -283,7 +281,7 @@ public class DiceRollPanel extends VBox {
         int total = d20Result + attackModifier;
         String rollText = d20Result + " + " + attackModifier + " = " + total + " vs AC " + targetAC;
         
-        if (margin <= 0) {
+        if (margin < 0) {
             // Miss
             currentState = State.RESULT_MISS;
             resultLabel.setText("MISS! (" + rollText + ")");
@@ -293,10 +291,17 @@ public class DiceRollPanel extends VBox {
         } else {
             // Hit - show tier and request damage dice
             currentState = State.DAMAGE_ROLL;
-            resultLabel.setText("HIT! (" + rollText + ")");
-            resultLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #4CAF50;");
+            boolean isCritical = d20Result == 20;
+            resultLabel.setText((isCritical ? "CRIT HIT!" : "HIT!") + " (" + rollText + ")");
+            resultLabel.setStyle(
+                "-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: " +
+                (isCritical ? "#FFD54F" : "#4CAF50") + ";"
+            );
             
             String tierText = "Tier " + tier + " (margin: " + margin + ")";
+            if (isCritical) {
+                tierText += " | CRIT: Natural 20 -> x1.5 final damage";
+            }
             tierLabel.setText(tierText);
             
             // Get dice to roll

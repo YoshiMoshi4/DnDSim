@@ -80,6 +80,17 @@ public final class ColorUtils {
         return java.awt.Color.decode(normalized);
     }
 
+    public static String toHex(javafx.scene.paint.Color color) {
+        if (color == null) {
+            return DEFAULT_COLOR;
+        }
+
+        int red = (int) Math.round(color.getRed() * 255.0);
+        int green = (int) Math.round(color.getGreen() * 255.0);
+        int blue = (int) Math.round(color.getBlue() * 255.0);
+        return String.format("#%02X%02X%02X", red, green, blue);
+    }
+
     private static String normalizeFallback(String fallback) {
         if (fallback == null || fallback.trim().isEmpty()) {
             return DEFAULT_COLOR;

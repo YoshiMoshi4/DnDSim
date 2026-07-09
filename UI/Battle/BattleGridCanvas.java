@@ -3,6 +3,7 @@ package UI.Battle;
 import EntityRes.*;
 import Objects.*;
 import UI.SpriteUtils;
+import javafx.animation.PauseTransition;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
@@ -11,8 +12,8 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.util.Duration;
 
-import java.util.Optional;
 
 public class BattleGridCanvas extends Pane {
 
@@ -31,11 +32,13 @@ public class BattleGridCanvas extends Pane {
     private Enemy movingEnemy;
     private boolean pickupMode;
     private Entity pickupEntity;
-    
-    // Pending attack target (while dice roll panel is open)
-    private GridObject pendingAttackTarget;
+    private final VBox infoPopup;
+    private boolean infoPopupPinned;
+    private GridObject infoPopupTarget;
+    private final PauseTransition hoverDelay;
+    private GridObject pendingHoverTarget;
 
-    public BattleGridCanvas(BattleGrid grid, TurnManager tm, BattleView battleView, 
+    public BattleGridCanvas(BattleGrid grid, TurnManager tm, BattleView battleView,
                            CombatLogPane combatLogPane) {
         this.canvas = new Canvas();
         this.grid = grid;
@@ -50,20 +53,32 @@ public class BattleGridCanvas extends Pane {
         this.moveMode = false;
         this.movingEntity = null;
         this.movingEnemy = null;
-        this.pendingAttackTarget = null;
         this.pickupMode = false;
         this.pickupEntity = null;
+        this.infoPopup = new VBox(3);
+        this.infoPopupPinned = false;
+        this.infoPopupTarget = null;
+        this.hoverDelay = new PauseTransition(Duration.seconds(1));
+        this.pendingHoverTarget = null;
 
         getChildren().add(canvas);
         setStyle("-fx-background-color: white;");
+
+        infoPopup.setPadding(new javafx.geometry.Insets(8, 10, 8, 10));
+        infoPopup.setStyle("-fx-background-color: #2d2d30; -fx-border-color: #505052; " +
+            "-fx-border-width: 1; -fx-background-radius: 6; -fx-border-radius: 6;");
+        infoPopup.setPrefWidth(160);
+        infoPopup.setVisible(false);
+        infoPopup.setManaged(false);
+        getChildren().add(infoPopup);
 
         // Bind canvas size to pane size
         canvas.widthProperty().bind(widthProperty());
         canvas.heightProperty().bind(heightProperty());
 
         // Redraw when size changes
-        widthProperty().addListener((obs, oldVal, newVal) -> redraw());
-        heightProperty().addListener((obs, oldVal, newVal) -> redraw());
+        widthProperty().addListener((obs, oldVal, newVal) -> { hideInfoPopup(); redraw(); });
+        heightProperty().addListener((obs, oldVal, newVal) -> { hideInfoPopup(); redraw(); });
 
         // Keyboard shortcuts for menu
         setFocusTraversable(true);
@@ -71,6 +86,12 @@ public class BattleGridCanvas extends Pane {
 
         // Mouse handlers
         canvas.setOnMousePressed(this::handleMousePressed);
+        canvas.setOnMouseMoved(this::handleMouseMoved);
+        canvas.setOnMouseExited(e -> {
+            hoverDelay.stop();
+            pendingHoverTarget = null;
+            hideInfoPopupIfNotPinned();
+        });
     }
 
     public void setBattleStarted(boolean started) {
@@ -78,7 +99,14 @@ public class BattleGridCanvas extends Pane {
     }
 
     private void handleMousePressed(MouseEvent e) {
+        if (e.getButton() == MouseButton.SECONDARY) {
+            handleRightClick(e);
+            return;
+        }
         if (e.getButton() == MouseButton.PRIMARY) {
+            if (infoPopupPinned) {
+                hideInfoPopup();
+            }
             int[] cellInfo = getCellAtPoint(e.getX(), e.getY());
             if (cellInfo != null) {
                 int row = cellInfo[0];
@@ -97,6 +125,174 @@ public class BattleGridCanvas extends Pane {
             }
             handleLeftClick(e);
         }
+    }
+
+    private void handleRightClick(MouseEvent e) {
+        int[] cellInfo = getCellAtPoint(e.getX(), e.getY());
+        if (cellInfo == null) return;
+        int row = cellInfo[0];
+        int col = cellInfo[1];
+        if (!grid.inBounds(row, col)) return;
+
+        GridObject obj = grid.getObjectAt(row, col);
+        hoverDelay.stop();
+        pendingHoverTarget = null;
+        if (obj instanceof Entity || obj instanceof Enemy) {
+            showInfoPopup(obj, e.getX(), e.getY(), true);
+            requestFocus();
+        } else {
+            hideInfoPopup();
+        }
+    }
+
+    /**
+     * Track the entity/enemy under the cursor and, after it stays under the
+     * cursor for a beat, show the (non-pinned) hover info popup.
+     */
+    private void handleMouseMoved(MouseEvent e) {
+        if (infoPopupPinned) return;
+
+        GridObject obj = null;
+        int[] cellInfo = getCellAtPoint(e.getX(), e.getY());
+        if (cellInfo != null && grid.inBounds(cellInfo[0], cellInfo[1])) {
+            GridObject candidate = grid.getObjectAt(cellInfo[0], cellInfo[1]);
+            if (candidate instanceof Entity || candidate instanceof Enemy) {
+                obj = candidate;
+            }
+        }
+
+        if (obj == pendingHoverTarget) {
+            // Still hovering the same target - let any pending timer keep running.
+            return;
+        }
+
+        // Hover target changed - reset the delay and hide whatever was showing.
+        hoverDelay.stop();
+        pendingHoverTarget = obj;
+        hideInfoPopupIfNotPinned();
+
+        if (obj != null) {
+            final GridObject hoverTarget = obj;
+            final double mx = e.getX();
+            final double my = e.getY();
+            hoverDelay.setOnFinished(ev -> {
+                if (pendingHoverTarget == hoverTarget && !infoPopupPinned) {
+                    showInfoPopup(hoverTarget, mx, my, false);
+                }
+            });
+            hoverDelay.playFromStart();
+        }
+    }
+
+    /**
+     * Show the hover/pinned info popup for an entity or enemy.
+     * Pinned popups (right-click) include a Delete button and stay open until
+     * the user left-clicks elsewhere on the grid.
+     */
+    private void showInfoPopup(GridObject obj, double mouseX, double mouseY, boolean pinned) {
+        infoPopup.getChildren().clear();
+
+        Label nameLabel = new Label(CombatManager.getTargetName(obj));
+        nameLabel.setStyle("-fx-text-fill: #ffffff; -fx-font-size: 13px; -fx-font-weight: bold;");
+        infoPopup.getChildren().add(nameLabel);
+
+        int hp = CombatManager.getTargetHealth(obj);
+        int maxHp = CombatManager.getTargetMaxHealth(obj);
+        int ac = CombatManager.getTargetAC(obj);
+        int mobility = 0;
+        if (obj instanceof Entity entity) {
+            mobility = entity.getMovement();
+        } else if (obj instanceof Enemy enemy) {
+            mobility = enemy.getMovement();
+        }
+
+        java.util.List<String> diceList = new java.util.ArrayList<>();
+        String[] dice = CombatManager.getDamageDice(obj);
+        if (dice != null) {
+            for (String d : dice) {
+                if (d != null) diceList.add(d);
+            }
+        }
+        String diceText = String.join("/", diceList);
+
+        for (String line : new String[]{
+                "HP: " + hp + " / " + maxHp,
+                "AC: " + ac,
+                "MOB: " + mobility,
+                "DMG: " + diceText}) {
+            Label l = new Label(line);
+            l.setStyle("-fx-text-fill: #cccccc; -fx-font-size: 11px;");
+            infoPopup.getChildren().add(l);
+        }
+
+        if (pinned) {
+            Button deleteBtn = new Button("Delete");
+            deleteBtn.getStyleClass().add("button");
+            deleteBtn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white; -fx-font-size: 11px;");
+            deleteBtn.setOnAction(ev -> deleteObject(obj));
+            infoPopup.getChildren().add(deleteBtn);
+        }
+
+        infoPopupPinned = pinned;
+        infoPopupTarget = obj;
+        infoPopup.setVisible(true);
+        // The popup is unmanaged, so its parent Pane never resizes it to fit its
+        // content. applyCss() must run first so children's font/padding styles are
+        // resolved before autosize() reads their preferred heights - otherwise the
+        // computed height comes back too short and the background only covers part
+        // of the content (e.g. just the name row).
+        infoPopup.applyCss();
+        infoPopup.autosize();
+
+        double popupWidth = infoPopup.getWidth();
+        double popupHeight = infoPopup.getHeight();
+
+        double px = mouseX + 12;
+        double py = mouseY + 12;
+        if (px + popupWidth > getWidth()) px = mouseX - popupWidth - 12;
+        if (py + popupHeight > getHeight()) py = mouseY - popupHeight - 12;
+        if (px < 0) px = 4;
+        if (py < 0) py = 4;
+
+        infoPopup.setLayoutX(px);
+        infoPopup.setLayoutY(py);
+    }
+
+    private void hideInfoPopupIfNotPinned() {
+        if (!infoPopupPinned) {
+            infoPopup.setVisible(false);
+            infoPopupTarget = null;
+        }
+    }
+
+    private void hideInfoPopup() {
+        infoPopup.setVisible(false);
+        infoPopupPinned = false;
+        infoPopupTarget = null;
+    }
+
+    /**
+     * Remove an entity or enemy from the board via the info popup's Delete button.
+     */
+    private void deleteObject(GridObject obj) {
+        if (obj instanceof Entity entity) {
+            grid.removeEntity(entity);
+            turnManager.removeEntity(entity);
+            combatLogPane.log(entity.getName() + " removed from the battlefield.", CombatLogPane.LogType.INFO);
+        } else if (obj instanceof Enemy enemy) {
+            grid.removeEnemy(enemy);
+            turnManager.removeEnemy(enemy);
+            combatLogPane.log(enemy.getName() + " removed from the battlefield.", CombatLogPane.LogType.INFO);
+        }
+
+        if (selectedObject == obj) {
+            selectedObject = null;
+            battleView.updateSelectedEntity(null);
+        }
+
+        hideInfoPopup();
+        redraw();
+        battleView.refreshPartyHealth();
     }
 
     private void handleKeyPressed(javafx.scene.input.KeyEvent e) {
@@ -185,7 +381,6 @@ public class BattleGridCanvas extends Pane {
     }
 
     private void cancelModes() {
-        GridObject current = selectedObject;
         moveMode = false;
         movingEntity = null;
         movingEnemy = null;
@@ -633,7 +828,7 @@ public class BattleGridCanvas extends Pane {
             } else if (clicked instanceof TerrainObject terrain) {
                 // Terrain attacks still use direct damage (no AC)
                 Entity attacker = attackingEntity;
-                int damage = attacker.getAttackPower();
+                int damage = attacker.getAttackDamage();
                 terrain.takeDamage(damage);
                 combatLogPane.logTerrainDamage(attacker.getName(), damage, terrain.getHealth());
                 if (terrain.isDestroyed()) {
@@ -670,7 +865,7 @@ public class BattleGridCanvas extends Pane {
             } else if (clicked instanceof TerrainObject terrain) {
                 // Terrain attacks still use direct damage (no AC)
                 Enemy attacker = attackingEnemy;
-                int damage = attacker.getAttackPower();
+                int damage = attacker.getAttackDamage();
                 terrain.takeDamage(damage);
                 combatLogPane.logTerrainDamage(attacker.getName(), damage, terrain.getHealth());
                 if (terrain.isDestroyed()) {
@@ -699,8 +894,6 @@ public class BattleGridCanvas extends Pane {
      * Start the dice roll attack sequence via DiceRollPanel
      */
     private void startDiceRollAttack(GridObject attacker, GridObject target) {
-        pendingAttackTarget = target;
-        
         // Show dice panel, hide action panel
         battleView.showDiceRollPanel();
         
@@ -787,8 +980,6 @@ public class BattleGridCanvas extends Pane {
         attackMode = false;
         attackingEntity = null;
         attackingEnemy = null;
-        pendingAttackTarget = null;
-        
         // Hide dice panel, show action panel
         battleView.hideDiceRollPanel();
         
@@ -799,22 +990,6 @@ public class BattleGridCanvas extends Pane {
         
         redraw();
         battleView.refreshPartyHealth();
-    }
-
-    private void attemptMove(GridObject obj, int row, int col) {
-        if (grid.isBlocked(row, col)) return;
-
-        if (obj instanceof Entity e) {
-            int dist = Math.abs(e.getRow() - row) + Math.abs(e.getCol() - col);
-
-            if (battleStarted) {
-                int mobilityLimit = e.getMovement();
-                if (dist > mobilityLimit) return;
-            }
-        }
-
-        obj.setRow(row);
-        obj.setCol(col);
     }
 
     public void pickupAction() {
@@ -1015,9 +1190,15 @@ public class BattleGridCanvas extends Pane {
             // Get fallback color
             java.awt.Color awtColor = e.getCharSheet().getDisplayColor();
             Color fallbackColor = Color.rgb(awtColor.getRed(), awtColor.getGreen(), awtColor.getBlue());
-            
+
+            // Highlight whichever combatant's turn it currently is
+            if (turnManager.isCurrent(e)) {
+                gc.setFill(Color.rgb(255, 215, 0, 0.35));
+                gc.fillOval(x + 1, y + 1, cellSize - 2, cellSize - 2);
+            }
+
             // Draw sprite or fallback
-            SpriteUtils.drawSpriteOnCanvas(gc, e.getCharSheet().getSpritePath(), 
+            SpriteUtils.drawSpriteOnCanvas(gc, e.getCharSheet().getSpritePath(),
                 centerX, centerY, spriteSize, fallbackColor, true);
 
             if (e == selectedObject) {
@@ -1040,7 +1221,13 @@ public class BattleGridCanvas extends Pane {
             
             // Get fallback color
             Color fallbackColor = Color.web(en.getColor());
-            
+
+            // Highlight whichever combatant's turn it currently is
+            if (turnManager.isCurrent(en)) {
+                gc.setFill(Color.rgb(255, 215, 0, 0.35));
+                gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+            }
+
             // Draw sprite or fallback (enemies use squares as fallback)
             String spritePath = en.getSpritePath();
             if (spritePath != null && SpriteUtils.spriteExists(spritePath)) {

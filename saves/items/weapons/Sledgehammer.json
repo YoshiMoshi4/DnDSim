@@ -1,1 +1,1 @@
-{"damageDice":["d4","d4","d4"],"statType":"STRENGTH","modifiedAttributes":[1,-2,1,0,0,0],"abilities":[],"damage":0,"name":"Sledgehammer","type":"Weapon","color":1,"quantity":1}
+{"damageDice":["d4","d6","d6"],"statType":"STRENGTH","modifiedAttributes":[1,0,1,0,0,0],"abilities":[],"damage":0,"name":"Sledgehammer","type":"Weapon","color":"#808080","quantity":1}

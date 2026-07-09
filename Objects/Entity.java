@@ -56,6 +56,15 @@ public class Entity extends GridObject {
         // Unarmed uses STR
         return charSheet.getTotalAttribute(0);
     }
+
+    /**
+     * Get the direct damage value used by legacy terrain damage interactions.
+     */
+    public int getAttackDamage() {
+        int weaponDamage = charSheet.getEquippedWeapon() != null ? charSheet.getEquippedWeapon().getDamageValue() : 1;
+        int strength = charSheet.getAttribute(0); // STRENGTH = 0
+        return weaponDamage + strength;
+    }
     
     /**
      * Get damage dice from equipped weapon

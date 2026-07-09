@@ -290,7 +290,19 @@ public class BattleView {
             return;
         }
 
-        if (pendingObject instanceof Enemy enemy) {
+        if (pendingObject instanceof Entity entity) {
+            entity.setRow(row);
+            entity.setCol(col);
+            grid.addEntity(entity);
+            addEntity(entity);
+            addStatusLabel.setText("Placed: " + entity.getName());
+            // Party members are unique - stop the paint tool after one placement
+            objectPlacementMode = false;
+            pendingObjectSupplier = null;
+            pendingObjectKey = null;
+            pendingObjectName = null;
+            refreshAddObjectsPanels();
+        } else if (pendingObject instanceof Enemy enemy) {
             enemy.setRow(row);
             enemy.setCol(col);
             grid.addEnemy(enemy);
@@ -373,6 +385,9 @@ public class BattleView {
         if (panelExpanded) {
             // Collapse with animation
             panelExpanded = false;
+            if (objectPlacementMode) {
+                cancelObjectPlacement();
+            }
             AnimationUtils.animateHeight(addObjectsPanel, 0, () -> addObjectsPanel.setVisible(false));
         } else {
             // Expand with animation
@@ -617,7 +632,7 @@ public class BattleView {
             if (dexLabel != null) dexLabel.setText("DEX: --");
             if (intLabel != null) intLabel.setText("INT: --");
             if (mobLabel != null) mobLabel.setText("MOB: " + en.getMovement());
-            if (primaryLabel != null) primaryLabel.setText("ATK: " + en.getAttackPower());
+            if (primaryLabel != null) primaryLabel.setText("ATK: " + en.getAttackModifier());
             if (secondaryLabel != null) secondaryLabel.setText("");
             
             // Update health bar for enemy
@@ -1157,18 +1172,13 @@ public class BattleView {
                 }
                 
                 hasAvailableParty = true;
-                
+
                 // Create a card-style button for party members
-                HBox card = createEntitySelectionCard(cs, true);
+                final String key = "party:" + cs.getName();
+                HBox card = createEntitySelectionCard(cs, true, isPlacementSelectionActive(key));
                 card.setOnMouseClicked(e -> {
-                    CharSheet charSheet = sheetBtn.getSheet().getCharSheet();
-                    Entity newEntity = new Entity(0, 0, charSheet);
-                    grid.addEntityAtNextAvailable(newEntity);
-                    addEntity(newEntity);
-                    gridCanvas.redraw();
-                    addStatusLabel.setText("Added: " + sheetBtn.getText());
-                    // Refresh the panel to remove the added character
-                    refreshAddObjectsPanels();
+                    startObjectPlacement(() -> new Entity(0, 0, sheetBtn.getSheet().getCharSheet()),
+                        key, cs.getName());
                 });
                 content.getChildren().add(card);
             }
@@ -1185,9 +1195,9 @@ public class BattleView {
         return scroll;
     }
     
-    private HBox createEntitySelectionCard(CharSheet cs, boolean isParty) {
+    private HBox createEntitySelectionCard(CharSheet cs, boolean isParty, boolean selected) {
         CardUtils.CardStyle style = isParty ? CardUtils.CardStyle.PARTY : CardUtils.CardStyle.ENEMY;
-        
+
         HBox card = new HBox(10);
         card.setAlignment(Pos.CENTER_LEFT);
         card.setPadding(new Insets(10, 15, 10, 15));
@@ -1197,6 +1207,10 @@ public class BattleView {
             "-fx-background-radius: 6; -fx-border-color: %s; -fx-border-radius: 6; -fx-border-width: 1;",
             style.bgColor, adjustBrightness(style.bgColor, -10), style.borderColor
         ));
+        if (selected) {
+            card.setStyle(card.getStyle().replace("-fx-border-color: " + style.borderColor,
+                "-fx-border-color: " + style.accentColor + "; -fx-border-width: 2"));
+        }
         
         // Icon
         Node avatar = IconUtils.createIcon(isParty ? IconUtils.Icon.PERSON : IconUtils.Icon.SKULL, 24, style.accentColor);
@@ -1330,7 +1344,7 @@ public class BattleView {
         Label nameLabel = new Label(enemy.getName());
         nameLabel.setStyle(String.format("-fx-text-fill: %s; -fx-font-size: 13px; -fx-font-weight: bold;", style.accentColor));
         
-        Label statsLabel = new Label(String.format("ATK: %d  •  MOB: %d", enemy.getAttackPower(), enemy.getMovement()));
+        Label statsLabel = new Label(String.format("ATK: %d  •  MOB: %d", enemy.getAttackModifier(), enemy.getMovement()));
         statsLabel.setStyle("-fx-text-fill: #888; -fx-font-size: 11px;");
         
         info.getChildren().addAll(nameLabel, statsLabel);
@@ -1421,7 +1435,7 @@ public class BattleView {
             content.getChildren().add(header);
 
             for (Weapon weapon : weapons.values()) {
-                String btnText = String.format("%s  |  DMG: %d", weapon.getName(), weapon.getDamage());
+                String btnText = String.format("%s  |  DMG: %s", weapon.getName(), String.join("/", weapon.getDamageDice()));
                 String key = "pickup:weapon:" + weapon.getName();
                 Button btn = new Button(btnText);
                 btn.getStyleClass().add("button");

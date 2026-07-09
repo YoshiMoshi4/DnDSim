@@ -185,6 +185,14 @@ public class CharSheet {
         return sum;
     }
 
+    public int getStatPointBalance() {
+        return getAvailableStatPoints() - getSpentStatPoints();
+    }
+
+    public boolean isOverStatBudget() {
+        return getStatPointBalance() < 0;
+    }
+
     public void setTotalHP(int newHP) {
         totalHP = newHP;
         this.save();

@@ -1037,21 +1037,28 @@ public class AssetEditorView {
         
         // Sprite picker
         final String[] spritePath = { null };
-        javafx.scene.layout.HBox spritePicker = SpritePickerUtils.createCompactSpritePicker(
-            null,
-            "terrain",
-            toHexColor(colorPicker.getValue()),
-            false,
-            newPath -> spritePath[0] = newPath,
-            dialog
-        );
+        HBox spritePickerContainer = new HBox();
+        Runnable refreshSpritePicker = () -> {
+            spritePickerContainer.getChildren().setAll(
+                SpritePickerUtils.createCompactSpritePicker(
+                    spritePath[0],
+                    "terrain",
+                    toHexColor(colorPicker.getValue()),
+                    false,
+                    newPath -> spritePath[0] = newPath,
+                    dialog
+                )
+            );
+        };
+        refreshSpritePicker.run();
+        colorPicker.setOnAction(e -> refreshSpritePicker.run());
         
         int row = 0;
         grid.add(new Label("Type:"), 0, row); grid.add(typeField, 1, row++);
         grid.add(new Label("HP:"), 0, row); grid.add(hpField, 1, row++);
         grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label(""), 0, row); grid.add(blocksCheck, 1, row++);
-        grid.add(new Label("Sprite:"), 0, row); grid.add(spritePicker, 1, row++);
+        grid.add(new Label("Sprite:"), 0, row); grid.add(spritePickerContainer, 1, row++);
         
         addDialogButtons(grid, row, dialog, () -> {
             String type = typeField.getText();
@@ -1082,23 +1089,37 @@ public class AssetEditorView {
         
         // Sprite picker
         final String[] spritePath = { terrain.getSpritePath() };
-        javafx.scene.layout.HBox spritePicker = SpritePickerUtils.createCompactSpritePicker(
-            spritePath[0],
-            "terrain",
-            terrain.getColor(),
-            false,
-            newPath -> spritePath[0] = newPath,
-            dialog
-        );
+        HBox spritePickerContainer = new HBox();
+        Runnable refreshSpritePicker = () -> {
+            spritePickerContainer.getChildren().setAll(
+                SpritePickerUtils.createCompactSpritePicker(
+                    spritePath[0],
+                    "terrain",
+                    toHexColor(colorPicker.getValue()),
+                    false,
+                    newPath -> spritePath[0] = newPath,
+                    dialog
+                )
+            );
+        };
+        refreshSpritePicker.run();
+        colorPicker.setOnAction(e -> refreshSpritePicker.run());
         
         int row = 0;
         grid.add(new Label("Type:"), 0, row); grid.add(typeField, 1, row++);
         grid.add(new Label("HP:"), 0, row); grid.add(hpField, 1, row++);
         grid.add(new Label("Color:"), 0, row); grid.add(colorPicker, 1, row++);
         grid.add(new Label(""), 0, row); grid.add(blocksCheck, 1, row++);
-        grid.add(new Label("Sprite:"), 0, row); grid.add(spritePicker, 1, row++);
+        grid.add(new Label("Sprite:"), 0, row); grid.add(spritePickerContainer, 1, row++);
         
         addDialogButtons(grid, row, dialog, () -> {
+            String type = typeField.getText().trim();
+            int hp = Integer.parseInt(hpField.getText());
+            if (type.isEmpty()) {
+                return false;
+            }
+            terrain.setType(type);
+            terrain.setHealth(hp);
             terrain.setBlocksMovement(blocksCheck.isSelected());
             terrain.setColor(toHexColor(colorPicker.getValue()));
             terrain.setSpritePath(spritePath[0]);
@@ -1326,10 +1347,7 @@ public class AssetEditorView {
     }
 
     private String toHexColor(Color color) {
-        int red = (int) Math.round(color.getRed() * 255.0);
-        int green = (int) Math.round(color.getGreen() * 255.0);
-        int blue = (int) Math.round(color.getBlue() * 255.0);
-        return String.format("#%02X%02X%02X", red, green, blue);
+        return ColorUtils.toHex(color);
     }
 
     private void handleBack() {

@@ -1,0 +1,21 @@
+{
+  "name": "Falsiradix",
+  "health": 15,
+  "maxHealth": 15,
+  "mobility": 2,
+  "armorClass": 12,
+  "attackModifier": 0,
+  "damageDice": [
+    "d4",
+    "d8",
+    "d6"
+  ],
+  "initiative": 2,
+  "dexterity": 2,
+  "color": "#4D804D",
+  "instanceNumber": 0,
+  "baseName": "Falsiradix",
+  "attackDamage": 0,
+  "row": 0,
+  "col": 0
+}

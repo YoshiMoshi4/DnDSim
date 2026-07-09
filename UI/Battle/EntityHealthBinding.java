@@ -3,7 +3,6 @@ package UI.Battle;
 import Objects.Entity;
 import javafx.beans.property.*;
 import javafx.beans.binding.Bindings;
-import javafx.beans.binding.DoubleBinding;
 
 /**
  * Observable wrapper for Entity health to enable UI bindings.

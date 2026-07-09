@@ -4,9 +4,6 @@ public class Armor extends Item {
 
     // Fields
     private int armorType;
-    private final int HEAD = 0;
-    private final int TORSO = 1;
-    private final int LEGS = 2;
     private int defense;
     private int[] modifiedAttributes;
 

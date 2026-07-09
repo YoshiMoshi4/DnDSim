@@ -27,6 +27,7 @@ public class CharacterSheetPane extends BorderPane {
     private MenuButton statusMenu;
     private Map<String, CheckMenuItem> statusMenuItems;
     private ColorPicker colorPicker;
+    private HBox basicInfoMainBox;
     
     private ComboBox<String> primaryWeapon;
     private ComboBox<String> secondaryWeapon;
@@ -90,8 +91,8 @@ public class CharacterSheetPane extends BorderPane {
     }
 
     private TitledPane createBasicInfoSection() {
-        HBox mainBox = new HBox(20);
-        mainBox.setAlignment(Pos.TOP_LEFT);
+        basicInfoMainBox = new HBox(20);
+        basicInfoMainBox.setAlignment(Pos.TOP_LEFT);
         
         // Sprite display on the left
         VBox spriteBox = createSpriteSection();
@@ -222,15 +223,16 @@ public class CharacterSheetPane extends BorderPane {
         colorPicker.setPrefWidth(150);
         colorPicker.setOnAction(e -> {
             if (updatingDisplay) return;
-            sheet.setColor(toHexColor(colorPicker.getValue()));
+            sheet.setColor(ColorUtils.toHex(colorPicker.getValue()));
             sheet.save();
+            refreshSpriteSection();
         });
         grid.add(colorPicker, 1, row++);
         
         // Combine sprite and form
-        mainBox.getChildren().addAll(spriteBox, grid);
+        basicInfoMainBox.getChildren().addAll(spriteBox, grid);
         
-        TitledPane pane = new TitledPane("Basic Info", mainBox);
+        TitledPane pane = new TitledPane("Basic Info", basicInfoMainBox);
         pane.getStyleClass().add("form-section");
         pane.setCollapsible(false);
         return pane;
@@ -250,6 +252,13 @@ public class CharacterSheetPane extends BorderPane {
             newPath -> sheet.setSpritePath(newPath),
             () -> getScene() != null ? getScene().getWindow() : null
         );
+    }
+
+    private void refreshSpriteSection() {
+        if (basicInfoMainBox == null || basicInfoMainBox.getChildren().isEmpty()) {
+            return;
+        }
+        basicInfoMainBox.getChildren().set(0, createSpriteSection());
     }
     
     private void updateHpBar() {
@@ -1121,7 +1130,12 @@ public class CharacterSheetPane extends BorderPane {
         chaTotal.setText(String.valueOf(sheet.getTotalAttribute(CharSheet.CHARISMA)));
 
         levelSpinner.getValueFactory().setValue(sheet.getLevel());
-        pointsLabel.setText("Points: " + sheet.getSpentStatPoints() + " / " + sheet.getAvailableStatPoints());
+        int pointBalance = sheet.getStatPointBalance();
+        pointsLabel.setText("Points: " + sheet.getSpentStatPoints() + " / " + sheet.getAvailableStatPoints()
+            + (pointBalance < 0 ? " (Over by " + Math.abs(pointBalance) + ")" : ""));
+        pointsLabel.setStyle(pointBalance < 0
+            ? "-fx-text-fill: #f44336; -fx-font-weight: bold;"
+            : "-fx-text-fill: #ce9178; -fx-font-weight: bold;");
         
         // Inventory - populate ListViews
         consumablesData.clear();
@@ -1282,13 +1296,6 @@ public class CharacterSheetPane extends BorderPane {
     private void save() {
         sheet.save();
         updateDisplay();
-    }
-
-    private String toHexColor(Color color) {
-        int red = (int) Math.round(color.getRed() * 255.0);
-        int green = (int) Math.round(color.getGreen() * 255.0);
-        int blue = (int) Math.round(color.getBlue() * 255.0);
-        return String.format("#%02X%02X%02X", red, green, blue);
     }
 
     public CharSheet getCharSheet() {

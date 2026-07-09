@@ -86,6 +86,17 @@ public class Weapon extends Item {
         if ("CHARISMA".equalsIgnoreCase(statType)) return CharSheet.CHARISMA;
         return CharSheet.STRENGTH;
     }
+
+    /**
+     * Get the legacy-style flat damage value derived from the first damage die.
+     */
+    public int getDamageValue() {
+        String[] dice = getDamageDice();
+        if (dice.length > 0) {
+            return getAverageDieValue(dice[0]);
+        }
+        return damage > 0 ? damage : 4;
+    }
     
     /**
      * Get the ammo type this weapon uses (null for melee weapons)
@@ -114,11 +125,7 @@ public class Weapon extends Item {
 
     @Deprecated
     public int getDamage() {
-        // For backward compatibility, calculate average damage from tier 1
-        if (damageDice != null && damageDice.length > 0) {
-            return getAverageDieValue(damageDice[0]);
-        }
-        return damage > 0 ? damage : 4;
+        return getDamageValue();
     }
     
     private int getAverageDieValue(String die) {

@@ -391,8 +391,6 @@ public class CharacterSheetView {
                 int draggedIdx = items.indexOf(item);
                 
                 // Calculate target index based on drop position
-                int targetIdx = items.size() - 1;
-                
                 // Get the item we're dropping on
                 double y = event.getY();
                 int cellHeight = 24; // Approximate cell height
@@ -575,6 +573,9 @@ public class CharacterSheetView {
         grid.add(new Label("Color:"), 0, row);
         ColorPicker colorPicker = new ColorPicker(Color.web(EntityRes.ColorUtils.fromLegacyIndex(0)));
         grid.add(colorPicker, 1, row++);
+        Label colorHint = new Label("Colors are saved as hex values.");
+        colorHint.setStyle("-fx-text-fill: #888888; -fx-font-size: 10px;");
+        grid.add(colorHint, 0, row++, 2, 1);
         
         // HP
         grid.add(new Label("Total HP:"), 0, row);
@@ -610,6 +611,9 @@ public class CharacterSheetView {
         grid.add(new Label("CHA:"), 0, row);
         TextField chaField = new TextField("3");
         grid.add(chaField, 1, row++);
+        Label statHint = new Label("Base stats are STR, DEX, CON, INT, WIS, CHA.");
+        statHint.setStyle("-fx-text-fill: #888888; -fx-font-size: 10px;");
+        grid.add(statHint, 0, row++, 2, 1);
         
         // Equipment
         ItemDatabase db = ItemDatabase.getInstance();
@@ -660,7 +664,7 @@ public class CharacterSheetView {
                 };
                 
                 CharSheet newSheet = new CharSheet(nameField.getText(), true, hp, attr,
-                    toHexColor(colorPicker.getValue()));
+                    ColorUtils.toHex(colorPicker.getValue()));
                 newSheet.setArmorClass(ac);
                 
                 // Equip items (only if not "None")
@@ -720,7 +724,12 @@ public class CharacterSheetView {
         grid.add(btnBox, 0, row++);
         GridPane.setColumnSpan(btnBox, 2);
         
-        Scene scene = new Scene(grid, 350, 620);
+        ScrollPane dialogScroll = new ScrollPane(grid);
+        dialogScroll.setFitToWidth(true);
+        dialogScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        dialogScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+
+        Scene scene = new Scene(dialogScroll, 370, 620);
         scene.getStylesheets().add(new java.io.File("resources/styles/dark-theme.css").toURI().toString());
         
         dialog.setScene(scene);
@@ -767,7 +776,7 @@ public class CharacterSheetView {
         acSpinner.setEditable(true);
         grid.add(acSpinner, 1, row++);
         
-        grid.add(new Label("Dexterity:"), 0, row);
+        grid.add(new Label("Dexterity (Attack + Initiative):"), 0, row);
         Spinner<Integer> dexSpinner = new Spinner<>(-10, 99, existing != null ? existing.getDexterity() : 2);
         dexSpinner.setEditable(true);
         grid.add(dexSpinner, 1, row++);
@@ -796,19 +805,29 @@ public class CharacterSheetView {
         grid.add(new Label("Color:"), 0, row);
         ColorPicker colorPicker = new ColorPicker(Color.web(existing != null ? existing.getColor() : ColorUtils.fromLegacyIndex(0)));
         grid.add(colorPicker, 1, row++);
+        Label enemyHint = new Label("Dexterity drives both enemy attack rolls and initiative.");
+        enemyHint.setStyle("-fx-text-fill: #888888; -fx-font-size: 10px;");
+        grid.add(enemyHint, 0, row++, 2, 1);
         
         // Sprite picker
         grid.add(new Label("Sprite:"), 0, row);
         final String[] spritePath = { existing != null ? existing.getSpritePath() : null };
-        javafx.scene.layout.HBox spritePicker = SpritePickerUtils.createCompactSpritePicker(
-            spritePath[0],
-            "enemies",
-            existing != null ? existing.getColor() : ColorUtils.fromLegacyIndex(0),
-            false, // Not party
-            newPath -> spritePath[0] = newPath,
-            dialog
-        );
-        grid.add(spritePicker, 1, row++);
+        HBox spritePickerContainer = new HBox();
+        Runnable refreshSpritePicker = () -> {
+            spritePickerContainer.getChildren().setAll(
+                SpritePickerUtils.createCompactSpritePicker(
+                    spritePath[0],
+                    "enemies",
+                    ColorUtils.toHex(colorPicker.getValue()),
+                    false, // Not party
+                    newPath -> spritePath[0] = newPath,
+                    dialog
+                )
+            );
+        };
+        refreshSpritePicker.run();
+        colorPicker.setOnAction(e -> refreshSpritePicker.run());
+        grid.add(spritePickerContainer, 1, row++);
         
         HBox btnBox = new HBox(10);
         Button saveBtn = new Button("Save");
@@ -820,7 +839,7 @@ public class CharacterSheetView {
                 Enemy enemy = new Enemy(0, 0, name, hpSpinner.getValue(), mobSpinner.getValue(),
                         acSpinner.getValue(), damageDice,
                         dexSpinner.getValue(), dexSpinner.getValue(),
-                    toHexColor(colorPicker.getValue()));
+                    ColorUtils.toHex(colorPicker.getValue()));
                 enemy.setSpritePath(spritePath[0]);
                 enemy.save();
                 loadEnemies();
@@ -862,12 +881,5 @@ public class CharacterSheetView {
         alert.setHeaderText(null);
         alert.setContentText(content);
         alert.showAndWait();
-    }
-
-    private String toHexColor(Color color) {
-        int red = (int) Math.round(color.getRed() * 255.0);
-        int green = (int) Math.round(color.getGreen() * 255.0);
-        int blue = (int) Math.round(color.getBlue() * 255.0);
-        return String.format("#%02X%02X%02X", red, green, blue);
     }
 }

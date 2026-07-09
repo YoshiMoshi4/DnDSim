@@ -3,7 +3,6 @@ package UI.Battle;
 import Objects.Entity;
 import UI.IconUtils;
 import UI.SpriteUtils;
-import javafx.beans.binding.Bindings;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;

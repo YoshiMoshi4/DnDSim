@@ -49,6 +49,16 @@ public class TerrainObject extends GridObject {
         return type;
     }
 
+    public void setType(String type) {
+        if (type != null && !type.trim().isEmpty()) {
+            this.type = type.trim();
+        }
+    }
+
+    public void setHealth(int health) {
+        this.health = Math.max(0, health);
+    }
+
     public boolean blocksMovement() {
         return blocksMovement;
     }

@@ -1,8 +1,1 @@
-{
-  "type": "Rock",
-  "health": 20,
-  "color": 1,
-  "blocksMovement": true,
-  "row": 0,
-  "col": 0
-}
+{"type":"Rock","health":20,"color":"#808080","blocksMovement":true,"row":0,"col":0}

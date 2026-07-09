@@ -99,21 +99,28 @@ public class Enemy extends GridObject {
 
     @Deprecated
     public void attack(Entity target) {
-        int damage = getAttackPower() - target.getDefense();
+        int damage = getAttackDamage() - target.getDefense();
         target.takeDamage(Math.max(0, damage));
     }
 
     @Deprecated
     public void attack(Enemy target) {
-        int damage = getAttackPower();  // Enemies have no defense
+        int damage = getAttackDamage();  // Enemies have no defense
         target.takeDamage(Math.max(0, damage));
+    }
+
+    /**
+     * Get the direct damage value used by legacy terrain damage interactions.
+     */
+    public int getAttackDamage() {
+        // Legacy: return flat attack damage for backward compatibility
+        if (attackDamage > 0) return attackDamage;
+        return 3 + attackModifier;  // Derive from modifier
     }
 
     @Deprecated
     public int getAttackPower() {
-        // Legacy: return flat attack damage for backward compatibility
-        if (attackDamage > 0) return attackDamage;
-        return 3 + attackModifier;  // Derive from modifier
+        return getAttackDamage();
     }
     
     /**
@@ -132,7 +139,8 @@ public class Enemy extends GridObject {
     }
     
     /**
-     * Get modifier added to attack rolls (uses dexterity)
+     * Get modifier added to attack rolls.
+     * Current enemy design uses dexterity for both attack rolls and initiative.
      */
     public int getAttackModifier() {
         return dexterity;
@@ -186,7 +194,7 @@ public class Enemy extends GridObject {
     }
 
     public int getInitiative() {
-        // Initiative is now based on dexterity
+        // Initiative currently shares the same dexterity value as attack rolls.
         return dexterity;
     }
 
