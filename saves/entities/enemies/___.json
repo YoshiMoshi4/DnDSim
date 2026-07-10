@@ -1,0 +1,21 @@
+{
+  "name": "???",
+  "health": 55,
+  "maxHealth": 55,
+  "mobility": 4,
+  "armorClass": 12,
+  "attackModifier": 0,
+  "damageDice": [
+    "d8",
+    "d6",
+    "d12"
+  ],
+  "initiative": 6,
+  "dexterity": 6,
+  "color": "#000000",
+  "instanceNumber": 0,
+  "baseName": "???",
+  "attackDamage": 0,
+  "row": 0,
+  "col": 0
+}

@@ -330,9 +330,7 @@ public class BattleGridCanvas extends Pane {
                         e.consume();
                     }
                     case Q -> {
-                        entity.getCharSheet().swapWeapons();
-                        redraw();
-                        battleView.updateSelectedEntity(entity);
+                        triggerSwapForSelected();
                         e.consume();
                     }
                     case P -> {
@@ -637,6 +635,9 @@ public class BattleGridCanvas extends Pane {
         if (!battleStarted) return;
         if (selectedObject instanceof Entity entity && entity.isParty()) {
             entity.getCharSheet().swapWeapons();
+            // The newly-equipped weapon may have entirely different dice - drop any temporary
+            // per-tier overrides so the display/combat math reflect its real dice, not leftovers.
+            entity.resetDiceOverride();
             redraw();
             battleView.updateSelectedEntity(entity);
         }

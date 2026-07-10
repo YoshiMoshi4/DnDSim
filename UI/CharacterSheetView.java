@@ -841,7 +841,12 @@ public class CharacterSheetView {
                         dexSpinner.getValue(), dexSpinner.getValue(),
                     ColorUtils.toHex(colorPicker.getValue()));
                 enemy.setSpritePath(spritePath[0]);
-                enemy.save();
+                if (!enemy.save()) {
+                    showAlert(Alert.AlertType.ERROR, "Save Failed",
+                        "Could not save \"" + name + "\" - the name may contain characters " +
+                        "that aren't allowed in a file name. Try a different name.");
+                    return;
+                }
                 loadEnemies();
                 updateSheetLists();
                 showEnemyPane(enemy);

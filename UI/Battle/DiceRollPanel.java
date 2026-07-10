@@ -8,6 +8,8 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.effect.DropShadow;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,8 +60,9 @@ public class DiceRollPanel extends VBox {
     private final List<TextField> damageInputs = new ArrayList<>();
     private final Button submitBtn;
     private final Button cancelBtn;
-    private final Label diceListLabel;
+    private final TextFlow diceListLabel;
     private final Label tierLabel;
+    private final HBox tierBox;
     
     // Callbacks
     private Consumer<AttackOutcome> onAttackComplete;
@@ -97,9 +100,9 @@ public class DiceRollPanel extends VBox {
     public DiceRollPanel() {
         setSpacing(10);
         setPadding(new Insets(12));
-        setPrefWidth(200);
-        setMinWidth(180);
-        setMaxWidth(220);
+        setPrefWidth(210);
+        setMinWidth(200);
+        setMaxWidth(230);
         getStyleClass().add("card");
         setStyle("-fx-background-color: linear-gradient(to bottom, #2d2d30, #252528); " +
                 "-fx-border-color: #daa520; -fx-border-width: 2; -fx-border-radius: 6; " +
@@ -153,21 +156,26 @@ public class DiceRollPanel extends VBox {
         
         inputArea.getChildren().addAll(d20Label, d20Input);
         
-        // Result area (initially hidden)
+        // Result area (initially hidden) - a colored banner stating just the outcome, no math
         resultLabel = new Label("");
-        resultLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold;");
+        resultLabel.setContentDisplay(ContentDisplay.LEFT);
+        resultLabel.setGraphicTextGap(8);
+        resultLabel.setMaxWidth(Double.MAX_VALUE);
+        resultLabel.setAlignment(Pos.CENTER);
         resultLabel.setWrapText(true);
-        
+
+        // Small centered "TIER N" pill, shown only on a hit/crit
         tierLabel = new Label("");
-        tierLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #569cd6;");
-        
+        tierLabel.getStyleClass().addAll("badge", "badge-primary");
+        tierLabel.setStyle("-fx-font-size: 11px;");
+        tierBox = new HBox(tierLabel);
+        tierBox.setAlignment(Pos.CENTER);
+
         // Damage input area
         damageInputArea = new VBox(6);
-        
-        diceListLabel = new Label("Roll: --");
-        diceListLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #e0e0e0;");
-        diceListLabel.setWrapText(true);
-        
+
+        diceListLabel = new TextFlow();
+
         Separator sep2 = new Separator();
         sep2.setStyle("-fx-background-color: #505052;");
         
@@ -178,18 +186,20 @@ public class DiceRollPanel extends VBox {
         submitBtn = new Button("Roll");
         submitBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.DICE));
         submitBtn.getStyleClass().add("button");
-        submitBtn.setPrefWidth(70);
+        // Text changes between "Roll"/"OK"/"Confirm" - never let it shrink below what the
+        // longest label needs, or the text silently ellipsizes ("Conf...") instead of fitting.
+        submitBtn.setMinWidth(Region.USE_PREF_SIZE);
         submitBtn.setOnAction(e -> handleSubmit());
-        
+
         cancelBtn = new Button("Cancel");
         cancelBtn.getStyleClass().add("button");
-        cancelBtn.setPrefWidth(70);
+        cancelBtn.setMinWidth(Region.USE_PREF_SIZE);
         cancelBtn.setOnAction(e -> handleCancel());
         
         buttonBox.getChildren().addAll(submitBtn, cancelBtn);
         
-        getChildren().addAll(headerBox, attackerLabel, targetLabel, infoLabel, 
-                            sep1, inputArea, resultLabel, tierLabel, 
+        getChildren().addAll(headerBox, attackerLabel, targetLabel, infoLabel,
+                            sep1, inputArea, resultLabel, tierBox,
                             damageInputArea, diceListLabel, sep2, buttonBox);
         
         // Start hidden
@@ -224,12 +234,16 @@ public class DiceRollPanel extends VBox {
         d20Input.clear();
         d20Input.setDisable(false);
         resultLabel.setText("");
+        resultLabel.setGraphic(null);
+        resultLabel.setStyle("");
         tierLabel.setText("");
+        tierBox.setVisible(false);
+        tierBox.setManaged(false);
         damageInputArea.getChildren().clear();
         damageInputs.clear();
-        diceListLabel.setText("");
+        diceListLabel.getChildren().clear();
         submitBtn.setText("Roll");
-        
+
         // Show panel
         currentState = State.D20_ROLL;
         titleLabel.setText("Attack Roll");
@@ -274,47 +288,81 @@ public class DiceRollPanel extends VBox {
         // Calculate margin and tier
         margin = CombatManager.calculateMargin(d20Result, attackModifier, targetAC);
         tier = CombatManager.getAttackTier(margin);
-        
+
         // Display result
         d20Input.setDisable(true);
-        
-        int total = d20Result + attackModifier;
-        String rollText = d20Result + " + " + attackModifier + " = " + total + " vs AC " + targetAC;
-        
+
         if (margin < 0) {
-            // Miss
+            // Miss - just state the outcome, no breakdown
             currentState = State.RESULT_MISS;
-            resultLabel.setText("MISS! (" + rollText + ")");
-            resultLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #F44336;");
-            tierLabel.setText("Margin: " + margin);
+            setResultBanner("MISS", IconUtils.Icon.CLOSE, "#F44336", "rgba(244, 67, 54, 0.15)");
+            tierBox.setVisible(false);
+            tierBox.setManaged(false);
             submitBtn.setText("OK");
         } else {
-            // Hit - show tier and request damage dice
+            // Hit - state the outcome and tier, then request damage dice
             currentState = State.DAMAGE_ROLL;
             boolean isCritical = d20Result == 20;
-            resultLabel.setText((isCritical ? "CRIT HIT!" : "HIT!") + " (" + rollText + ")");
-            resultLabel.setStyle(
-                "-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: " +
-                (isCritical ? "#FFD54F" : "#4CAF50") + ";"
-            );
-            
-            String tierText = "Tier " + tier + " (margin: " + margin + ")";
             if (isCritical) {
-                tierText += " | CRIT: Natural 20 -> x1.5 final damage";
+                setResultBanner("CRITICAL HIT", IconUtils.Icon.LIGHTNING, "#FFD54F", "rgba(255, 213, 79, 0.15)");
+            } else {
+                setResultBanner("HIT", IconUtils.Icon.CHECK, "#4CAF50", "rgba(76, 175, 80, 0.15)");
             }
-            tierLabel.setText(tierText);
-            
-            // Get dice to roll
+
+            tierLabel.setText("TIER " + tier);
+            tierBox.setVisible(true);
+            tierBox.setManaged(true);
+
+            // Get dice to roll, plus the flat ability-modifier bonus applied to the final total
             diceToRoll = CombatManager.getDiceForTier(damageDice, tier);
             String diceStr = CombatManager.formatDiceList(diceToRoll);
-            diceListLabel.setText("Roll: " + diceStr);
+            updateDiceListDisplay(diceStr, getAbilityModifier());
             diceListLabel.setVisible(true);
-            
+
             // Create damage input fields
             setupDamageInputs();
-            
+
             submitBtn.setText("Confirm");
         }
+    }
+
+    /**
+     * Show just the outcome (no d20/AC math) as a colored icon banner.
+     */
+    private void setResultBanner(String text, IconUtils.Icon icon, String color, String backgroundRgba) {
+        resultLabel.setText(text);
+        resultLabel.setGraphic(IconUtils.createIcon(icon, 18, color));
+        resultLabel.setStyle(
+            "-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: " + color + "; " +
+            "-fx-background-color: " + backgroundRgba + "; -fx-background-radius: 8; " +
+            "-fx-border-color: " + color + "; -fx-border-width: 1.5; -fx-border-radius: 8; " +
+            "-fx-padding: 8 12 8 12;"
+        );
+    }
+
+    /**
+     * The ability modifier damage bonus: floor((stat score + 2) / 2), using whatever stat the
+     * attacker's weapon uses (or Strength if unarmed) - the same stat driving the attack roll.
+     */
+    private int getAbilityModifier() {
+        return Math.floorDiv(attackModifier + 2, 2);
+    }
+
+    /**
+     * Render "Roll: <dice> +<bonus>" with the bonus colored green/red/gray by sign.
+     */
+    private void updateDiceListDisplay(String diceStr, int abilityModifier) {
+        diceListLabel.getChildren().clear();
+
+        Text rollText = new Text("Roll: " + diceStr + "  ");
+        rollText.setStyle("-fx-fill: #e0e0e0; -fx-font-size: 12px;");
+
+        String bonusColor = abilityModifier > 0 ? "#4CAF50" : abilityModifier < 0 ? "#F44336" : "#888888";
+        String bonusSign = abilityModifier >= 0 ? "+" : "";
+        Text bonusText = new Text(bonusSign + abilityModifier + " dmg");
+        bonusText.setStyle("-fx-fill: " + bonusColor + "; -fx-font-size: 12px; -fx-font-weight: bold;");
+
+        diceListLabel.getChildren().addAll(rollText, bonusText);
     }
     
     private void setupDamageInputs() {
@@ -425,11 +473,14 @@ public class DiceRollPanel extends VBox {
             }
         }
 
-        // Critical hit rule: natural 20 on d20 multiplies final rolled damage by 1.5.
+        // Critical hit rule: natural 20 on d20 multiplies final rolled dice damage by 1.5.
         if (d20Result == 20) {
             totalDamage = (int) Math.ceil(totalDamage * 1.5);
         }
-        
+
+        // Ability modifier is a flat bonus added on top of the (possibly crit-multiplied) dice total.
+        totalDamage = Math.max(0, totalDamage + getAbilityModifier());
+
         completeAttack(totalDamage);
     }
     

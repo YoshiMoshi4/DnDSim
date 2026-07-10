@@ -1,0 +1,21 @@
+{
+  "name": "Human Puppet",
+  "health": 18,
+  "maxHealth": 18,
+  "mobility": 3,
+  "armorClass": 11,
+  "attackModifier": 0,
+  "damageDice": [
+    "d6",
+    "d6",
+    "d8"
+  ],
+  "initiative": 2,
+  "dexterity": 2,
+  "color": "#993300",
+  "instanceNumber": 0,
+  "baseName": "Human Puppet",
+  "attackDamage": 0,
+  "row": 0,
+  "col": 0
+}

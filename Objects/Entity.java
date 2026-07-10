@@ -9,6 +9,9 @@ public class Entity extends GridObject {
     protected CharSheet charSheet;
     private int instanceNumber = 0;  // 0 = not set (party entity), >0 = non-party instance number
     private String baseName;  // Original name without instance number
+    private int acAdjustment = 0;  // Temporary in-battle AC tweak; not persisted, resets each battle
+    private final int[] statAdjustment = new int[6];  // Temporary in-battle stat tweaks, indexed by CharSheet.STRENGTH..CHARISMA
+    private final String[] diceOverride = new String[3];  // Temporary in-battle damage dice tweaks per tier; null = use weapon's real die
 
     public Entity(int row, int col, CharSheet charSheet) {
         super(row, col);
@@ -36,7 +39,38 @@ public class Entity extends GridObject {
      * AC is based on total defense from equipped armor
      */
     public int getAC() {
-        return 10 + charSheet.getTotalDefense();  // Base AC 10 + armor bonus
+        return 10 + charSheet.getTotalDefense() + acAdjustment;  // Base AC 10 + armor bonus + temporary adjustment
+    }
+
+    public int getAcAdjustment() {
+        return acAdjustment;
+    }
+
+    /**
+     * Temporarily adjust this entity's AC for the current battle only.
+     * Not persisted to the CharSheet, so it resets whenever a new Entity is created.
+     */
+    public void adjustAC(int delta) {
+        acAdjustment += delta;
+    }
+
+    public int getStatAdjustment(int attributeIndex) {
+        return statAdjustment[attributeIndex];
+    }
+
+    /**
+     * Temporarily adjust one of this entity's 6 basic stats for the current battle only.
+     * Not persisted to the CharSheet, so it resets whenever a new Entity is created.
+     */
+    public void adjustStat(int attributeIndex, int delta) {
+        statAdjustment[attributeIndex] += delta;
+    }
+
+    /**
+     * The stat total (base + equipment + status + temporary battle adjustment) used for combat math.
+     */
+    public int getAdjustedAttribute(int attributeIndex) {
+        return charSheet.getTotalAttribute(attributeIndex) + statAdjustment[attributeIndex];
     }
 
     @Deprecated
@@ -51,10 +85,10 @@ public class Entity extends GridObject {
         Weapon weapon = charSheet.getEquippedWeapon();
         if (weapon != null) {
             int statIndex = weapon.getStatIndex();
-            return charSheet.getTotalAttribute(statIndex);
+            return getAdjustedAttribute(statIndex);
         }
         // Unarmed uses STR
-        return charSheet.getTotalAttribute(0);
+        return getAdjustedAttribute(CharSheet.STRENGTH);
     }
 
     /**
@@ -67,19 +101,54 @@ public class Entity extends GridObject {
     }
     
     /**
-     * Get damage dice from equipped weapon
+     * Get damage dice from equipped weapon, with any temporary battle adjustment applied per tier.
      */
     public String[] getDamageDice() {
-        Weapon weapon = charSheet.getEquippedWeapon();
-        if (weapon != null) {
-            return weapon.getDamageDice();
+        String[] base = getBaseDamageDice();
+        String[] result = new String[3];
+        for (int i = 0; i < 3; i++) {
+            result[i] = diceOverride[i] != null ? diceOverride[i] : base[i];
         }
-        // Unarmed dice
-        return new String[]{"d4", "d4", "d4"};
+        return result;
+    }
+
+    /**
+     * Get the equipped weapon's real damage dice, ignoring any temporary battle override.
+     */
+    public String[] getBaseDamageDice() {
+        Weapon weapon = charSheet.getEquippedWeapon();
+        String[] weaponDice = weapon != null ? weapon.getDamageDice() : new String[]{"d4", "d4", "d4"};
+        String[] base = new String[3];
+        for (int i = 0; i < 3; i++) {
+            base[i] = weaponDice != null && i < weaponDice.length ? weaponDice[i] : null;
+        }
+        return base;
+    }
+
+    public String getDiceOverride(int tier) {
+        return diceOverride[tier];
+    }
+
+    /**
+     * Temporarily override one damage-dice tier for the current battle only.
+     * Not persisted to the Weapon, so it resets whenever a new Entity is created.
+     */
+    public void setDiceOverride(int tier, String die) {
+        diceOverride[tier] = die;
+    }
+
+    /**
+     * Clear all temporary damage-dice overrides, e.g. when the equipped weapon changes so the
+     * display/combat math snap back to reflect the newly equipped weapon's real dice.
+     */
+    public void resetDiceOverride() {
+        for (int i = 0; i < diceOverride.length; i++) {
+            diceOverride[i] = null;
+        }
     }
 
     public int getMovement() {
-        int totalDex = charSheet.getTotalAttribute(CharSheet.DEXTERITY);
+        int totalDex = getAdjustedAttribute(CharSheet.DEXTERITY);
         return 1 +((totalDex + 1) / 2);
     }
 

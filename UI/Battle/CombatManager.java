@@ -17,7 +17,7 @@ import java.util.List;
  * 1. Attacker rolls d20
  * 2. Calculate margin = (d20 + stat modifier) - target AC
  * 3. If margin < 0, attack misses (margin == 0 still hits, since meeting AC exactly succeeds)
- * 4. Otherwise, determine tier: 1-4 = tier 1, 5-9 = tier 2, 10+ = tier 3
+ * 4. Otherwise, determine tier: 1-4 = tier 1, 5-7 = tier 2, 8+ = tier 3
  * 5. Roll damage dice based on tier (cumulative: tier 2 includes tier 1 dice, etc.)
  */
 public class CombatManager {
@@ -49,7 +49,7 @@ public class CombatManager {
         private static int calculateTier(int margin) {
             if (margin < 0) return 0;
             if (margin <= 4) return 1;
-            if (margin <= 9) return 2;
+            if (margin <= 7) return 2;
             return 3;
         }
     }

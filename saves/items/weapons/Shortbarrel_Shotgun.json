@@ -1,1 +1,1 @@
-{"damageDice":["d4","d4","d8"],"statType":"DEXTERITY","ammoType":"12 Gauge","modifiedAttributes":[0,0,0,0],"abilities":[],"damage":0,"name":"Shortbarrel Shotgun","type":"Weapon","color":4,"quantity":1}
+{"damageDice":["d6","d4","d8"],"statType":"DEXTERITY","modifiedAttributes":[0,0,0,0,0,0],"abilities":[],"damage":0,"name":"Shortbarrel Shotgun","type":"Weapon","color":"#FF0000","quantity":1}

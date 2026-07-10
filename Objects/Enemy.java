@@ -20,9 +20,23 @@ public class Enemy extends GridObject {
     private int instanceNumber = 0;
     private String baseName;
     private String spritePath; // Path to enemy sprite image (e.g., "sprites/enemies/spider.png")
-    
+    private transient int acAdjustment = 0;  // Temporary in-battle AC tweak; not persisted, resets each battle
+    private transient int dexAdjustment = 0;  // Temporary in-battle Dexterity tweak; not persisted, resets each battle
+    private transient String[] diceOverride = new String[3];  // Temporary in-battle damage dice tweaks per tier; null = use real die
+
     // Legacy field for backward compatibility
     private int attackDamage;
+
+    /**
+     * No-arg constructor so Gson deserialization (used by Enemy.load()) goes through normal
+     * reflective construction instead of falling back to UnsafeAllocator, which skips field
+     * initializers entirely - that was leaving diceOverride null instead of new String[3] for
+     * every enemy loaded from disk, causing an NPE the moment a loaded enemy's damage dice
+     * were read (e.g. attacking, being attacked, or hovering it during battle).
+     */
+    public Enemy() {
+        super(0, 0);
+    }
 
     public Enemy(int row, int col, String name, int maxHealth, int mobility, int armorClass,
                  String[] damageDice, int initiative, int dexterity, String color) {
@@ -128,22 +142,49 @@ public class Enemy extends GridObject {
      */
     public int getAC() {
         // Handle legacy enemies without explicit AC
-        if (armorClass <= 0) {
-            return 10;  // Default AC
-        }
-        return armorClass;
+        int baseAC = armorClass <= 0 ? 10 : armorClass;
+        return baseAC + acAdjustment;
     }
-    
+
     public void setAC(int ac) {
         this.armorClass = ac;
     }
-    
+
+    public int getAcAdjustment() {
+        return acAdjustment;
+    }
+
+    /**
+     * Temporarily adjust this enemy's AC for the current battle only.
+     * Not persisted (transient), so it resets whenever a fresh Enemy is loaded.
+     */
+    public void adjustAC(int delta) {
+        acAdjustment += delta;
+    }
+
+    public int getDexAdjustment() {
+        return dexAdjustment;
+    }
+
+    /**
+     * Temporarily adjust this enemy's Dexterity for the current battle only.
+     * Not persisted (transient), so it resets whenever a fresh Enemy is loaded.
+     * Does not affect movement (flat `mobility` stat) or already-rolled initiative.
+     */
+    public void adjustDexterity(int delta) {
+        dexAdjustment += delta;
+    }
+
+    public int getAdjustedDexterity() {
+        return dexterity + dexAdjustment;
+    }
+
     /**
      * Get modifier added to attack rolls.
      * Current enemy design uses dexterity for both attack rolls and initiative.
      */
     public int getAttackModifier() {
-        return dexterity;
+        return getAdjustedDexterity();
     }
     
     public void setAttackModifier(int modifier) {
@@ -151,18 +192,61 @@ public class Enemy extends GridObject {
     }
     
     /**
-     * Get damage dice per tier [tier1, tier2, tier3]
+     * Get damage dice per tier [tier1, tier2, tier3], with any temporary battle adjustment applied.
      */
     public String[] getDamageDice() {
+        ensureDiceOverride();
+        String[] base = getBaseDamageDice();
+        String[] result = new String[3];
+        for (int i = 0; i < 3; i++) {
+            result[i] = diceOverride[i] != null ? diceOverride[i] : base[i];
+        }
+        return result;
+    }
+
+    /**
+     * Gson's deserializer (Enemy.load()) constructs instances via reflection without running
+     * field initializers, so a freshly-loaded Enemy could have a null diceOverride array even
+     * with the no-arg constructor in place. Guard against that defensively here too.
+     */
+    private void ensureDiceOverride() {
+        if (diceOverride == null) {
+            diceOverride = new String[3];
+        }
+    }
+
+    /**
+     * Get this enemy's real damage dice, ignoring any temporary battle override.
+     */
+    public String[] getBaseDamageDice() {
         // Handle legacy enemies
         if (damageDice == null && attackDamage > 0) {
             damageDice = convertLegacyDamage(attackDamage);
         }
-        return damageDice != null ? damageDice : new String[]{"d4", "d4", "d6"};
+        String[] source = damageDice != null ? damageDice : new String[]{"d4", "d4", "d6"};
+        String[] base = new String[3];
+        for (int i = 0; i < 3; i++) {
+            base[i] = i < source.length ? source[i] : null;
+        }
+        return base;
     }
-    
+
     public void setDamageDice(String[] dice) {
         this.damageDice = dice;
+    }
+
+    public String getDiceOverride(int tier) {
+        ensureDiceOverride();
+        return diceOverride[tier];
+    }
+
+    /**
+     * Temporarily override one damage-dice tier for the current battle only.
+     * Not persisted (transient), so it resets whenever a fresh Enemy is loaded.
+     */
+    public void setDiceOverride(int tier, String die) {
+        ensureDiceOverride();
+        diceOverride[tier] = die;
     }
 
     @Deprecated
@@ -264,19 +348,34 @@ public class Enemy extends GridObject {
         }
     }
 
-    // Save enemy to JSON file
-    public void save() {
+    /**
+     * Strip characters that are illegal in a Windows filename (or unmappable by the JVM's
+     * native filename encoding, which Windows silently turns into '?' - itself illegal) so
+     * the display name can contain any characters without breaking the save path.
+     */
+    private static String sanitizeFileName(String name) {
+        String sanitized = name.replaceAll("[<>:\"/\\\\|?*\\x00-\\x1F]", "_")
+                .replaceAll("[.\\s]+$", "")
+                .trim();
+        return sanitized.isEmpty() ? "Unnamed_Enemy" : sanitized;
+    }
+
+    // Save enemy to JSON file. Returns true on success; false if the write failed (e.g. an
+    // invalid filename), leaving the caller's in-memory object as the only copy.
+    public boolean save() {
         try {
             File dir = new File("saves/entities/enemies");
             if (!dir.exists()) {
                 dir.mkdirs();
             }
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            FileWriter writer = new FileWriter("saves/entities/enemies/" + baseName + ".json");
+            FileWriter writer = new FileWriter("saves/entities/enemies/" + sanitizeFileName(baseName) + ".json");
             gson.toJson(this, writer);
             writer.close();
+            return true;
         } catch (Exception e) {
             System.out.println("Error saving enemy: " + e.getMessage());
+            return false;
         }
     }
 

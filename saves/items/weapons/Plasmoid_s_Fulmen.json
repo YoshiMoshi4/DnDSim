@@ -1,1 +1,1 @@
-{"damageDice":["d6","d4","d10"],"statType":"INTELLIGENCE","modifiedAttributes":[0,0,0,0],"abilities":[],"damage":0,"name":"Plasmoid\u0027s Fulmen","type":"Weapon","color":4,"quantity":1}
+{"damageDice":["d6","d8","d12"],"statType":"INTELLIGENCE","modifiedAttributes":[0,0,0,0,0,0],"abilities":[],"damage":0,"name":"Plasmoid\u0027s Fulmen","type":"Weapon","color":"#FF0000","quantity":1}

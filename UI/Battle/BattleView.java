@@ -40,9 +40,14 @@ public class BattleView {
     private Button useItemBtn;
     private Button swapBtn;
     private Button pickupBtn;
-    private Button endTurnBtn;
     private ProgressBar healthBar;
     private Label healthTextLabel;
+    // Stat rows that only apply to party members (Entities have all 6 stats; Enemies only have Dexterity)
+    private HBox strRow;
+    private HBox conRow;
+    private HBox intRow;
+    private HBox wisRow;
+    private HBox chaRow;
     private final Map<String, Integer> enemyInstanceCounts = new HashMap<>();
     
     // Dice roll panel for combat
@@ -412,185 +417,269 @@ public class BattleView {
     private VBox createActionPanel() {
         VBox panel = new VBox(8);
         panel.setPadding(new Insets(10));
-        panel.setPrefWidth(170);
-        panel.setMinWidth(170);
+        panel.setPrefWidth(185);
+        panel.setMinWidth(185);
         panel.getStyleClass().add("panel");
         panel.setStyle("-fx-background-color: #2d2d30; -fx-border-color: #505052; -fx-border-width: 0 0 0 1;");
-        
+
         // Selected entity indicator
         Label selectLabel = new Label("Selected");
         selectLabel.getStyleClass().add("label-title");
         selectLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #daa520;");
-        
+
         Label selectedEntityLabel = new Label("--");
         selectedEntityLabel.setId("selectedEntityLabel");
         selectedEntityLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #e0e0e0; -fx-font-weight: bold;");
         selectedEntityLabel.setWrapText(true);
-        
-        // Attributes section
-        Label attrLabel = new Label("Attributes");
-        attrLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
-        
-        HBox attrRow1 = new HBox(8);
-        Label strLabel = new Label("STR: --");
-        strLabel.setId("strLabel");
-        strLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
-        Label dexLabel = new Label("DEX: --");
-        dexLabel.setId("dexLabel");
-        dexLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
-        attrRow1.getChildren().addAll(strLabel, dexLabel);
-        
-        HBox attrRow2 = new HBox(8);
-        Label intLabel = new Label("INT: --");
-        intLabel.setId("intLabel");
-        intLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
-        Label mobLabel = new Label("MOB: --");
-        mobLabel.setId("mobLabel");
-        mobLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
-        attrRow2.getChildren().addAll(intLabel, mobLabel);
-        
-        // Weapons section
-        Label weapLabel = new Label("Weapons");
-        weapLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
-        
-        Label primaryLabel = new Label("1: --");
-        primaryLabel.setId("primaryLabel");
-        primaryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
-        primaryLabel.setWrapText(true);
-        
-        Label secondaryLabel = new Label("2: --");
-        secondaryLabel.setId("secondaryLabel");
-        secondaryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
-        secondaryLabel.setWrapText(true);
-        
+
         // Health section with progress bar and adjustment buttons
         Label healthLabel = new Label("Health");
         healthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
-        
+
         HBox healthRow = new HBox(5);
         healthRow.setAlignment(Pos.CENTER_LEFT);
-        
+
         Button healthMinusBtn = new Button("-");
         healthMinusBtn.setStyle("-fx-min-width: 25px; -fx-min-height: 20px; -fx-font-size: 12px;");
         healthMinusBtn.setOnAction(e -> adjustHealth(-1));
-        
+
         StackPane healthPane = new StackPane();
         healthPane.setAlignment(Pos.CENTER);
-        
+
         healthBar = new ProgressBar(0);
         healthBar.setPrefWidth(100);
         healthBar.setPrefHeight(20);
         healthBar.setStyle("-fx-accent: #F44336;");
-        
+
         healthTextLabel = new Label("-- / --");
         healthTextLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: white; -fx-font-weight: bold;");
-        
+
         healthPane.getChildren().addAll(healthBar, healthTextLabel);
-        
+
         Button healthPlusBtn = new Button("+");
         healthPlusBtn.setStyle("-fx-min-width: 25px; -fx-min-height: 20px; -fx-font-size: 12px;");
         healthPlusBtn.setOnAction(e -> adjustHealth(1));
-        
+
         healthRow.getChildren().addAll(healthMinusBtn, healthPane, healthPlusBtn);
-        
+
+        // Stats section - AC + all 6 basic stats, temporarily adjustable for this battle only
+        Label statsLabel = new Label("Stats");
+        statsLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
+
+        HBox acRow = createStatRow("AC", "#FFD700", "acLabel", d -> adjustAC(d));
+        HBox strRowLocal = createStatRow("STR", "#d75f5f", "strLabel", d -> adjustStat(CharSheet.STRENGTH, d));
+        HBox dexRow = createStatRow("DEX", "#4CAF50", "dexLabel", d -> adjustStat(CharSheet.DEXTERITY, d));
+        HBox conRowLocal = createStatRow("CON", "#2196F3", "conLabel", d -> adjustStat(CharSheet.CONSTITUTION, d));
+        HBox intRowLocal = createStatRow("INT", "#FF9800", "intLabel", d -> adjustStat(CharSheet.INTELLIGENCE, d));
+        HBox wisRowLocal = createStatRow("WIS", "#4ec9b0", "wisLabel", d -> adjustStat(CharSheet.WISDOM, d));
+        HBox chaRowLocal = createStatRow("CHA", "#c586c0", "chaLabel", d -> adjustStat(CharSheet.CHARISMA, d));
+        strRow = strRowLocal;
+        conRow = conRowLocal;
+        intRow = intRowLocal;
+        wisRow = wisRowLocal;
+        chaRow = chaRowLocal;
+
+        Label mobLabel = new Label("MOB: --");
+        mobLabel.setId("mobLabel");
+        mobLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
+
+        // Weapon section - shows the currently equipped (primary) weapon only, with a small
+        // swap button next to it to bring the secondary weapon forward instead.
+        Label weapLabel = new Label("Weapon");
+        weapLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
+
+        Label primaryLabel = new Label("--");
+        primaryLabel.setId("primaryLabel");
+        primaryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
+        primaryLabel.setWrapText(true);
+        HBox.setHgrow(primaryLabel, Priority.ALWAYS);
+
+        swapBtn = createSmallIconButton(IconUtils.Icon.UNDO, "Q");
+        swapBtn.setDisable(true);
+        swapBtn.setOnAction(e -> gridCanvas.triggerSwapForSelected());
+
+        HBox weaponRow = new HBox(6, primaryLabel, swapBtn);
+        weaponRow.setAlignment(Pos.CENTER_LEFT);
+
+        // Damage dice section - one row per tier, temporarily cyclable through d4..d20
+        Label diceLabel = new Label("Damage Dice");
+        diceLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
+
+        HBox tier1Row = createStatRow("T1", "#a0a0a0", "tier1Label", d -> adjustDice(0, d));
+        HBox tier2Row = createStatRow("T2", "#a0a0a0", "tier2Label", d -> adjustDice(1, d));
+        HBox tier3Row = createStatRow("T3", "#a0a0a0", "tier3Label", d -> adjustDice(2, d));
+
         Separator sep = new Separator();
         sep.setStyle("-fx-background-color: #505052;");
-        
+
         Label actionsLabel = new Label("Actions");
         actionsLabel.getStyleClass().add("label-title");
         actionsLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #808080;");
-        
-        // Action buttons
-        moveBtn = new Button("Move (F)");
-        moveBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.MOVE));
-        moveBtn.getStyleClass().add("button");
-        moveBtn.setMaxWidth(Double.MAX_VALUE);
+
+        // Action buttons - condensed into a numpad-style grid of square icon buttons
+        moveBtn = createSquareActionButton(IconUtils.Icon.MOVE, "F");
         moveBtn.setDisable(true);
         moveBtn.setOnAction(e -> gridCanvas.startMoveMode());
-        
-        attackBtn = new Button("Attack (E)");
-        attackBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.TARGET));
-        attackBtn.getStyleClass().add("button");
-        attackBtn.setMaxWidth(Double.MAX_VALUE);
+
+        attackBtn = createSquareActionButton(IconUtils.Icon.TARGET, "E");
         attackBtn.setDisable(true);
         attackBtn.setOnAction(e -> gridCanvas.startAttackMode());
-        
-        useItemBtn = new Button("Use Item (R)");
-        useItemBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.POTION));
-        useItemBtn.getStyleClass().add("button");
-        useItemBtn.setMaxWidth(Double.MAX_VALUE);
+
+        useItemBtn = createSquareActionButton(IconUtils.Icon.POTION, "R");
         useItemBtn.setDisable(true);
         useItemBtn.setOnAction(e -> gridCanvas.triggerUseItemForSelected());
-        
-        swapBtn = new Button("Swap (Q)");
-        swapBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.UNDO));
-        swapBtn.getStyleClass().add("button");
-        swapBtn.setMaxWidth(Double.MAX_VALUE);
-        swapBtn.setDisable(true);
-        swapBtn.setOnAction(e -> gridCanvas.triggerSwapForSelected());
-        
-        pickupBtn = new Button("Pickup (P)");
-        pickupBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.POTION));
-        pickupBtn.getStyleClass().add("button");
-        pickupBtn.setMaxWidth(Double.MAX_VALUE);
+
+        pickupBtn = createSquareActionButton(IconUtils.Icon.POTION, "P");
         pickupBtn.setDisable(true);
         pickupBtn.setOnAction(e -> gridCanvas.startPickupMode());
         pickupBtn.setStyle("-fx-background-color: #8B4513;");
-        
-        Separator sep2 = new Separator();
-        sep2.setStyle("-fx-background-color: #505052;");
-        
-        endTurnBtn = new Button("End Turn");
-        endTurnBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.FAST_FORWARD));
-        endTurnBtn.getStyleClass().add("button");
-        endTurnBtn.setMaxWidth(Double.MAX_VALUE);
-        endTurnBtn.setDisable(true);
-        endTurnBtn.setOnAction(e -> handleNextTurn());
-        
+
+        GridPane actionsGrid = new GridPane();
+        actionsGrid.setHgap(8);
+        actionsGrid.setVgap(8);
+        actionsGrid.setAlignment(Pos.CENTER_LEFT);
+        actionsGrid.add(moveBtn, 0, 0);
+        actionsGrid.add(attackBtn, 1, 0);
+        actionsGrid.add(useItemBtn, 0, 1);
+        actionsGrid.add(pickupBtn, 1, 1);
+
         // Round indicator
         Label roundLabel = new Label("Round: --");
         roundLabel.setId("roundLabel");
         roundLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #888888;");
-        
+
         panel.getChildren().addAll(
             selectLabel, selectedEntityLabel,
-            attrLabel, attrRow1, attrRow2,
-            weapLabel, primaryLabel, secondaryLabel,
-            healthLabel, healthRow, sep,
-            actionsLabel, moveBtn, attackBtn, useItemBtn, swapBtn, pickupBtn, sep2,
-            endTurnBtn, roundLabel
+            healthLabel, healthRow,
+            statsLabel, acRow, strRow, dexRow, conRow, intRow, wisRow, chaRow, mobLabel,
+            weapLabel, weaponRow, diceLabel, tier1Row, tier2Row, tier3Row, sep,
+            actionsLabel, actionsGrid,
+            roundLabel
         );
-        
+
         return panel;
     }
-    
+
+    /**
+     * Build a compact, color-coded stat row: an abbreviation label matching the character sheet's
+     * stat colors, flanked by rounded spinner-style -/+ buttons around the live value.
+     */
+    private HBox createStatRow(String abbrev, String colorHex, String valueLabelId, java.util.function.IntConsumer onAdjust) {
+        Label abbrevLabel = new Label(abbrev);
+        abbrevLabel.setMinWidth(30);
+        abbrevLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: " + colorHex + ";");
+
+        Button minusBtn = new Button("−");
+        minusBtn.getStyleClass().addAll("spinner-button", "spinner-decrement");
+        minusBtn.setMinSize(20, 20);
+        minusBtn.setMaxSize(20, 20);
+        minusBtn.setOnAction(e -> onAdjust.accept(-1));
+
+        Label valueLabel = new Label("--");
+        valueLabel.setId(valueLabelId);
+        valueLabel.getStyleClass().add("spinner-value");
+        valueLabel.setMinWidth(30);
+        valueLabel.setAlignment(Pos.CENTER);
+        valueLabel.setStyle("-fx-font-size: 12px;");
+
+        Button plusBtn = new Button("+");
+        plusBtn.getStyleClass().addAll("spinner-button", "spinner-increment");
+        plusBtn.setMinSize(20, 20);
+        plusBtn.setMaxSize(20, 20);
+        plusBtn.setOnAction(e -> onAdjust.accept(1));
+
+        HBox spinnerBox = new HBox(minusBtn, valueLabel, plusBtn);
+        spinnerBox.setAlignment(Pos.CENTER);
+
+        HBox row = new HBox(6, abbrevLabel, spinnerBox);
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
+    }
+
+    /**
+     * Build a square icon button for the numpad-style actions grid, keeping the icon and the
+     * keyboard-shortcut letter that used to appear in the full-width button's text label.
+     */
+    private Button createSquareActionButton(IconUtils.Icon icon, String shortcutLetter) {
+        VBox content = new VBox(2);
+        content.setAlignment(Pos.CENTER);
+        Label shortcutLabel = new Label(shortcutLetter);
+        shortcutLabel.setStyle("-fx-font-size: 9px; -fx-font-weight: bold; -fx-text-fill: #909095;");
+        content.getChildren().addAll(IconUtils.createIcon(icon, 20, "#dcdcdc"), shortcutLabel);
+
+        Button btn = new Button();
+        btn.setGraphic(content);
+        btn.getStyleClass().add("button");
+        btn.setMinSize(56, 56);
+        btn.setPrefSize(56, 56);
+        btn.setMaxSize(56, 56);
+        return btn;
+    }
+
+    /**
+     * Build a small icon button for inline placement next to a label (e.g. the weapon swap
+     * button), keeping the same icon + shortcut-letter convention as the numpad action buttons.
+     */
+    private Button createSmallIconButton(IconUtils.Icon icon, String shortcutLetter) {
+        VBox content = new VBox(1);
+        content.setAlignment(Pos.CENTER);
+        Label shortcutLabel = new Label(shortcutLetter);
+        shortcutLabel.setStyle("-fx-font-size: 7px; -fx-font-weight: bold; -fx-text-fill: #909095;");
+        content.getChildren().addAll(IconUtils.createIcon(icon, 12, "#dcdcdc"), shortcutLabel);
+
+        Button btn = new Button();
+        btn.setGraphic(content);
+        btn.getStyleClass().add("button");
+        btn.setMinSize(28, 28);
+        btn.setPrefSize(28, 28);
+        btn.setMaxSize(28, 28);
+        return btn;
+    }
+
     private void updateActionPanel() {
         Label roundLabel = (Label) actionPanel.lookup("#roundLabel");
         if (roundLabel != null) {
             roundLabel.setText("Round: " + turnManager.getRound());
         }
-        // End turn is always available during battle
-        endTurnBtn.setDisable(turnManager.getTurnOrder().isEmpty());
     }
-    
+
     public void updateSelectedEntity(GridObject obj) {
         this.selectedEntity = obj;
         Label selectedLabel = (Label) actionPanel.lookup("#selectedEntityLabel");
         Label strLabel = (Label) actionPanel.lookup("#strLabel");
         Label dexLabel = (Label) actionPanel.lookup("#dexLabel");
+        Label conLabel = (Label) actionPanel.lookup("#conLabel");
         Label intLabel = (Label) actionPanel.lookup("#intLabel");
+        Label wisLabel = (Label) actionPanel.lookup("#wisLabel");
+        Label chaLabel = (Label) actionPanel.lookup("#chaLabel");
         Label mobLabel = (Label) actionPanel.lookup("#mobLabel");
+        Label acLabel = (Label) actionPanel.lookup("#acLabel");
         Label primaryLabel = (Label) actionPanel.lookup("#primaryLabel");
-        Label secondaryLabel = (Label) actionPanel.lookup("#secondaryLabel");
-        
+        Label tier1Label = (Label) actionPanel.lookup("#tier1Label");
+        Label tier2Label = (Label) actionPanel.lookup("#tier2Label");
+        Label tier3Label = (Label) actionPanel.lookup("#tier3Label");
+
+        // Only party Entities have all 6 basic stats; Enemies only have Dexterity.
+        boolean showFullStats = obj instanceof Entity;
+        for (HBox row : new HBox[]{strRow, conRow, intRow, wisRow, chaRow}) {
+            row.setVisible(showFullStats);
+            row.setManaged(showFullStats);
+        }
+
         if (obj == null) {
             if (selectedLabel != null) selectedLabel.setText("--");
-            if (strLabel != null) strLabel.setText("STR: --");
-            if (dexLabel != null) dexLabel.setText("DEX: --");
-            if (intLabel != null) intLabel.setText("INT: --");
+            if (strLabel != null) strLabel.setText("--");
+            if (dexLabel != null) dexLabel.setText("--");
+            if (conLabel != null) conLabel.setText("--");
+            if (intLabel != null) intLabel.setText("--");
+            if (wisLabel != null) wisLabel.setText("--");
+            if (chaLabel != null) chaLabel.setText("--");
             if (mobLabel != null) mobLabel.setText("MOB: --");
-            if (primaryLabel != null) primaryLabel.setText("1: --");
-            if (secondaryLabel != null) secondaryLabel.setText("2: --");
+            if (acLabel != null) acLabel.setText("--");
+            if (primaryLabel != null) primaryLabel.setText("--");
+            if (tier1Label != null) tier1Label.setText("--");
+            if (tier2Label != null) tier2Label.setText("--");
+            if (tier3Label != null) tier3Label.setText("--");
             healthBar.setProgress(0);
             healthTextLabel.setText("-- / --");
             moveBtn.setDisable(true);
@@ -600,26 +689,41 @@ public class BattleView {
             pickupBtn.setDisable(true);
         } else if (obj instanceof Entity e) {
             if (selectedLabel != null) selectedLabel.setText(e.getName());
-            if (strLabel != null) strLabel.setText("STR: " + e.getCharSheet().getTotalAttribute(0));
-            if (dexLabel != null) dexLabel.setText("DEX: " + e.getCharSheet().getTotalAttribute(1));
-            if (intLabel != null) intLabel.setText("INT: " + e.getCharSheet().getTotalAttribute(3));
+            styleAdjustedValue(strLabel, e.getStatAdjustment(CharSheet.STRENGTH));
+            styleAdjustedValue(dexLabel, e.getStatAdjustment(CharSheet.DEXTERITY));
+            styleAdjustedValue(conLabel, e.getStatAdjustment(CharSheet.CONSTITUTION));
+            styleAdjustedValue(intLabel, e.getStatAdjustment(CharSheet.INTELLIGENCE));
+            styleAdjustedValue(wisLabel, e.getStatAdjustment(CharSheet.WISDOM));
+            styleAdjustedValue(chaLabel, e.getStatAdjustment(CharSheet.CHARISMA));
+            styleAdjustedValue(acLabel, e.getAcAdjustment());
+            if (strLabel != null) strLabel.setText(String.valueOf(e.getAdjustedAttribute(CharSheet.STRENGTH)));
+            if (dexLabel != null) dexLabel.setText(String.valueOf(e.getAdjustedAttribute(CharSheet.DEXTERITY)));
+            if (conLabel != null) conLabel.setText(String.valueOf(e.getAdjustedAttribute(CharSheet.CONSTITUTION)));
+            if (intLabel != null) intLabel.setText(String.valueOf(e.getAdjustedAttribute(CharSheet.INTELLIGENCE)));
+            if (wisLabel != null) wisLabel.setText(String.valueOf(e.getAdjustedAttribute(CharSheet.WISDOM)));
+            if (chaLabel != null) chaLabel.setText(String.valueOf(e.getAdjustedAttribute(CharSheet.CHARISMA)));
             if (mobLabel != null) mobLabel.setText("MOB: " + e.getMovement());
-            
+            if (acLabel != null) acLabel.setText(String.valueOf(e.getAC()));
+
             Weapon primary = e.getCharSheet().getEquippedWeapon();
-            Weapon secondary = e.getCharSheet().getEquippedSecondary();
             if (primaryLabel != null) {
-                primaryLabel.setText("1: " + formatWeaponWithAmmoCount(e, primary));
+                primaryLabel.setText(formatWeaponWithAmmoCount(e, primary));
             }
-            if (secondaryLabel != null) {
-                secondaryLabel.setText("2: " + formatWeaponWithAmmoCount(e, secondary));
-            }
-            
+            String[] dice = e.getDamageDice();
+            String[] baseDice = e.getBaseDamageDice();
+            if (tier1Label != null) tier1Label.setText(dice[0] != null ? dice[0] : "--");
+            if (tier2Label != null) tier2Label.setText(dice[1] != null ? dice[1] : "--");
+            if (tier3Label != null) tier3Label.setText(dice[2] != null ? dice[2] : "--");
+            styleAdjustedDie(tier1Label, dice[0], baseDice[0]);
+            styleAdjustedDie(tier2Label, dice[1], baseDice[1]);
+            styleAdjustedDie(tier3Label, dice[2], baseDice[2]);
+
             // Update health bar
             int maxHP = e.getCharSheet().getTotalHP();
             int currentHP = e.getCharSheet().getCurrentHP();
             healthBar.setProgress(maxHP > 0 ? (double) currentHP / maxHP : 0);
             healthTextLabel.setText(currentHP + " / " + maxHP);
-            
+
             boolean canAct = e.isParty() && battleState.isBattleStarted();
             moveBtn.setDisable(!canAct);
             attackBtn.setDisable(!canAct);
@@ -628,19 +732,27 @@ public class BattleView {
             pickupBtn.setDisable(!canAct);
         } else if (obj instanceof Enemy en) {
             if (selectedLabel != null) selectedLabel.setText(en.getName());
-            if (strLabel != null) strLabel.setText("STR: --");
-            if (dexLabel != null) dexLabel.setText("DEX: --");
-            if (intLabel != null) intLabel.setText("INT: --");
+            styleAdjustedValue(dexLabel, en.getDexAdjustment());
+            styleAdjustedValue(acLabel, en.getAcAdjustment());
+            if (dexLabel != null) dexLabel.setText(String.valueOf(en.getAdjustedDexterity()));
             if (mobLabel != null) mobLabel.setText("MOB: " + en.getMovement());
+            if (acLabel != null) acLabel.setText(String.valueOf(en.getAC()));
             if (primaryLabel != null) primaryLabel.setText("ATK: " + en.getAttackModifier());
-            if (secondaryLabel != null) secondaryLabel.setText("");
-            
+            String[] dice = en.getDamageDice();
+            String[] baseDice = en.getBaseDamageDice();
+            if (tier1Label != null) tier1Label.setText(dice[0] != null ? dice[0] : "--");
+            if (tier2Label != null) tier2Label.setText(dice[1] != null ? dice[1] : "--");
+            if (tier3Label != null) tier3Label.setText(dice[2] != null ? dice[2] : "--");
+            styleAdjustedDie(tier1Label, dice[0], baseDice[0]);
+            styleAdjustedDie(tier2Label, dice[1], baseDice[1]);
+            styleAdjustedDie(tier3Label, dice[2], baseDice[2]);
+
             // Update health bar for enemy
             int maxHP = en.getMaxHealth();
             int currentHP = en.getHealth();
             healthBar.setProgress(maxHP > 0 ? (double) currentHP / maxHP : 0);
             healthTextLabel.setText(currentHP + " / " + maxHP);
-            
+
             boolean canAct = battleState.isBattleStarted();
             moveBtn.setDisable(!canAct);
             attackBtn.setDisable(!canAct);
@@ -648,11 +760,37 @@ public class BattleView {
             swapBtn.setDisable(true);
             pickupBtn.setDisable(true);
         }
-        
+
         // Keep focus on grid canvas for keyboard shortcuts
         if (obj != null) {
             gridCanvas.requestFocus();
         }
+    }
+
+    /**
+     * Color a stat value label green if it's been temporarily boosted, red if reduced,
+     * or the default white if unchanged from its base value.
+     */
+    private void styleAdjustedValue(Label label, int adjustment) {
+        if (label == null) return;
+        String color = adjustment > 0 ? "#4CAF50" : adjustment < 0 ? "#F44336" : "#ffffff";
+        label.setStyle("-fx-font-size: 12px; -fx-text-fill: " + color + ";");
+    }
+
+    /**
+     * Color a damage-dice tier label green if it's been temporarily bumped up the d4..d20
+     * progression, red if bumped down, or the default white if unchanged from the weapon's die.
+     */
+    private void styleAdjustedDie(Label label, String currentDie, String baseDie) {
+        if (label == null) return;
+        int diceIndexDelta = diceIndex(currentDie) - diceIndex(baseDie);
+        String color = diceIndexDelta > 0 ? "#4CAF50" : diceIndexDelta < 0 ? "#F44336" : "#ffffff";
+        label.setStyle("-fx-font-size: 12px; -fx-text-fill: " + color + ";");
+    }
+
+    private int diceIndex(String die) {
+        int index = java.util.Arrays.asList(DICE_PROGRESSION).indexOf(die);
+        return index < 0 ? 0 : index;
     }
 
     /**
@@ -695,6 +833,67 @@ public class BattleView {
             int newHP = Math.max(0, Math.min(maxHP, currentHP + delta));
             en.setHealth(newHP);
             gridCanvas.redraw();
+            updateSelectedEntity(en);
+        }
+    }
+
+    /**
+     * Temporarily adjust the selected entity's/enemy's AC for this battle only.
+     * Not persisted - it lives on the in-battle instance and resets next battle.
+     */
+    private void adjustAC(int delta) {
+        if (selectedEntity == null) return;
+
+        if (selectedEntity instanceof Entity e) {
+            e.adjustAC(delta);
+            updateSelectedEntity(e);
+        } else if (selectedEntity instanceof Enemy en) {
+            en.adjustAC(delta);
+            updateSelectedEntity(en);
+        }
+    }
+
+    /**
+     * Temporarily adjust one of the selected entity's/enemy's basic stats for this battle only.
+     * Not persisted - it lives on the in-battle instance and resets next battle. Enemies only
+     * have a real Dexterity stat, so any other index is a no-op for them (their rows are hidden).
+     */
+    private void adjustStat(int attributeIndex, int delta) {
+        if (selectedEntity == null) return;
+
+        if (selectedEntity instanceof Entity e) {
+            e.adjustStat(attributeIndex, delta);
+            updateSelectedEntity(e);
+        } else if (selectedEntity instanceof Enemy en && attributeIndex == CharSheet.DEXTERITY) {
+            en.adjustDexterity(delta);
+            updateSelectedEntity(en);
+        }
+    }
+
+    private static final String[] DICE_PROGRESSION = {"d4", "d6", "d8", "d10", "d12", "d20"};
+
+    /**
+     * Step a die one size up or down the d4..d20 progression, clamped at both ends.
+     */
+    private String cycleDie(String currentDie, int direction) {
+        int newIndex = Math.max(0, Math.min(DICE_PROGRESSION.length - 1, diceIndex(currentDie) + direction));
+        return DICE_PROGRESSION[newIndex];
+    }
+
+    /**
+     * Temporarily override one damage-dice tier for this battle only.
+     * Not persisted - it lives on the in-battle instance and resets next battle.
+     */
+    private void adjustDice(int tier, int direction) {
+        if (selectedEntity == null) return;
+
+        if (selectedEntity instanceof Entity e) {
+            String currentDie = e.getDamageDice()[tier];
+            e.setDiceOverride(tier, cycleDie(currentDie, direction));
+            updateSelectedEntity(e);
+        } else if (selectedEntity instanceof Enemy en) {
+            String currentDie = en.getDamageDice()[tier];
+            en.setDiceOverride(tier, cycleDie(currentDie, direction));
             updateSelectedEntity(en);
         }
     }

@@ -1,0 +1,21 @@
+{
+  "name": "Spliced Hound",
+  "health": 22,
+  "maxHealth": 22,
+  "mobility": 5,
+  "armorClass": 13,
+  "attackModifier": 0,
+  "damageDice": [
+    "d8",
+    "d6",
+    "d8"
+  ],
+  "initiative": 7,
+  "dexterity": 7,
+  "color": "#FF6666",
+  "instanceNumber": 0,
+  "baseName": "Spliced Hound",
+  "attackDamage": 0,
+  "row": 0,
+  "col": 0
+}
