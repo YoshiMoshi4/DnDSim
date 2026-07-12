@@ -827,20 +827,8 @@ public class BattleGridCanvas extends Pane {
                 startDiceRollAttack(attackingEntity, targetEnemy);
                 return;
             } else if (clicked instanceof TerrainObject terrain) {
-                // Terrain attacks still use direct damage (no AC)
-                Entity attacker = attackingEntity;
-                int damage = attacker.getAttackDamage();
-                terrain.takeDamage(damage);
-                combatLogPane.logTerrainDamage(attacker.getName(), damage, terrain.getHealth());
-                if (terrain.isDestroyed()) {
-                    grid.removeDestroyedTerrain();
-                    combatLogPane.logTerrainDestroyed();
-                }
-                attackMode = false;
-                attackingEntity = null;
-                selectedObject = attacker;
-                redraw();
-                battleView.updateSelectedEntity(attacker);
+                // Start dice roll sequence for Entity attacking Terrain
+                startDiceRollAttack(attackingEntity, terrain);
                 return;
             } else if (clicked == null) {
                 Entity attacker = attackingEntity;
@@ -864,20 +852,8 @@ public class BattleGridCanvas extends Pane {
                 startDiceRollAttack(attackingEnemy, targetEnemy);
                 return;
             } else if (clicked instanceof TerrainObject terrain) {
-                // Terrain attacks still use direct damage (no AC)
-                Enemy attacker = attackingEnemy;
-                int damage = attacker.getAttackDamage();
-                terrain.takeDamage(damage);
-                combatLogPane.logTerrainDamage(attacker.getName(), damage, terrain.getHealth());
-                if (terrain.isDestroyed()) {
-                    grid.removeDestroyedTerrain();
-                    combatLogPane.logTerrainDestroyed();
-                }
-                attackMode = false;
-                attackingEnemy = null;
-                selectedObject = attacker;
-                redraw();
-                battleView.updateSelectedEntity(attacker);
+                // Start dice roll sequence for Enemy attacking Terrain
+                startDiceRollAttack(attackingEnemy, terrain);
                 return;
             } else if (clicked == null) {
                 Enemy attacker = attackingEnemy;
@@ -940,16 +916,22 @@ public class BattleGridCanvas extends Pane {
                 if (target instanceof Entity e) {
                     grid.removeEntity(e);
                     turnManager.removeEntity(e);
+                    combatLogPane.logDefeat(CombatManager.getTargetName(target));
                 } else if (target instanceof Enemy en) {
                     grid.removeEnemy(en);
                     turnManager.removeEnemy(en);
                     battleView.getBattleState().incrementEnemiesDefeated();
+                    combatLogPane.logDefeat(CombatManager.getTargetName(target));
+                } else if (target instanceof TerrainObject) {
+                    grid.removeDestroyedTerrain();
+                    combatLogPane.logTerrainDestroyed();
                 }
-                combatLogPane.logDefeat(CombatManager.getTargetName(target));
             }
-            
-            // Update stats
-            battleView.getBattleState().addDamageDealt(outcome.totalDamage);
+
+            // Update stats (terrain damage doesn't count toward battle stats)
+            if (!(target instanceof TerrainObject)) {
+                battleView.getBattleState().addDamageDealt(outcome.totalDamage);
+            }
             if (target instanceof Entity) {
                 battleView.getBattleState().addDamageTaken(outcome.totalDamage);
             }

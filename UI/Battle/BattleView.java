@@ -1605,7 +1605,7 @@ public class BattleView {
                 }
                 btn.setOnAction(e -> {
                     startObjectPlacement(
-                        () -> new TerrainObject(0, 0, terrain.getType(), terrain.getHealth()),
+                        () -> new TerrainObject(terrain),
                         key,
                         terrain.getType()
                     );

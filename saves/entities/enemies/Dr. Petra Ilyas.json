@@ -1,14 +1,14 @@
 {
   "name": "Dr. Petra Ilyas",
-  "health": 20,
-  "maxHealth": 20,
+  "health": 25,
+  "maxHealth": 25,
   "mobility": 4,
   "armorClass": 11,
   "attackModifier": 0,
   "damageDice": [
     "d4",
     "d4",
-    "d6"
+    "d4"
   ],
   "initiative": 6,
   "dexterity": 6,

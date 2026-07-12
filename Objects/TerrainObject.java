@@ -41,6 +41,14 @@ public class TerrainObject extends GridObject {
         this.color = ColorUtils.fromLegacyIndex(8);
     }
 
+    /**
+     * Copy constructor - used when placing a fresh instance of a terrain template.
+     */
+    public TerrainObject(TerrainObject other) {
+        this(other.row, other.col, other.type, other.health, other.color, other.blocksMovement);
+        this.spritePath = other.spritePath;
+    }
+
     public int getHealth() {
         return health;
     }

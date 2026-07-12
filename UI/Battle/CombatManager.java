@@ -6,6 +6,7 @@ import EntityRes.Weapon;
 import Objects.Entity;
 import Objects.Enemy;
 import Objects.GridObject;
+import Objects.TerrainObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -154,13 +155,15 @@ public class CombatManager {
     }
     
     /**
-     * Get AC for a target (Entity or Enemy)
+     * Get AC for a target (Entity, Enemy, or Terrain)
      */
     public static int getTargetAC(GridObject target) {
         if (target instanceof Entity e) {
             return e.getAC();
         } else if (target instanceof Enemy en) {
             return en.getAC();
+        } else if (target instanceof TerrainObject) {
+            return 10; // Stationary object - flat AC
         }
         return 10; // Default AC
     }
@@ -197,6 +200,8 @@ public class CombatManager {
             return e.getName();
         } else if (target instanceof Enemy en) {
             return en.getName();
+        } else if (target instanceof TerrainObject t) {
+            return t.getType();
         }
         return "Unknown";
     }
@@ -209,6 +214,8 @@ public class CombatManager {
             e.takeDamage(damage);
         } else if (target instanceof Enemy en) {
             en.takeDamage(damage);
+        } else if (target instanceof TerrainObject t) {
+            t.takeDamage(damage);
         }
     }
     
@@ -220,6 +227,8 @@ public class CombatManager {
             return e.isDead();
         } else if (target instanceof Enemy en) {
             return en.isDead();
+        } else if (target instanceof TerrainObject t) {
+            return t.isDestroyed();
         }
         return false;
     }
@@ -232,6 +241,8 @@ public class CombatManager {
             return e.getHealth();
         } else if (target instanceof Enemy en) {
             return en.getHealth();
+        } else if (target instanceof TerrainObject t) {
+            return t.getHealth();
         }
         return 0;
     }

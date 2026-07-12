@@ -218,13 +218,6 @@ public class CombatLogPane extends VBox {
     }
 
     /**
-     * Logs terrain damage.
-     */
-    public void logTerrainDamage(String attacker, int damage, int remainingHp) {
-        log(String.format("🪨 %s hits terrain for %d [%d HP left]", attacker, damage, remainingHp), LogType.ATTACK);
-    }
-
-    /**
      * Logs terrain destruction.
      */
     public void logTerrainDestroyed() {

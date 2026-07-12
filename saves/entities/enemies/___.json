@@ -3,7 +3,7 @@
   "health": 55,
   "maxHealth": 55,
   "mobility": 4,
-  "armorClass": 12,
+  "armorClass": 13,
   "attackModifier": 0,
   "damageDice": [
     "d8",
@@ -12,7 +12,7 @@
   ],
   "initiative": 6,
   "dexterity": 6,
-  "color": "#000000",
+  "color": "#943B3B",
   "instanceNumber": 0,
   "baseName": "???",
   "attackDamage": 0,

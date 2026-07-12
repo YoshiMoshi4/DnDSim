@@ -36,10 +36,10 @@ public class Entity extends GridObject {
     
     /**
      * Get Armor Class for attack roll calculations
-     * AC is based on total defense from equipped armor
+     * Base AC from the character sheet (default 10) + total defense from equipped armor
      */
     public int getAC() {
-        return 10 + charSheet.getTotalDefense() + acAdjustment;  // Base AC 10 + armor bonus + temporary adjustment
+        return charSheet.getArmorClass() + charSheet.getTotalDefense() + acAdjustment;
     }
 
     public int getAcAdjustment() {
