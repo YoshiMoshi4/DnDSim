@@ -10,8 +10,6 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
 import javafx.util.StringConverter;
 
@@ -64,7 +62,7 @@ public class FormUtils {
         spinnerBox.getStyleClass().add("styled-spinner");
         
         Button decrementBtn = new Button();
-        decrementBtn.setGraphic(createMinusIcon());
+        decrementBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.MINUS, 12, "#ffffff"));
         decrementBtn.getStyleClass().addAll("spinner-button", "spinner-decrement");
         decrementBtn.setMinSize(28, 28);
         decrementBtn.setMaxSize(28, 28);
@@ -77,7 +75,7 @@ public class FormUtils {
         valueField.setMaxWidth(60);
         
         Button incrementBtn = new Button();
-        incrementBtn.setGraphic(createPlusIcon());
+        incrementBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.PLUS, 12, "#ffffff"));
         incrementBtn.getStyleClass().addAll("spinner-button", "spinner-increment");
         incrementBtn.setMinSize(28, 28);
         incrementBtn.setMaxSize(28, 28);
@@ -467,30 +465,6 @@ public class FormUtils {
         pulse.setCycleCount(2);
         pulse.setAutoReverse(true);
         pulse.play();
-    }
-    
-    // ==================== ICONS ====================
-    
-    private static Node createPlusIcon() {
-        SVGPath svg = new SVGPath();
-        svg.setContent("M12 4v16m-8-8h16");
-        svg.setFill(Color.TRANSPARENT);
-        svg.setStroke(Color.web("#fff"));
-        svg.setStrokeWidth(2);
-        svg.setScaleX(0.5);
-        svg.setScaleY(0.5);
-        return svg;
-    }
-    
-    private static Node createMinusIcon() {
-        SVGPath svg = new SVGPath();
-        svg.setContent("M4 12h16");
-        svg.setFill(Color.TRANSPARENT);
-        svg.setStroke(Color.web("#fff"));
-        svg.setStrokeWidth(2);
-        svg.setScaleX(0.5);
-        svg.setScaleY(0.5);
-        return svg;
     }
     
     // Platform import for runLater

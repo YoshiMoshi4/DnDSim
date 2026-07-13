@@ -9,16 +9,20 @@ import UI.SpriteUtils;
 import javafx.animation.*;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextFormatter;
 import javafx.scene.control.Tooltip;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.util.Duration;
 
 import java.util.HashMap;
@@ -29,10 +33,14 @@ import java.util.function.Consumer;
 
 public class TimelinePane extends HBox {
 
+    private static final int PORTRAIT_SIZE = 44;
+    private static final int RING_SIZE = 50;
+
     private final TurnManager turnManager;
     private final Label roundLabel;
     private final VBox roundBox;
     private final HBox entitiesBox;
+    private final ScrollPane entitiesScroll;
     private javafx.scene.Node battleControls;
     private final Map<GridObject, VBox> combatantBoxes = new HashMap<>();
     private final Map<GridObject, javafx.scene.control.ProgressBar> hpBars = new HashMap<>();
@@ -49,9 +57,9 @@ public class TimelinePane extends HBox {
         setSpacing(15);
         setPadding(new Insets(10));
         setAlignment(Pos.CENTER_LEFT);
-        setPrefHeight(110);
-        setMinHeight(110);
-        setMaxHeight(110);
+        setPrefHeight(136);
+        setMinHeight(136);
+        setMaxHeight(136);
 
         // Left column: round label with the battle controls slot below it
         HBox labelRow = new HBox(8);
@@ -69,14 +77,44 @@ public class TimelinePane extends HBox {
         roundBox.setPrefWidth(160);
         roundBox.getChildren().add(labelRow);
 
-        // Entities container
-        entitiesBox = new HBox(5);
+        // Entities container, wrapped in a scroll pane so a long roster or
+        // long names scroll (mouse wheel) instead of clipping past the window
+        entitiesBox = new HBox(9);
         entitiesBox.setAlignment(Pos.CENTER_LEFT);
-        HBox.setHgrow(entitiesBox, Priority.ALWAYS);
 
-        getChildren().addAll(roundBox, entitiesBox);
+        entitiesScroll = new ScrollPane(entitiesBox);
+        entitiesScroll.setFitToHeight(true);
+        entitiesScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        entitiesScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        entitiesScroll.setPannable(true);
+        entitiesScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        entitiesScroll.setOnScroll(e -> {
+            double overflow = entitiesBox.getWidth() - entitiesScroll.getViewportBounds().getWidth();
+            if (overflow > 0) {
+                entitiesScroll.setHvalue(Math.max(0, Math.min(1,
+                    entitiesScroll.getHvalue() - e.getDeltaY() / overflow)));
+                e.consume();
+            }
+        });
+        HBox.setHgrow(entitiesScroll, Priority.ALWAYS);
+
+        getChildren().addAll(roundBox, entitiesScroll);
 
         refresh();
+    }
+
+    /** A portrait centered inside a colored faction ring (green party / red enemy). */
+    private StackPane wrapPortrait(Node portrait, String ringColorHex) {
+        Circle ring = new Circle(RING_SIZE / 2.0);
+        ring.setFill(Color.TRANSPARENT);
+        ring.setStroke(Color.web(ringColorHex));
+        ring.setStrokeWidth(2.5);
+
+        StackPane wrap = new StackPane(ring, portrait);
+        wrap.setPrefSize(RING_SIZE, RING_SIZE);
+        wrap.setMinSize(RING_SIZE, RING_SIZE);
+        wrap.setMaxSize(RING_SIZE, RING_SIZE);
+        return wrap;
     }
 
     /**
@@ -124,23 +162,22 @@ public class TimelinePane extends HBox {
         cancelBtn.setOnAction(e -> onCancel.run());
 
         for (Entity member : partyMembers) {
-            VBox box = new VBox(3);
+            VBox box = new VBox(4);
             box.setAlignment(Pos.CENTER);
-            box.setPrefWidth(90);
-            box.setMinWidth(70);
-            box.setMaxWidth(110);
-            box.setPadding(new Insets(6));
+            box.setMinWidth(64);
+            box.setPadding(new Insets(8));
             box.getStyleClass().add("timeline-entity");
 
-            box.getChildren().add(SpriteUtils.createCharacterSprite(member.getCharSheet(), 28));
+            box.getChildren().add(wrapPortrait(
+                SpriteUtils.createCharacterSprite(member.getCharSheet(), PORTRAIT_SIZE), "#4CAF50"));
 
-            Label nameLabel = new Label(truncateName(member.getName(), 10));
-            nameLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #dcdcdc;");
+            Label nameLabel = new Label(member.getName());
+            nameLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #dcdcdc; -fx-font-weight: bold;");
             box.getChildren().add(nameLabel);
 
             TextField field = new TextField();
-            field.setPrefWidth(44);
-            field.setMaxWidth(44);
+            field.setPrefWidth(48);
+            field.setMaxWidth(48);
             field.setPromptText("d20");
             field.getStyleClass().add("timeline-init-field");
             field.setTextFormatter(new TextFormatter<>(change ->
@@ -379,14 +416,11 @@ public class TimelinePane extends HBox {
     }
 
     private VBox createCombatantBox(GridObject combatant, boolean isCurrent) {
-        VBox box = new VBox(3);
+        VBox box = new VBox(4);
         box.setAlignment(Pos.CENTER);
-        box.setPrefWidth(90);
-        box.setMinWidth(70);
-        box.setMaxWidth(110);
-        box.setPrefHeight(55);
-        box.setPadding(new Insets(6));
-        
+        box.setMinWidth(64);
+        box.setPadding(new Insets(8));
+
         if (isCurrent) {
             box.getStyleClass().addAll("timeline-entity", "timeline-entity-current");
         } else {
@@ -394,32 +428,36 @@ public class TimelinePane extends HBox {
         }
 
         String name;
-        javafx.scene.Node portrait;
+        Node portrait;
+        String ringColor;
         boolean hasHp = true;
         if (combatant instanceof Entity e) {
             name = e.getName();
-            portrait = SpriteUtils.createCharacterSprite(e.getCharSheet(), 28);
+            portrait = SpriteUtils.createCharacterSprite(e.getCharSheet(), PORTRAIT_SIZE);
+            ringColor = "#4CAF50";
         } else if (combatant instanceof Enemy en) {
             name = en.getName();
-            portrait = SpriteUtils.createEnemySprite(en, 28);
+            portrait = SpriteUtils.createEnemySprite(en, PORTRAIT_SIZE);
+            ringColor = "#d75f5f";
         } else {
             name = "Unknown";
-            portrait = IconUtils.createIcon(IconUtils.Icon.SKULL, 16, "#d75f5f");
+            portrait = IconUtils.createIcon(IconUtils.Icon.SKULL, 24, "#808080");
+            ringColor = "#808080";
             hasHp = false;
         }
-        box.getChildren().add(portrait);
+        box.getChildren().add(wrapPortrait(portrait, ringColor));
 
-        Label nameLabel = new Label(truncateName(name, 10));
-        nameLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #dcdcdc;");
+        Label nameLabel = new Label(name);
+        nameLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #dcdcdc; -fx-font-weight: bold;");
 
         box.getChildren().add(nameLabel);
 
         // Mini HP readout, values filled in by refreshHp()
         if (hasHp) {
             javafx.scene.control.ProgressBar hpBar = new javafx.scene.control.ProgressBar(1);
-            hpBar.setPrefSize(64, 6);
-            hpBar.setMinHeight(6);
-            hpBar.setMaxHeight(6);
+            hpBar.setPrefSize(70, 7);
+            hpBar.setMinHeight(7);
+            hpBar.setMaxHeight(7);
             hpBar.getStyleClass().add("hp-bar");
             Label hpText = new Label();
             hpText.setStyle("-fx-font-size: 9px; -fx-text-fill: #b8b8c0;");
@@ -454,8 +492,4 @@ public class TimelinePane extends HBox {
         return box;
     }
 
-    private String truncateName(String name, int maxLen) {
-        if (name.length() <= maxLen) return name;
-        return name.substring(0, maxLen - 3) + "...";
-    }
 }

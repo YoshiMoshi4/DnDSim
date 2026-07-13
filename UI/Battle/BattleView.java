@@ -16,6 +16,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.util.Duration;
 
 import java.util.*;
@@ -129,7 +130,9 @@ public class BattleView {
         diceRollPanel.setManaged(false);
 
         battleTabBtn = new ToggleButton("Battle");
+        battleTabBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.SWORDS));
         manageTabBtn = new ToggleButton("Manage");
+        manageTabBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.GEAR));
         ToggleGroup sidebarTabs = new ToggleGroup();
         for (ToggleButton tab : new ToggleButton[]{battleTabBtn, manageTabBtn}) {
             tab.getStyleClass().add("hotbar-tab");
@@ -397,6 +400,13 @@ public class BattleView {
         hotbarTabs = new ToggleGroup();
         for (String category : new String[]{"Party", "Enemies", "Terrain", "Pickups"}) {
             ToggleButton tab = new ToggleButton(category);
+            IconUtils.Icon categoryIcon = switch (category) {
+                case "Party" -> IconUtils.Icon.PARTY;
+                case "Enemies" -> IconUtils.Icon.SKULL;
+                case "Terrain" -> IconUtils.Icon.MAP;
+                default -> IconUtils.Icon.CHEST;
+            };
+            tab.setGraphic(IconUtils.smallIcon(categoryIcon));
             tab.getStyleClass().add("hotbar-tab");
             tab.setUserData(category.toLowerCase());
             tab.setToggleGroup(hotbarTabs);
@@ -506,8 +516,9 @@ public class BattleView {
         HBox healthRow = new HBox(5);
         healthRow.setAlignment(Pos.CENTER_LEFT);
 
-        Button healthMinusBtn = new Button("-");
-        healthMinusBtn.setStyle("-fx-min-width: 25px; -fx-min-height: 20px; -fx-font-size: 12px;");
+        Button healthMinusBtn = new Button();
+        healthMinusBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.MINUS, 12, "#dcdcdc"));
+        healthMinusBtn.setStyle("-fx-min-width: 25px; -fx-min-height: 20px;");
         healthMinusBtn.setOnAction(e -> adjustHealth(-1));
 
         StackPane healthPane = new StackPane();
@@ -523,8 +534,9 @@ public class BattleView {
 
         healthPane.getChildren().addAll(healthBar, healthTextLabel);
 
-        Button healthPlusBtn = new Button("+");
-        healthPlusBtn.setStyle("-fx-min-width: 25px; -fx-min-height: 20px; -fx-font-size: 12px;");
+        Button healthPlusBtn = new Button();
+        healthPlusBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.PLUS, 12, "#dcdcdc"));
+        healthPlusBtn.setStyle("-fx-min-width: 25px; -fx-min-height: 20px;");
         healthPlusBtn.setOnAction(e -> adjustHealth(1));
 
         healthRow.getChildren().addAll(healthMinusBtn, healthPane, healthPlusBtn);
@@ -630,7 +642,8 @@ public class BattleView {
         abbrevLabel.setMinWidth(30);
         abbrevLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: " + colorHex + ";");
 
-        Button minusBtn = new Button("−");
+        Button minusBtn = new Button();
+        minusBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.MINUS, 10, "#dcdcdc"));
         minusBtn.getStyleClass().addAll("spinner-button", "spinner-decrement");
         minusBtn.setMinSize(20, 20);
         minusBtn.setMaxSize(20, 20);
@@ -643,7 +656,8 @@ public class BattleView {
         valueLabel.setAlignment(Pos.CENTER);
         valueLabel.setStyle("-fx-font-size: 12px;");
 
-        Button plusBtn = new Button("+");
+        Button plusBtn = new Button();
+        plusBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.PLUS, 10, "#dcdcdc"));
         plusBtn.getStyleClass().addAll("spinner-button", "spinner-increment");
         plusBtn.setMinSize(20, 20);
         plusBtn.setMaxSize(20, 20);
@@ -1055,6 +1069,8 @@ public class BattleView {
         // Board theme picker (live switch)
         Label themeLabel = new Label("Board Theme");
         themeLabel.getStyleClass().add("label-header");
+        themeLabel.setGraphic(IconUtils.smallIcon(IconUtils.Icon.MAP));
+        themeLabel.setGraphicTextGap(6);
         ComboBox<String> themePicker = new ComboBox<>();
         themePicker.getItems().addAll(GridTheme.names());
         themePicker.setValue(gridCanvas.getTheme().name);
@@ -1296,9 +1312,12 @@ public class BattleView {
     }
 
     public void addEntity(Entity entity) {
-        turnManager.addEntity(entity);
+        int d20 = turnManager.addEntity(entity);
         if (battleState.isBattleStarted()) {
             timelinePane.refresh();
+            if (d20 > 0) {
+                showInitiativeRoll(entity, d20);
+            }
         } else {
             timelinePane.showRoster(partyOnField());
         }
@@ -1314,10 +1333,18 @@ public class BattleView {
     }
 
     public void addEnemy(Enemy enemy) {
-        turnManager.addEnemy(enemy);
+        int d20 = turnManager.addEnemy(enemy);
         if (battleState.isBattleStarted()) {
             timelinePane.refresh();
         }
+        // Enemies always roll on placement, pre-battle or not - see TurnManager.addEnemy
+        showInitiativeRoll(enemy, d20);
+    }
+
+    /** Floating "d20 N" feedback for a mid-battle initiative roll, gold on a natural 20. */
+    private void showInitiativeRoll(GridObject combatant, int d20) {
+        gridCanvas.spawnFloatingText(combatant, "d20 " + d20,
+            d20 == 20 ? Color.web("#FFD700") : Color.web("#6ec6ff"));
     }
 
     public void removeEnemy(Enemy enemy) {

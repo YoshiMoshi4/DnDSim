@@ -1171,7 +1171,8 @@ public class AssetEditorView {
         });
         
         HBox buttons = new HBox(5);
-        Button addBtn = new Button("+");
+        Button addBtn = new Button();
+        addBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.PLUS, 12, "#dcdcdc"));
         addBtn.getStyleClass().add("button");
         addBtn.setOnAction(e -> {
             showAbilityDialog(null, ability -> {
@@ -1193,7 +1194,8 @@ public class AssetEditorView {
             }
         });
         
-        Button removeBtn = new Button("-");
+        Button removeBtn = new Button();
+        removeBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.MINUS, 12, "#dcdcdc"));
         removeBtn.getStyleClass().add("button");
         removeBtn.setOnAction(e -> {
             ItemAbility selected = abilityList.getSelectionModel().getSelectedItem();

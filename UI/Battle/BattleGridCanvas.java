@@ -1381,8 +1381,11 @@ public class BattleGridCanvas extends Pane {
         return new double[]{t.fromRow + (row - t.fromRow) * p, t.fromCol + (col - t.fromCol) * p};
     }
 
-    /** Queue combat text rising from the target's tile; the render loop animates it. */
-    private void spawnFloatingText(GridObject target, String text, Color color) {
+    /**
+     * Queue combat text rising from the target's tile; the render loop animates it.
+     * Public so callers outside the canvas (e.g. mid-battle initiative rolls) can use it.
+     */
+    public void spawnFloatingText(GridObject target, String text, Color color) {
         spawnFloatingText(target.getRow(), target.getCol(), text, color);
     }
 

@@ -50,15 +50,15 @@ public class MainMenuView {
         grid.setHgap(20);
         grid.setVgap(20);
 
-        Button battleBtn = createMenuButton("Start Battle System", IconUtils.Icon.PLAY, "#b8860b");
+        Button battleBtn = createMenuButton("Start Battle System", IconUtils.Icon.SWORDS, "#b8860b");
         battleBtn.setOnAction(e -> handleBattleSystem());
         grid.add(battleBtn, 0, 0);
 
-        Button characterBtn = createMenuButton("Character Sheets", IconUtils.Icon.PERSON, "#569cd6");
+        Button characterBtn = createMenuButton("Character Sheets", IconUtils.Icon.SCRIPT, "#569cd6");
         characterBtn.setOnAction(e -> appController.navigateToCharacterSheets());
         grid.add(characterBtn, 1, 0);
 
-        Button assetBtn = createMenuButton("Asset Editor", IconUtils.Icon.GEAR, "#4ec9b0");
+        Button assetBtn = createMenuButton("Asset Editor", IconUtils.Icon.WRENCH, "#4ec9b0");
         assetBtn.setOnAction(e -> appController.navigateToAssetEditor());
         grid.add(assetBtn, 0, 1);
         GridPane.setColumnSpan(assetBtn, 2);

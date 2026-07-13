@@ -380,23 +380,19 @@ public class TurnManager {
         return round;
     }
 
-    public void addEntity(Entity entity) {
+    /**
+     * Add a party member to the battle. If the battle has already started,
+     * they immediately roll initiative and are inserted into the turn order.
+     *
+     * @return the raw d20 roll if initiative was rolled, or -1 if the battle
+     *         hasn't started yet (no roll needed)
+     */
+    public int addEntity(Entity entity) {
         turnOrder.add(entity);
         if (battleStarted) {
-            // Roll initiative for the new entity
-            int d20 = random.nextInt(20) + 1;
-            int dexMod = entity.getCharSheet().getTotalAttribute(CharSheet.DEXTERITY);
-            int total = d20 + dexMod;
-            initiativeRolls.put(entity, total);
-            rollBreakdown.put(entity, new int[]{d20, dexMod});
-            
-            // Re-sort
-            turnOrder.sort((o1, o2) -> {
-                int init1 = initiativeRolls.getOrDefault(o1, 0);
-                int init2 = initiativeRolls.getOrDefault(o2, 0);
-                return Integer.compare(init2, init1);
-            });
+            return rollAndInsert(entity, entity.getCharSheet().getTotalAttribute(CharSheet.DEXTERITY));
         }
+        return -1;
     }
 
     public void removeEntity(Entity entity) {
@@ -412,23 +408,50 @@ public class TurnManager {
         }
     }
 
-    public void addEnemy(Enemy enemy) {
+    /**
+     * Add an enemy to the battle. Always rolls a d20 immediately (unlike
+     * party members, enemies never get a manual initiative entry, so there's
+     * no reason to wait) and inserts them into the turn order. Pre-battle,
+     * this roll is just a preview for the placement floating-text feedback -
+     * calculateInitiativeOrder() rerolls and re-sorts everyone fresh at
+     * Begin Battle, so nothing about this ordering is load-bearing yet.
+     *
+     * @return the raw d20 roll, for floating-text feedback
+     */
+    public int addEnemy(Enemy enemy) {
         turnOrder.add(enemy);
-        if (battleStarted) {
-            // Roll initiative for the new enemy
-            int d20 = random.nextInt(20) + 1;
-            int dexMod = enemy.getDexterity();
-            int total = d20 + dexMod;
-            initiativeRolls.put(enemy, total);
-            rollBreakdown.put(enemy, new int[]{d20, dexMod});
-            
-            // Re-sort
-            turnOrder.sort((o1, o2) -> {
-                int init1 = initiativeRolls.getOrDefault(o1, 0);
-                int init2 = initiativeRolls.getOrDefault(o2, 0);
-                return Integer.compare(init2, init1);
-            });
+        return rollAndInsert(enemy, enemy.getDexterity());
+    }
+
+    /**
+     * Roll initiative for a combatant joining mid-battle and re-sort the
+     * turn order. The currently-acting combatant's turn is preserved by
+     * object identity, so a late roll landing ahead of them in the order
+     * doesn't skip or repeat anyone's turn - it just takes effect starting
+     * next round.
+     *
+     * @param obj already appended to turnOrder by the caller
+     * @return the raw d20 roll, for floating-text feedback
+     */
+    private int rollAndInsert(GridObject obj, int dexMod) {
+        GridObject actingCombatant = turnOrder.isEmpty() ? null
+            : turnOrder.get(Math.min(currentIndex, turnOrder.size() - 1));
+
+        int d20 = random.nextInt(20) + 1;
+        int total = d20 + dexMod;
+        initiativeRolls.put(obj, total);
+        rollBreakdown.put(obj, new int[]{d20, dexMod});
+
+        turnOrder.sort((o1, o2) -> Integer.compare(
+            initiativeRolls.getOrDefault(o2, 0), initiativeRolls.getOrDefault(o1, 0)));
+
+        if (actingCombatant != null) {
+            int idx = turnOrder.indexOf(actingCombatant);
+            if (idx >= 0) {
+                currentIndex = idx;
+            }
         }
+        return d20;
     }
 
     public void removeEnemy(Enemy enemy) {

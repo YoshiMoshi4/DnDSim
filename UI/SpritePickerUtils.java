@@ -139,8 +139,9 @@ public class SpritePickerUtils {
         });
         
         // Clear button
-        Button clearBtn = new Button("×");
-        clearBtn.setStyle("-fx-font-size: 10px; -fx-padding: 3 6; -fx-text-fill: #ff6b6b;");
+        Button clearBtn = new Button();
+        clearBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.CLOSE, 10, "#ff6b6b"));
+        clearBtn.setStyle("-fx-padding: 3 6;");
         clearBtn.setOnAction(e -> {
             pathField.setText("");
             updatePreview(previewContainer, null, colorHex, isParty);
@@ -343,8 +344,9 @@ public class SpritePickerUtils {
         });
         
         // Clear button
-        Button clearBtn = new Button("×");
-        clearBtn.setStyle("-fx-padding: 2 4; -fx-text-fill: #ff6b6b;");
+        Button clearBtn = new Button();
+        clearBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.CLOSE, 10, "#ff6b6b"));
+        clearBtn.setStyle("-fx-padding: 2 4;");
         clearBtn.setOnAction(e -> {
             pathField.setText("");
             updateCompactPreview(previewContainer, null, colorHex, isParty);

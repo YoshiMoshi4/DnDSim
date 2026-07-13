@@ -1,0 +1,3 @@
+# Compiled bytecode - never commit build output
+*.class
+/bin/

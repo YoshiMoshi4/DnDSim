@@ -3,7 +3,11 @@ package UI;
 import javafx.animation.*;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
@@ -68,6 +72,10 @@ public class NotificationPane extends StackPane {
      * Shows a toast notification with custom duration.
      */
     public void showToast(String message, ToastType type, Duration duration) {
+        showToast(message, type, duration, null);
+    }
+
+    private void showToast(String message, ToastType type, Duration duration, IconUtils.Icon icon) {
         // Remove oldest toast if at max
         while (toastContainer.getChildren().size() >= MAX_TOASTS) {
             if (!toastContainer.getChildren().isEmpty()) {
@@ -75,7 +83,7 @@ public class NotificationPane extends StackPane {
             }
         }
 
-        Label toast = createToast(message, type);
+        Node toast = createToast(message, type, icon);
         toastContainer.getChildren().add(toast);
 
         // Animate in
@@ -108,25 +116,25 @@ public class NotificationPane extends StackPane {
      */
     public void showAttackResult(String attacker, String target, int damage, int remainingHp, int maxHp) {
         String hpPercent = String.format("%.0f%%", (remainingHp / (double) maxHp) * 100);
-        String message = String.format("⚔ %s → %s: %d damage (%s HP)", attacker, target, damage, hpPercent);
-        
-        ToastType type = remainingHp <= 0 ? ToastType.DANGER : 
+        String message = String.format("%s -> %s: %d damage (%s HP)", attacker, target, damage, hpPercent);
+
+        ToastType type = remainingHp <= 0 ? ToastType.DANGER :
                          remainingHp < maxHp * 0.25 ? ToastType.WARNING : ToastType.COMBAT;
-        showToast(message, type);
+        showToast(message, type, TOAST_DURATION, IconUtils.Icon.SWORDS);
     }
 
     /**
      * Shows a defeat notification.
      */
     public void showDefeat(String name) {
-        showToast("💀 " + name + " has been defeated!", ToastType.DANGER);
+        showToast(name + " has been defeated!", ToastType.DANGER, TOAST_DURATION, IconUtils.Icon.SKULL);
     }
 
     /**
      * Shows a heal notification.
      */
     public void showHeal(String name, int amount) {
-        showToast("💚 " + name + " healed " + amount + " HP!", ToastType.SUCCESS);
+        showToast(name + " healed " + amount + " HP!", ToastType.SUCCESS, TOAST_DURATION, IconUtils.Icon.HEART);
     }
 
     /**
@@ -136,26 +144,36 @@ public class NotificationPane extends StackPane {
         showToast(message, ToastType.INFO, Duration.seconds(2));
     }
 
-    private Label createToast(String message, ToastType type) {
-        Label toast = new Label(message);
-        toast.setWrapText(true);
+    private Node createToast(String message, ToastType type, IconUtils.Icon icon) {
+        Label textLabel = new Label(message);
+        textLabel.setWrapText(true);
+        textLabel.setStyle("-fx-text-fill: #dcdcdc; -fx-font-size: 13px;");
+
+        Region toast;
+        if (icon != null) {
+            HBox row = new HBox(10, IconUtils.createIcon(icon, 18, type.getColor()), textLabel);
+            row.setAlignment(Pos.CENTER_LEFT);
+            HBox.setHgrow(textLabel, Priority.ALWAYS);
+            toast = row;
+        } else {
+            toast = textLabel;
+        }
+
         toast.setMaxWidth(380);
         toast.setPadding(new Insets(12, 20, 12, 20));
-        toast.setStyle(String.format(
+        toast.setStyle(toast.getStyle() + String.format(
             "-fx-background-color: #2d2d30;" +
             "-fx-background-radius: 8;" +
             "-fx-border-color: %s;" +
             "-fx-border-width: 0 0 0 4;" +
             "-fx-border-radius: 8 0 0 8;" +
-            "-fx-text-fill: #dcdcdc;" +
-            "-fx-font-size: 13px;" +
             "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.4), 10, 0, 2, 2);",
             type.getColor()
         ));
         return toast;
     }
 
-    private void dismissToast(Label toast) {
+    private void dismissToast(Node toast) {
         FadeTransition fade = new FadeTransition(FADE_DURATION, toast);
         fade.setToValue(0);
         
@@ -167,14 +185,14 @@ public class NotificationPane extends StackPane {
         dismissAnim.play();
     }
 
-    private FadeTransition createFadeIn(Label toast) {
+    private FadeTransition createFadeIn(Node toast) {
         FadeTransition fade = new FadeTransition(FADE_DURATION, toast);
         fade.setFromValue(0);
         fade.setToValue(1);
         return fade;
     }
 
-    private TranslateTransition createSlideDown(Label toast) {
+    private TranslateTransition createSlideDown(Node toast) {
         TranslateTransition slide = new TranslateTransition(FADE_DURATION, toast);
         slide.setFromY(-20);
         slide.setToY(0);

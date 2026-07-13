@@ -225,9 +225,10 @@ public class CharacterSheetView {
         titleLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #4CAF50;");
         HBox.setHgrow(titleLabel, Priority.ALWAYS);
         
-        Button closeBtn = new Button("X");
+        Button closeBtn = new Button();
+        closeBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.CLOSE, 14, "#dcdcdc"));
         closeBtn.getStyleClass().add("button");
-        closeBtn.setStyle("-fx-font-size: 14px; -fx-min-width: 30; -fx-min-height: 30;");
+        closeBtn.setStyle("-fx-min-width: 30; -fx-min-height: 30;");
         closeBtn.setOnAction(e -> hidePartyPopup());
         
         header.getChildren().addAll(titleLabel, closeBtn);

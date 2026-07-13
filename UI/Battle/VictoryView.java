@@ -108,29 +108,35 @@ public class VictoryView extends StackPane {
             "-fx-text-fill: linear-gradient(to bottom, #FFD700, #FFA500); " +
             "-fx-font-family: 'Segoe UI', sans-serif;"
         );
-        
+
         // Golden glow effect
         DropShadow glow = new DropShadow();
         glow.setColor(Color.web("#FFD700"));
         glow.setRadius(20);
         glow.setSpread(0.4);
-        
+
         Glow innerGlow = new Glow(0.6);
         innerGlow.setInput(glow);
         title.setEffect(innerGlow);
-        
+
         // Subtle pulsing animation
         Timeline pulse = new Timeline(
-            new KeyFrame(Duration.ZERO, 
+            new KeyFrame(Duration.ZERO,
                 new KeyValue(glow.radiusProperty(), 20)),
-            new KeyFrame(Duration.millis(1000), 
+            new KeyFrame(Duration.millis(1000),
                 new KeyValue(glow.radiusProperty(), 30))
         );
         pulse.setAutoReverse(true);
         pulse.setCycleCount(Animation.INDEFINITE);
         pulse.play();
-        
-        contentBox.getChildren().add(title);
+
+        // Gold shield flourishes flanking the title
+        Node leftShield = IconUtils.createIcon(IconUtils.Icon.SHIELD, 32, "#FFD700");
+        Node rightShield = IconUtils.createIcon(IconUtils.Icon.SHIELD, 32, "#FFD700");
+        HBox titleRow = new HBox(16, leftShield, title, rightShield);
+        titleRow.setAlignment(Pos.CENTER);
+
+        contentBox.getChildren().add(titleRow);
     }
 
     private void createLatinQuote() {

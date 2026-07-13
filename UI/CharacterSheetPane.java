@@ -532,13 +532,14 @@ public class CharacterSheetPane extends BorderPane {
             private final Label descLabel = new Label();
             private final Label triggerLabel = new Label();
             private final Region spacer = new Region();
-            private final Button removeBtn = new Button("×");
-            
+            private final Button removeBtn = new Button();
+
             {
+                removeBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.CLOSE, 12, "#ffffff"));
                 container.setAlignment(Pos.CENTER_LEFT);
                 container.setPadding(new Insets(5, 10, 5, 10));
                 HBox.setHgrow(spacer, Priority.ALWAYS);
-                
+
                 nameLabel.setStyle("-fx-text-fill: #BB86FC; -fx-font-weight: bold;");
                 descLabel.setStyle("-fx-text-fill: #888888; -fx-font-size: 11px;");
                 triggerLabel.setStyle("-fx-text-fill: #4CAF50; -fx-font-size: 10px;");
@@ -567,7 +568,7 @@ public class CharacterSheetPane extends BorderPane {
                 } else {
                     nameLabel.setText(ability.getName());
                     descLabel.setText(ability.getDescription());
-                    triggerLabel.setText(ability.getTriggerType() + " → " + ability.getEffectType() + 
+                    triggerLabel.setText(ability.getTriggerType() + " -> " + ability.getEffectType() +
                         (ability.getMagnitude() != 0 ? " (" + ability.getMagnitude() + ")" : ""));
                     setGraphic(container);
                     setStyle("-fx-background-color: #383838; -fx-background-radius: 5;");
@@ -769,13 +770,14 @@ public class CharacterSheetPane extends BorderPane {
             private final Label nameLabel = new Label();
             private final Label quantityLabel = new Label();
             private final Region spacer = new Region();
-            private final Button removeBtn = new Button("×");
-            
+            private final Button removeBtn = new Button();
+
             {
+                removeBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.CLOSE, 12, "#ffffff"));
                 container.setAlignment(Pos.CENTER_LEFT);
                 container.setPadding(new Insets(5, 10, 5, 10));
                 HBox.setHgrow(spacer, Priority.ALWAYS);
-                
+
                 nameLabel.setStyle("-fx-text-fill: #e0e0e0; -fx-font-weight: bold;");
                 quantityLabel.setStyle("-fx-text-fill: #888888; -fx-font-size: 11px;");
                 
