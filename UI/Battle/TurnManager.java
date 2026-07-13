@@ -8,11 +8,14 @@ import java.util.function.Consumer;
 
 public class TurnManager {
 
+    /** How the first round opens: party first, normal initiative, or enemies first. */
+    public enum RoundStartMode { SURPRISE, NORMAL, AMBUSH }
+
     private final List<GridObject> turnOrder;
     private int currentIndex = 0;
     private int round = 1;
     private boolean battleStarted = false;
-    private boolean surpriseRound = false;
+    private RoundStartMode roundStartMode = RoundStartMode.NORMAL;
     
     // Initiative tracking
     private final Map<GridObject, Integer> initiativeRolls = new HashMap<>();
@@ -53,8 +56,10 @@ public class TurnManager {
         rollBreakdown.clear();
         pendingTieResolutions.clear();
         
-        if (surpriseRound) {
+        if (roundStartMode == RoundStartMode.SURPRISE) {
             logMessages.add("Surprise Round! All party members act first.");
+        } else if (roundStartMode == RoundStartMode.AMBUSH) {
+            logMessages.add("Ambush! All enemies act first.");
         }
         
         // Roll initiative for everyone
@@ -71,8 +76,9 @@ public class TurnManager {
             int dexMod = getDexterity(obj);
             int total = d20 + dexMod;
             
-            // In surprise round, party members get +100 to ensure they go first
-            if (surpriseRound && isPartyMember(obj)) {
+            // Surprise: party +100 so they all go first; ambush: enemies +100
+            if ((roundStartMode == RoundStartMode.SURPRISE && isPartyMember(obj))
+                    || (roundStartMode == RoundStartMode.AMBUSH && !isPartyMember(obj))) {
                 total += 100;
             }
             
@@ -281,12 +287,12 @@ public class TurnManager {
         return rollBreakdown.getOrDefault(obj, new int[]{0, 0});
     }
     
-    public void setSurpriseRound(boolean surprise) {
-        this.surpriseRound = surprise;
+    public void setRoundStartMode(RoundStartMode mode) {
+        this.roundStartMode = mode;
     }
-    
-    public boolean isSurpriseRound() {
-        return surpriseRound;
+
+    public RoundStartMode getRoundStartMode() {
+        return roundStartMode;
     }
     
     public void setTieResolutionHandler(Consumer<List<List<GridObject>>> handler) {

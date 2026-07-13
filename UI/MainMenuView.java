@@ -6,6 +6,7 @@ import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.*;
@@ -187,6 +188,17 @@ public class MainMenuView {
 
         bottomPanel.getChildren().add(sizeLabel);
 
+        // Board texture theme
+        HBox themeRow = new HBox(8);
+        themeRow.setAlignment(Pos.CENTER);
+        Label themeLabel = new Label("Theme:");
+        themeLabel.getStyleClass().add("label");
+        ComboBox<String> themePicker = new ComboBox<>();
+        themePicker.getItems().addAll(UI.Battle.GridTheme.names());
+        themePicker.setValue("stone");
+        themeRow.getChildren().addAll(themeLabel, themePicker);
+        bottomPanel.getChildren().add(themeRow);
+
         Button cancelBtn = new Button("Cancel");
         cancelBtn.getStyleClass().add("button");
         cancelBtn.setOnAction(e -> {
@@ -198,14 +210,14 @@ public class MainMenuView {
 
         dialogRoot.setBottom(bottomPanel);
 
-        Scene scene = new Scene(dialogRoot, 320, 450);
+        Scene scene = new Scene(dialogRoot, 320, 480);
         scene.getStylesheets().add(new java.io.File("resources/styles/dark-theme.css").toURI().toString());
 
         dialog.setScene(scene);
         dialog.showAndWait();
 
         if (confirmed[0] && selectedRows[0] > 0 && selectedCols[0] > 0) {
-            appController.navigateToBattle(selectedRows[0], selectedCols[0]);
+            appController.navigateToBattle(selectedRows[0], selectedCols[0], themePicker.getValue());
         }
     }
 }

@@ -80,11 +80,15 @@ public class AppController {
     }
 
     public void navigateToBattle(int rows, int cols) {
+        navigateToBattle(rows, cols, "stone");
+    }
+
+    public void navigateToBattle(int rows, int cols, String themeName) {
         try {
             if (characterSheetView == null) {
                 characterSheetView = new CharacterSheetView(this);
             }
-            currentBattleView = new BattleView(rows, cols, characterSheetView, this);
+            currentBattleView = new BattleView(rows, cols, themeName, characterSheetView, this);
             characterSheetView.setBattleView(currentBattleView);
             setContent(currentBattleView.getRoot());
             primaryStage.setTitle("Battle - Cassandralis");

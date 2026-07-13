@@ -224,7 +224,7 @@ public class SpritePickerUtils {
         container.getChildren().clear();
         
         if (spritePath != null && !spritePath.isEmpty()) {
-            Image sprite = SpriteUtils.loadSprite(spritePath);
+            Image sprite = SpriteUtils.staticFrame(spritePath); // sheet-ref aware
             if (sprite != null) {
                 ImageView view = new ImageView(sprite);
                 view.setFitWidth(48);
@@ -363,7 +363,7 @@ public class SpritePickerUtils {
         container.getChildren().clear();
         
         if (spritePath != null && !spritePath.isEmpty()) {
-            Image sprite = SpriteUtils.loadSprite(spritePath);
+            Image sprite = SpriteUtils.staticFrame(spritePath); // sheet-ref aware
             if (sprite != null) {
                 ImageView view = new ImageView(sprite);
                 view.setFitWidth(28);

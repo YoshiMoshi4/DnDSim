@@ -582,6 +582,63 @@
     -fx-font-size: 11px;
 }
 
+.timeline-init-field {
+    -fx-background-color: #1e1e20;
+    -fx-text-fill: #e8e8ec;
+    -fx-prompt-text-fill: #6a6a70;
+    -fx-border-color: #505052;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-alignment: center;
+    -fx-font-size: 11px;
+    -fx-padding: 2 4 2 4;
+}
+
+.timeline-init-field:focused {
+    -fx-border-color: #daa520;
+}
+
+.timeline-button {
+    -fx-font-size: 11px;
+    -fx-padding: 4 10 4 10;
+}
+
+/* ===== PLACEMENT HOTBAR ===== */
+.hotbar-tab {
+    -fx-background-color: #353538;
+    -fx-text-fill: #b8b8c0;
+    -fx-font-size: 11px;
+    -fx-background-radius: 4;
+    -fx-padding: 4 10 4 10;
+    -fx-cursor: hand;
+}
+
+.hotbar-tab:selected {
+    -fx-background-color: linear-gradient(to bottom, #c99b00, #b8860b);
+    -fx-text-fill: #1e1e20;
+    -fx-font-weight: bold;
+}
+
+.hotbar-card {
+    -fx-background-color: linear-gradient(to bottom, #3c3c40, #333336);
+    -fx-background-radius: 6;
+    -fx-border-color: #505052;
+    -fx-border-radius: 6;
+    -fx-border-width: 1;
+}
+
+.hotbar-card:hover {
+    -fx-border-color: #daa520;
+}
+
+.hotbar-card-selected {
+    -fx-background-color: linear-gradient(to bottom, #46422e, #3a3728);
+    -fx-background-radius: 6;
+    -fx-border-color: #daa520;
+    -fx-border-radius: 6;
+    -fx-border-width: 2;
+}
+
 /* ===== TITLED PANE WITH DEPTH ===== */
 .titled-pane {
     -fx-text-fill: #dcdcdc;

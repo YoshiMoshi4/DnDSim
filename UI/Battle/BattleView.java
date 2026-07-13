@@ -8,11 +8,15 @@ import UI.CardUtils;
 import UI.CharacterSheetView;
 import UI.IconUtils;
 import UI.SheetButton;
+import UI.SpriteUtils;
+import javafx.animation.Interpolator;
+import javafx.animation.TranslateTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.util.Duration;
 
 import java.util.*;
 import java.util.function.Supplier;
@@ -26,8 +30,6 @@ public class BattleView {
     private final TurnManager turnManager;
     private final CharacterSheetView sheetView;
     private final BattleGridCanvas gridCanvas;
-    private final CombatLogPane combatLogPane;
-    private final PartyHealthPane partyHealthPane;
     private final TimelinePane timelinePane;
     private final BattleState battleState;
     private GridObject selectedEntity;
@@ -35,6 +37,10 @@ public class BattleView {
     private Button battleToggleBtn;
     private Button addObjBtn;
     private VBox actionPanel;
+    private VBox managePanel;
+    private ToggleButton battleTabBtn;
+    private ToggleButton manageTabBtn;
+    private boolean dicePanelShowing = false;
     private Button moveBtn;
     private Button attackBtn;
     private Button useItemBtn;
@@ -54,17 +60,23 @@ public class BattleView {
     private DiceRollPanel diceRollPanel;
     
     // Pull-up panel
+
     private VBox addObjectsPanel;
     private boolean panelExpanded = false;
     private Label addStatusLabel;
+    private FlowPane hotbarCardRow;
+    private ScrollPane hotbarScroll;
+    private ToggleGroup hotbarTabs;
+    private String activeHotbarCategory = "party";
     
     // Surprise round toggle
-    private CheckBox surpriseRoundCheckbox;
+    private Slider roundStartSlider;
     
     // Placement mode (party)
     private boolean placementMode = false;
     private final Queue<CharSheet> partyToPlace = new LinkedList<>();
     private CharSheet currentPlacing = null;
+    private boolean initiativeSetupActive = false;
     private javafx.beans.property.BooleanProperty placementModeProperty = new javafx.beans.property.SimpleBooleanProperty(false);
     
     // Object placement mode (enemies, terrain, pickups)
@@ -74,6 +86,10 @@ public class BattleView {
     private String pendingObjectName = null;
 
     public BattleView(int rows, int cols, CharacterSheetView sheetView, AppController appController) {
+        this(rows, cols, "stone", sheetView, appController);
+    }
+
+    public BattleView(int rows, int cols, String themeName, CharacterSheetView sheetView, AppController appController) {
         this.appController = appController;
         this.sheetView = sheetView;
         this.battleState = new BattleState();
@@ -90,12 +106,10 @@ public class BattleView {
         turnManager.setTieResolutionHandler(this::handleTieResolutions);
 
         // Create UI components
-        combatLogPane = new CombatLogPane();
-        partyHealthPane = new PartyHealthPane();
         timelinePane = new TimelinePane(turnManager);
-        timelinePane.setVisible(false);
 
-        gridCanvas = new BattleGridCanvas(grid, turnManager, this, combatLogPane);
+        gridCanvas = new BattleGridCanvas(grid, turnManager, this);
+        gridCanvas.setTheme(GridTheme.byName(themeName));
 
         BorderPane mainPane = new BorderPane();
         mainPane.setPadding(new Insets(10));
@@ -105,45 +119,56 @@ public class BattleView {
         mainPane.setTop(timelinePane);
         BorderPane.setMargin(timelinePane, new Insets(0, 0, 10, 0));
 
-        // Left side: Party health stacked with combat log
-        VBox leftPanel = new VBox(10);
-        leftPanel.getChildren().addAll(partyHealthPane, combatLogPane);
-        VBox.setVgrow(combatLogPane, Priority.ALWAYS);
-        
-        // Right side: Action panel and dice roll panel (swappable)
+        // Right side: tabbed sidebar - Battle (actions) / Manage (setup tools)
         actionPanel = createActionPanel();
+        managePanel = createManagePanel();
+        managePanel.setVisible(false);
+        managePanel.setManaged(false);
         diceRollPanel = new DiceRollPanel();
         diceRollPanel.setVisible(false);
         diceRollPanel.setManaged(false);
-        
-        StackPane rightPanel = new StackPane();
-        rightPanel.getChildren().addAll(actionPanel, diceRollPanel);
-        rightPanel.setAlignment(Pos.TOP_CENTER);
 
-        // Grid in center with left panel and action panel
+        battleTabBtn = new ToggleButton("Battle");
+        manageTabBtn = new ToggleButton("Manage");
+        ToggleGroup sidebarTabs = new ToggleGroup();
+        for (ToggleButton tab : new ToggleButton[]{battleTabBtn, manageTabBtn}) {
+            tab.getStyleClass().add("hotbar-tab");
+            tab.setToggleGroup(sidebarTabs);
+        }
+        battleTabBtn.setSelected(true);
+        sidebarTabs.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
+            if (newToggle == null) {
+                // Keep one tab always selected
+                sidebarTabs.selectToggle(oldToggle);
+            } else {
+                updateRightPanelContent();
+            }
+        });
+        HBox tabHeader = new HBox(6, battleTabBtn, manageTabBtn);
+        tabHeader.setAlignment(Pos.CENTER_LEFT);
+
+        StackPane rightContent = new StackPane(actionPanel, managePanel, diceRollPanel);
+        rightContent.setAlignment(Pos.TOP_CENTER);
+        VBox rightPanel = new VBox(8, tabHeader, rightContent);
+
+        // Add-objects drawer: a vertical panel that slides in from the right
+        // and covers the sidebar while placing objects. Width is tied to the
+        // sidebar so it covers it exactly and never widens the column.
+        addObjectsPanel = createAddObjectsPanel();
+        addObjectsPanel.setVisible(false);
+        addObjectsPanel.prefWidthProperty().bind(rightPanel.widthProperty());
+        addObjectsPanel.maxWidthProperty().bind(rightPanel.widthProperty());
+
+        StackPane rightWrap = new StackPane(rightPanel, addObjectsPanel);
+
         BorderPane centerArea = new BorderPane();
-        centerArea.setLeft(leftPanel);
         centerArea.setCenter(gridCanvas);
-        centerArea.setRight(rightPanel);
-        BorderPane.setMargin(leftPanel, new Insets(0, 10, 0, 0));
-        BorderPane.setMargin(rightPanel, new Insets(0, 0, 0, 10));
+        centerArea.setRight(rightWrap);
+        BorderPane.setMargin(rightWrap, new Insets(0, 0, 0, 10));
         mainPane.setCenter(centerArea);
 
-        // Bottom area with controls and pull-up panel
-        VBox bottomArea = new VBox(0);
-        
-        // Controls panel
-        HBox controlPanel = createControlPanel();
-        
-        // Add objects pull-up panel
-        addObjectsPanel = createAddObjectsPanel();
-        addObjectsPanel.setMaxHeight(0);
-        addObjectsPanel.setMinHeight(0);
-        addObjectsPanel.setPrefHeight(0);
-        addObjectsPanel.setVisible(false);
-        
-        bottomArea.getChildren().addAll(addObjectsPanel, controlPanel);
-        mainPane.setBottom(bottomArea);
+        // Battle controls live under the round counter in the timeline
+        timelinePane.setBattleControls(buildBattleControls());
 
         root = mainPane;
         rootWrapper = new StackPane(root);
@@ -163,7 +188,6 @@ public class BattleView {
     public void startPlacementPhase() {
         List<String> partyNames = PartyConfig.getMembers();
         if (partyNames.isEmpty()) {
-            combatLogPane.log("No party configured. Use Add Objects to add characters.", CombatLogPane.LogType.INFO);
             return;
         }
         
@@ -180,16 +204,12 @@ public class BattleView {
         }
         
         if (partyToPlace.isEmpty()) {
-            combatLogPane.log("No valid party members found.", CombatLogPane.LogType.INFO);
             return;
         }
-        
+
         placementMode = true;
         placementModeProperty.set(true);
-        
-        // Log placement start
-        combatLogPane.log("=== Party Placement ===", CombatLogPane.LogType.ROUND);
-        
+
         // Start with first party member
         advancePlacement();
         gridCanvas.redraw();
@@ -206,7 +226,7 @@ public class BattleView {
         }
         
         currentPlacing = partyToPlace.poll();
-        combatLogPane.log("Place " + currentPlacing.getName() + " - click on a tile", CombatLogPane.LogType.INFO);
+        addStatusLabel.setText("Place " + currentPlacing.getName() + " - click on a tile");
     }
     
     /**
@@ -217,8 +237,8 @@ public class BattleView {
         placementModeProperty.set(false);
         currentPlacing = null;
         
-        combatLogPane.log("All party members placed!", CombatLogPane.LogType.INFO);
-        partyHealthPane.updateParty(grid.getEntities());
+        addStatusLabel.setText("All party members placed");
+        timelinePane.showRoster(partyOnField());
         gridCanvas.redraw();
     }
     
@@ -237,6 +257,11 @@ public class BattleView {
      */
     public boolean isPlacementMode() {
         return placementMode;
+    }
+
+    /** Name of the party member currently being placed, or null outside the placement phase. */
+    public String getCurrentPlacingName() {
+        return currentPlacing != null ? currentPlacing.getName() : null;
     }
     
     /**
@@ -340,77 +365,119 @@ public class BattleView {
         gridCanvas.redraw();
     }
 
+    /**
+     * The placement hotbar: a compact bottom strip with category toggles and
+     * a single horizontally scrolling row of cards - nothing to clip, no
+     * vertical scrolling.
+     */
     private VBox createAddObjectsPanel() {
-        VBox panel = new VBox(10);
-        panel.getStyleClass().add("panel");
-        panel.setPadding(new Insets(10));
-        panel.setStyle("-fx-border-color: #505052; -fx-border-width: 1 0 0 0; -fx-background-color: #2d2d30;");
-        
-        // Header with status and close button
-        HBox header = new HBox(10);
-        header.setAlignment(Pos.CENTER_LEFT);
-        
-        addStatusLabel = new Label("Click items to add them to the battlefield");
-        addStatusLabel.getStyleClass().add("label-status");
-        HBox.setHgrow(addStatusLabel, Priority.ALWAYS);
-        
-        Button collapseBtn = new Button("Close");
+        VBox panel = new VBox(6);
+        panel.getStyleClass().add("hotbar");
+        panel.setPadding(new Insets(8, 10, 8, 10));
+        panel.setStyle("-fx-border-color: #505052; -fx-border-width: 0 0 0 1; -fx-background-color: #2d2d30;");
+
+        // Title row with close button
+        Label title = new Label("Add Objects");
+        title.getStyleClass().add("label-title");
+        title.setStyle("-fx-font-size: 14px; -fx-text-fill: #daa520;");
+        HBox.setHgrow(title, Priority.ALWAYS);
+        title.setMaxWidth(Double.MAX_VALUE);
+
+        Button collapseBtn = new Button();
         collapseBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.CLOSE));
         collapseBtn.getStyleClass().add("button");
         collapseBtn.setOnAction(e -> toggleAddObjectsPanel());
-        
-        header.getChildren().addAll(addStatusLabel, collapseBtn);
-        
-        // Tab pane
-        TabPane tabPane = new TabPane();
-        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabPane.setPrefHeight(250);
 
-        Tab partyTab = new Tab("Party");
-        partyTab.setContent(createPartyPanel());
-        tabPane.getTabs().add(partyTab);
+        HBox titleRow = new HBox(8, title, collapseBtn);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
 
-        Tab enemiesTab = new Tab("Enemies");
-        enemiesTab.setContent(createEnemiesPanel());
-        tabPane.getTabs().add(enemiesTab);
+        // Category toggles, wrapping to fit the drawer width
+        FlowPane tabRow = new FlowPane(4, 4);
+        tabRow.setPrefWrapLength(170);
+        hotbarTabs = new ToggleGroup();
+        for (String category : new String[]{"Party", "Enemies", "Terrain", "Pickups"}) {
+            ToggleButton tab = new ToggleButton(category);
+            tab.getStyleClass().add("hotbar-tab");
+            tab.setUserData(category.toLowerCase());
+            tab.setToggleGroup(hotbarTabs);
+            if (category.equals("Party")) {
+                tab.setSelected(true);
+            }
+            tabRow.getChildren().add(tab);
+        }
+        hotbarTabs.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
+            if (newToggle == null) {
+                // Keep one category always selected
+                hotbarTabs.selectToggle(oldToggle);
+            } else {
+                activeHotbarCategory = (String) newToggle.getUserData();
+                refreshAddObjectsPanels();
+            }
+        });
 
-        Tab terrainTab = new Tab("Terrain");
-        terrainTab.setContent(createTerrainPanel());
-        tabPane.getTabs().add(terrainTab);
+        addStatusLabel = new Label("Click items to add them to the battlefield");
+        addStatusLabel.getStyleClass().add("label-status");
+        addStatusLabel.setWrapText(true);
+        addStatusLabel.setStyle("-fx-font-size: 10px;");
 
-        Tab pickupsTab = new Tab("Pickups");
-        pickupsTab.setContent(createPickupsPanel());
-        tabPane.getTabs().add(pickupsTab);
+        // Cards wrap into columns and scroll vertically
+        hotbarCardRow = new FlowPane(6, 6);
+        hotbarCardRow.setPrefWrapLength(170);
+        hotbarCardRow.setPadding(new Insets(2));
 
-        panel.getChildren().addAll(header, tabPane);
+        hotbarScroll = new ScrollPane(hotbarCardRow);
+        hotbarScroll.setFitToWidth(true);
+        hotbarScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        hotbarScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        hotbarScroll.setPannable(true);
+        hotbarScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        VBox.setVgrow(hotbarScroll, Priority.ALWAYS);
+
+        panel.getChildren().addAll(titleRow, tabRow, addStatusLabel, hotbarScroll);
         return panel;
     }
-    
+
     private void toggleAddObjectsPanel() {
+        double offscreen = addObjectsPanel.getWidth() > 0 ? addObjectsPanel.getWidth() + 20 : 2000;
         if (panelExpanded) {
-            // Collapse with animation
+            // Slide out to the right
             panelExpanded = false;
             if (objectPlacementMode) {
                 cancelObjectPlacement();
             }
-            AnimationUtils.animateHeight(addObjectsPanel, 0, () -> addObjectsPanel.setVisible(false));
+            TranslateTransition slide = new TranslateTransition(Duration.millis(220), addObjectsPanel);
+            slide.setToX(offscreen);
+            slide.setInterpolator(Interpolator.EASE_IN);
+            slide.setOnFinished(e -> addObjectsPanel.setVisible(false));
+            slide.play();
         } else {
-            // Expand with animation
-            addObjectsPanel.setVisible(true);
+            // Slide in from the right
             panelExpanded = true;
             refreshAddObjectsPanels();
-            AnimationUtils.animateHeight(addObjectsPanel, 300, null);
+            addObjectsPanel.setTranslateX(offscreen);
+            addObjectsPanel.setVisible(true);
+            TranslateTransition slide = new TranslateTransition(Duration.millis(220), addObjectsPanel);
+            slide.setToX(0);
+            slide.setInterpolator(Interpolator.EASE_OUT);
+            slide.play();
         }
     }
-    
+
     private void refreshAddObjectsPanels() {
-        // Refresh the panel content when opened
-        if (addObjectsPanel.getChildren().size() > 1) {
-            TabPane tabPane = (TabPane) addObjectsPanel.getChildren().get(1);
-            tabPane.getTabs().get(0).setContent(createPartyPanel());
-            tabPane.getTabs().get(1).setContent(createEnemiesPanel());
-            tabPane.getTabs().get(2).setContent(createTerrainPanel());
-            tabPane.getTabs().get(3).setContent(createPickupsPanel());
+        if (hotbarCardRow == null) return;
+        hotbarCardRow.getChildren().clear();
+        List<Node> cards = switch (activeHotbarCategory) {
+            case "enemies" -> buildEnemyCards();
+            case "terrain" -> buildTerrainCards();
+            case "pickups" -> buildPickupCards();
+            default -> buildPartyCards();
+        };
+        if (cards.isEmpty()) {
+            Label empty = new Label("Nothing available in this category");
+            empty.setStyle("-fx-text-fill: #808080; -fx-font-style: italic;");
+            hotbarCardRow.getChildren().add(empty);
+        } else {
+            hotbarCardRow.getChildren().addAll(cards);
         }
     }
 
@@ -543,18 +610,12 @@ public class BattleView {
         actionsGrid.add(useItemBtn, 0, 1);
         actionsGrid.add(pickupBtn, 1, 1);
 
-        // Round indicator
-        Label roundLabel = new Label("Round: --");
-        roundLabel.setId("roundLabel");
-        roundLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #888888;");
-
         panel.getChildren().addAll(
             selectLabel, selectedEntityLabel,
             healthLabel, healthRow,
             statsLabel, acRow, strRow, dexRow, conRow, intRow, wisRow, chaRow, mobLabel,
             weapLabel, weaponRow, diceLabel, tier1Row, tier2Row, tier3Row, sep,
-            actionsLabel, actionsGrid,
-            roundLabel
+            actionsLabel, actionsGrid
         );
 
         return panel;
@@ -634,13 +695,6 @@ public class BattleView {
         btn.setPrefSize(28, 28);
         btn.setMaxSize(28, 28);
         return btn;
-    }
-
-    private void updateActionPanel() {
-        Label roundLabel = (Label) actionPanel.lookup("#roundLabel");
-        if (roundLabel != null) {
-            roundLabel.setText("Round: " + turnManager.getRound());
-        }
     }
 
     public void updateSelectedEntity(GridObject obj) {
@@ -898,37 +952,21 @@ public class BattleView {
         }
     }
 
-    private HBox createControlPanel() {
-        HBox panel = new HBox(10);
-        panel.setAlignment(Pos.CENTER);
-        panel.setPadding(new Insets(15, 10, 10, 10));
-        panel.setStyle("-fx-border-color: #505052; -fx-border-width: 1 0 0 0;");
-
-        Button backBtn = new Button("Character Sheets");
-        backBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.PERSON));
-        backBtn.getStyleClass().add("button");
-        backBtn.setPrefSize(160, 40);
-        backBtn.setOnAction(e -> handleBack());
-
-        addObjBtn = new Button("Add Objects");
-        addObjBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.PLUS));
-        addObjBtn.getStyleClass().add("button");
-        addObjBtn.setPrefSize(140, 40);
-        addObjBtn.setOnAction(e -> toggleAddObjectsPanel());
-        addObjBtn.disableProperty().bind(placementModeProperty);
-        // Objects can now be placed during battle
-
+    /** Compact battle controls shown under the timeline's round counter. */
+    private VBox buildBattleControls() {
         battleToggleBtn = new Button();
-        battleToggleBtn.setPrefSize(150, 40);
+        battleToggleBtn.setTooltip(new Tooltip("Begin or end the battle"));
         battleToggleBtn.getStyleClass().clear();
-        battleToggleBtn.getStyleClass().add(battleState.isBattleStarted() ? "button-danger" : "button-primary");
+        battleToggleBtn.getStyleClass().addAll("timeline-button",
+            battleState.isBattleStarted() ? "button-danger" : "button-primary");
         battleToggleBtn.disableProperty().bind(placementModeProperty);
         battleState.battleStartedProperty().addListener((obs, oldVal, newVal) -> {
             battleToggleBtn.getStyleClass().clear();
-            battleToggleBtn.getStyleClass().add(newVal ? "button-danger" : "button-primary");
+            battleToggleBtn.getStyleClass().addAll("timeline-button",
+                newVal ? "button-danger" : "button-primary");
         });
         battleToggleBtn.textProperty().bind(
-            battleState.battleStartedProperty().map(started -> started ? "End Battle" : "Begin Battle")
+            battleState.battleStartedProperty().map(started -> started ? "End" : "Begin")
         );
         battleToggleBtn.graphicProperty().bind(
             battleState.battleStartedProperty().map(started -> started ? IconUtils.smallIcon(IconUtils.Icon.STOP) : IconUtils.smallIcon(IconUtils.Icon.PLAY))
@@ -941,175 +979,177 @@ public class BattleView {
             }
         });
 
-        nextTurnBtn = new Button("Next Turn");
+        nextTurnBtn = new Button("Next");
         nextTurnBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.FAST_FORWARD));
-        nextTurnBtn.getStyleClass().add("button");
-        nextTurnBtn.setPrefSize(140, 40);
+        nextTurnBtn.setTooltip(new Tooltip("Next turn"));
+        nextTurnBtn.getStyleClass().addAll("button", "timeline-button");
         nextTurnBtn.setOnAction(e -> handleNextTurn());
         // Enable next turn only when battle is active and not in placement mode
         nextTurnBtn.disableProperty().bind(
             battleState.battleStartedProperty().not().or(placementModeProperty)
         );
-        
-        // Surprise round toggle (only visible before battle)
-        surpriseRoundCheckbox = new CheckBox("Surprise Round");
-        surpriseRoundCheckbox.getStyleClass().add("check-box");
-        surpriseRoundCheckbox.setTooltip(new Tooltip("Party members act first before normal turn order"));
-        surpriseRoundCheckbox.visibleProperty().bind(battleState.battleStartedProperty().not());
-        surpriseRoundCheckbox.managedProperty().bind(battleState.battleStartedProperty().not());
 
-        panel.getChildren().addAll(backBtn, addObjBtn, surpriseRoundCheckbox, battleToggleBtn, nextTurnBtn);
+        HBox buttons = new HBox(6, battleToggleBtn, nextTurnBtn);
+        buttons.setAlignment(Pos.CENTER_LEFT);
+
+        // Round-start mode slider: left = surprise (party first),
+        // middle = normal, right = ambush (enemies first). Locks once
+        // the battle begins.
+        roundStartSlider = new Slider(0, 2, 1);
+        roundStartSlider.setSnapToTicks(true);
+        roundStartSlider.setMajorTickUnit(1);
+        roundStartSlider.setMinorTickCount(0);
+        roundStartSlider.setPrefWidth(80);
+        roundStartSlider.setMaxWidth(80);
+        roundStartSlider.disableProperty().bind(battleState.battleStartedProperty());
+
+        Label modeLabel = new Label("Normal");
+        modeLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b8b8c0;");
+        roundStartSlider.valueProperty().addListener((obs, o, n) ->
+            modeLabel.setText(roundStartModeFromSlider().name().charAt(0)
+                + roundStartModeFromSlider().name().substring(1).toLowerCase()));
+        Tooltip.install(roundStartSlider, new Tooltip(
+            "Round start: Surprise (party acts first) / Normal / Ambush (enemies act first)"));
+
+        HBox sliderRow = new HBox(6, roundStartSlider, modeLabel);
+        sliderRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox controls = new VBox(5, buttons, sliderRow);
+        controls.setAlignment(Pos.CENTER_LEFT);
+        return controls;
+    }
+
+    private TurnManager.RoundStartMode roundStartModeFromSlider() {
+        double v = roundStartSlider.getValue();
+        if (v < 0.5) return TurnManager.RoundStartMode.SURPRISE;
+        if (v > 1.5) return TurnManager.RoundStartMode.AMBUSH;
+        return TurnManager.RoundStartMode.NORMAL;
+    }
+
+    /** The Manage sidebar tab: battlefield setup tools. */
+    private VBox createManagePanel() {
+        VBox panel = new VBox(10);
+        panel.setPadding(new Insets(10));
+        panel.setPrefWidth(185);
+        panel.setMinWidth(185);
+        panel.getStyleClass().add("panel");
+        panel.setStyle("-fx-background-color: #2d2d30; -fx-border-color: #505052; -fx-border-width: 0 0 0 1;");
+
+        Label title = new Label("Manage");
+        title.getStyleClass().add("label-title");
+        title.setStyle("-fx-font-size: 14px; -fx-text-fill: #daa520;");
+
+        Button backBtn = new Button("Character Sheets");
+        backBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.PERSON));
+        backBtn.getStyleClass().add("button");
+        backBtn.setMaxWidth(Double.MAX_VALUE);
+        backBtn.setOnAction(e -> handleBack());
+
+        addObjBtn = new Button("Add Objects");
+        addObjBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.PLUS));
+        addObjBtn.getStyleClass().add("button");
+        addObjBtn.setMaxWidth(Double.MAX_VALUE);
+        addObjBtn.setOnAction(e -> toggleAddObjectsPanel());
+        addObjBtn.disableProperty().bind(placementModeProperty);
+
+        // Board theme picker (live switch)
+        Label themeLabel = new Label("Board Theme");
+        themeLabel.getStyleClass().add("label-header");
+        ComboBox<String> themePicker = new ComboBox<>();
+        themePicker.getItems().addAll(GridTheme.names());
+        themePicker.setValue(gridCanvas.getTheme().name);
+        themePicker.setMaxWidth(Double.MAX_VALUE);
+        themePicker.setTooltip(new Tooltip("Board texture theme"));
+        themePicker.setOnAction(e -> gridCanvas.setTheme(GridTheme.byName(themePicker.getValue())));
+
+        Separator sep = new Separator();
+
+        panel.getChildren().addAll(title, backBtn, addObjBtn, sep, themeLabel, themePicker);
         return panel;
     }
 
+    /** Show the active sidebar tab's content, unless the dice panel is up. */
+    private void updateRightPanelContent() {
+        boolean manage = manageTabBtn.isSelected();
+        actionPanel.setVisible(!manage && !dicePanelShowing);
+        actionPanel.setManaged(!manage && !dicePanelShowing);
+        managePanel.setVisible(manage && !dicePanelShowing);
+        managePanel.setManaged(manage && !dicePanelShowing);
+    }
+
     private void handleBeginBattle() {
+        if (initiativeSetupActive) {
+            return;
+        }
         if (grid.getEntities().isEmpty()) {
             showAlert(Alert.AlertType.WARNING, "No Entities",
                     "Please add at least one entity before beginning battle.");
             return;
         }
 
-        Map<Entity, Integer> partyRollInputs = promptPartyInitiativeRolls();
-        if (partyRollInputs == null) {
-            // User cancelled manual initiative entry.
+        List<Entity> partyMembers = partyOnField();
+
+        if (partyMembers.isEmpty()) {
+            // No manual rolls needed - enemies roll automatically
+            commitBeginBattle(new HashMap<>());
             return;
         }
 
-        battleState.setBattleStarted(true);
-        turnManager.setBattleStarted(true);
-        
-        // Set surprise round before calculating initiative
-        turnManager.setSurpriseRound(surpriseRoundCheckbox.isSelected());
-        
-        // Calculate initiative and get log messages
-        combatLogPane.clear();
-        List<String> initiativeMessages = turnManager.calculateInitiativeOrder(partyRollInputs);
-        
-        // Log all initiative rolls
-        for (String msg : initiativeMessages) {
-            combatLogPane.log(msg, CombatLogPane.LogType.INFO);
-        }
-        
-        combatLogPane.logRound(1);
-        
-        // Log first turn and process abilities
-        if (!turnManager.getTurnOrder().isEmpty()) {
-            GridObject first = turnManager.getTurnOrder().get(0);
-            String firstName = (first instanceof Entity e) ? e.getName() : 
-                              (first instanceof Enemy en) ? en.getName() : "Unknown";
-            combatLogPane.logTurnStart(firstName);
-            
-            // Process ON_TURN_START abilities for first combatant
-            if (first instanceof Entity e) {
-                java.util.List<String> abilityMessages = e.getCharSheet().processEquippedAbilities(EntityRes.ItemAbility.ON_TURN_START);
-                for (String msg : abilityMessages) {
-                    combatLogPane.logAbility(firstName, msg);
-                }
+        // Inline initiative entry in the timeline strip
+        initiativeSetupActive = true;
+        timelinePane.enterInitiativeSetup(partyMembers,
+            rolls -> {
+                initiativeSetupActive = false;
+                commitBeginBattle(rolls);
+            },
+            () -> {
+                initiativeSetupActive = false;
+                timelinePane.exitInitiativeSetup(); // falls back to the roster view
+            });
+    }
+
+    /** Party members currently on the field. */
+    private List<Entity> partyOnField() {
+        List<Entity> party = new ArrayList<>();
+        for (Entity entity : grid.getEntities()) {
+            if (entity.isParty()) {
+                party.add(entity);
             }
         }
-        
+        return party;
+    }
+
+    /** Start the battle once party initiative values have been entered. */
+    private void commitBeginBattle(Map<Entity, Integer> partyRollInputs) {
+        battleState.setBattleStarted(true);
+        turnManager.setBattleStarted(true);
+
+        // Lock in the round-start mode before calculating initiative
+        turnManager.setRoundStartMode(roundStartModeFromSlider());
+
+        turnManager.calculateInitiativeOrder(partyRollInputs);
+
+        // Process ON_TURN_START abilities for the first combatant
+        if (!turnManager.getTurnOrder().isEmpty()
+                && turnManager.getTurnOrder().get(0) instanceof Entity e) {
+            e.getCharSheet().processEquippedAbilities(EntityRes.ItemAbility.ON_TURN_START);
+        }
+
         // Check for pending tie resolutions
         if (turnManager.hasPendingTieResolutions()) {
             handleTieResolutions(turnManager.getPendingTieResolutions());
         }
 
         gridCanvas.setBattleStarted(true);
-        timelinePane.setVisible(true);
+        timelinePane.exitInitiativeSetup();
         timelinePane.refresh();
-        partyHealthPane.refresh(grid.getEntities());
-        updateActionPanel();
         gridCanvas.redraw();
     }
 
-    /**
-     * Prompt the player for initiative d20 rolls for each party member currently on the field.
-     * Enemy initiatives remain randomized.
-     *
-     * @return Map of party entity to manual d20 roll; null when cancelled.
-     */
-    private Map<Entity, Integer> promptPartyInitiativeRolls() {
-        List<Entity> partyMembers = new ArrayList<>();
-        for (Entity entity : grid.getEntities()) {
-            if (entity.isParty()) {
-                partyMembers.add(entity);
-            }
-        }
-
-        if (partyMembers.isEmpty()) {
-            return new HashMap<>();
-        }
-
-        Dialog<Map<Entity, Integer>> dialog = new Dialog<>();
-        dialog.setTitle("Party Initiative Rolls");
-        dialog.setHeaderText("Enter each party member's d20 initiative roll (1-20)");
-
-        VBox content = new VBox(8);
-        content.setPadding(new Insets(10));
-
-        Map<Entity, Spinner<Integer>> rollInputs = new LinkedHashMap<>();
-        for (Entity member : partyMembers) {
-            HBox row = new HBox(10);
-            row.setAlignment(Pos.CENTER_LEFT);
-
-            Label nameLabel = new Label(member.getName() + ":");
-            nameLabel.setMinWidth(140);
-
-            Spinner<Integer> rollSpinner = new Spinner<>(1, 20, 10);
-            rollSpinner.setEditable(true);
-            rollSpinner.setPrefWidth(80);
-            rollInputs.put(member, rollSpinner);
-
-            row.getChildren().addAll(nameLabel, rollSpinner);
-            content.getChildren().add(row);
-        }
-
-        dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-
-        dialog.setResultConverter(buttonType -> {
-            if (buttonType == ButtonType.OK) {
-                Map<Entity, Integer> result = new HashMap<>();
-                for (Map.Entry<Entity, Spinner<Integer>> entry : rollInputs.entrySet()) {
-                    Integer value = entry.getValue().getValue();
-                    int roll = value != null ? value : 1;
-                    result.put(entry.getKey(), Math.max(1, Math.min(20, roll)));
-                }
-                return result;
-            }
-            return null;
-        });
-
-        Optional<Map<Entity, Integer>> result = dialog.showAndWait();
-        return result.orElse(null);
-    }
-
     private void handleNextTurn() {
-        int prevRound = turnManager.getRound();
-        java.util.List<String> abilityMessages = turnManager.nextTurn();
-        int newRound = turnManager.getRound();
-        
-        // Log new round if round changed
-        if (newRound > prevRound) {
-            combatLogPane.logRound(newRound);
-        }
-        
-        // Log whose turn it is
-        if (!turnManager.getTurnOrder().isEmpty()) {
-            int idx = turnManager.getCurrentIndex();
-            GridObject current = turnManager.getTurnOrder().get(idx);
-            String name = (current instanceof Entity e) ? e.getName() : 
-                         (current instanceof Enemy en) ? en.getName() : "Unknown";
-            combatLogPane.logTurnStart(name);
-            
-            // Log any triggered abilities
-            for (String msg : abilityMessages) {
-                combatLogPane.logAbility(name, msg);
-            }
-        }
-        
-        updateActionPanel();
+        turnManager.nextTurn(); // advances turn/round and procs turn-start abilities
+
         timelinePane.refresh();
-        partyHealthPane.refresh(grid.getEntities());
         gridCanvas.redraw();
     }
     
@@ -1219,15 +1259,6 @@ public class BattleView {
             if (chosenOrder != null) {
                 turnManager.applyTieResolution(tiedGroup, chosenOrder);
                 timelinePane.refresh();
-                
-                // Log the chosen order
-                StringBuilder orderStr = new StringBuilder("Turn order set: ");
-                for (int i = 0; i < chosenOrder.size(); i++) {
-                    if (i > 0) orderStr.append(" → ");
-                    GridObject obj = chosenOrder.get(i);
-                    orderStr.append((obj instanceof Entity e) ? e.getName() : "Unknown");
-                }
-                combatLogPane.log(orderStr.toString(), CombatLogPane.LogType.INFO);
             }
         });
     }
@@ -1248,49 +1279,51 @@ public class BattleView {
      * Show the dice roll panel and hide the action panel
      */
     public void showDiceRollPanel() {
-        actionPanel.setVisible(false);
-        actionPanel.setManaged(false);
+        dicePanelShowing = true;
+        updateRightPanelContent();
         diceRollPanel.setVisible(true);
         diceRollPanel.setManaged(true);
     }
-    
+
     /**
-     * Hide the dice roll panel and show the action panel
+     * Hide the dice roll panel and show the active sidebar tab again
      */
     public void hideDiceRollPanel() {
         diceRollPanel.setVisible(false);
         diceRollPanel.setManaged(false);
-        actionPanel.setVisible(true);
-        actionPanel.setManaged(true);
+        dicePanelShowing = false;
+        updateRightPanelContent();
     }
 
     public void addEntity(Entity entity) {
         turnManager.addEntity(entity);
-        partyHealthPane.updateParty(grid.getEntities());
         if (battleState.isBattleStarted()) {
-            updateActionPanel();
+            timelinePane.refresh();
+        } else {
+            timelinePane.showRoster(partyOnField());
         }
     }
 
     public void removeEntity(Entity entity) {
         turnManager.removeEntity(entity);
-        partyHealthPane.updateParty(grid.getEntities());
         if (battleState.isBattleStarted()) {
-            updateActionPanel();
+            timelinePane.refresh();
+        } else {
+            timelinePane.showRoster(partyOnField());
         }
     }
 
     public void addEnemy(Enemy enemy) {
         turnManager.addEnemy(enemy);
         if (battleState.isBattleStarted()) {
-            updateActionPanel();
+            timelinePane.refresh();
         }
     }
 
     public void removeEnemy(Enemy enemy) {
         turnManager.removeEnemy(enemy);
         if (battleState.isBattleStarted()) {
-            updateActionPanel();
+            timelinePane.refresh();
         }
     }
 
@@ -1298,7 +1331,7 @@ public class BattleView {
      * Refreshes the party health display. Call after combat actions.
      */
     public void refreshPartyHealth() {
-        partyHealthPane.refresh(grid.getEntities());
+        timelinePane.refreshHp();
     }
 
     private void handleBack() {
@@ -1351,371 +1384,152 @@ public class BattleView {
         victoryView.playEntranceAnimation();
     }
 
-    private ScrollPane createPartyPanel() {
-        VBox content = new VBox(8);
-        content.setPadding(new Insets(10));
-        content.getStyleClass().add("panel");
+    private List<Node> buildPartyCards() {
+        List<Node> cards = new ArrayList<>();
+        for (SheetButton sheetBtn : sheetView.getSheets()) {
+            if (!sheetBtn.getSheet().getCharSheet().getParty()) continue;
+            CharSheet cs = sheetBtn.getSheet().getCharSheet();
 
-        ArrayList<SheetButton> sheets = sheetView.getSheets();
-        boolean hasAvailableParty = false;
+            // Skip characters already on the field
+            boolean alreadyOnField = grid.getEntities().stream()
+                .anyMatch(entity -> entity.getCharSheet().getName().equals(cs.getName()));
+            if (alreadyOnField) continue;
 
-        for (SheetButton sheetBtn : sheets) {
-            if (sheetBtn.getSheet().getCharSheet().getParty()) {
-                CharSheet cs = sheetBtn.getSheet().getCharSheet();
-                
-                // Skip characters already on the field
-                boolean alreadyOnField = grid.getEntities().stream()
-                    .anyMatch(entity -> entity.getCharSheet().getName().equals(cs.getName()));
-                if (alreadyOnField) {
-                    continue;
-                }
-                
-                hasAvailableParty = true;
-
-                // Create a card-style button for party members
-                final String key = "party:" + cs.getName();
-                HBox card = createEntitySelectionCard(cs, true, isPlacementSelectionActive(key));
-                card.setOnMouseClicked(e -> {
-                    startObjectPlacement(() -> new Entity(0, 0, sheetBtn.getSheet().getCharSheet()),
-                        key, cs.getName());
-                });
-                content.getChildren().add(card);
-            }
+            final String key = "party:" + cs.getName();
+            Node icon = SpriteUtils.createCharacterSprite(cs, 40);
+            String tooltip = String.format("%s%nClass: %s%nHP: %d / %d",
+                cs.getName(),
+                cs.getCharacterClass() != null ? cs.getCharacterClass() : "Unknown",
+                cs.getCurrentHP(), cs.getTotalHP());
+            cards.add(createHotbarCard(icon, cs.getName(), tooltip,
+                cs.getCurrentHP() + "/" + cs.getTotalHP(), "#4CAF50", key,
+                () -> startObjectPlacement(() -> new Entity(0, 0, sheetBtn.getSheet().getCharSheet()),
+                    key, cs.getName())));
         }
-
-        if (!hasAvailableParty) {
-            Label empty = new Label("No party characters available");
-            empty.setStyle("-fx-text-fill: #808080;");
-            content.getChildren().add(empty);
-        }
-
-        ScrollPane scroll = new ScrollPane(content);
-        scroll.setFitToWidth(true);
-        return scroll;
-    }
-    
-    private HBox createEntitySelectionCard(CharSheet cs, boolean isParty, boolean selected) {
-        CardUtils.CardStyle style = isParty ? CardUtils.CardStyle.PARTY : CardUtils.CardStyle.ENEMY;
-
-        HBox card = new HBox(10);
-        card.setAlignment(Pos.CENTER_LEFT);
-        card.setPadding(new Insets(10, 15, 10, 15));
-        card.setCursor(javafx.scene.Cursor.HAND);
-        card.setStyle(String.format(
-            "-fx-background-color: linear-gradient(to right, %s, %s); " +
-            "-fx-background-radius: 6; -fx-border-color: %s; -fx-border-radius: 6; -fx-border-width: 1;",
-            style.bgColor, adjustBrightness(style.bgColor, -10), style.borderColor
-        ));
-        if (selected) {
-            card.setStyle(card.getStyle().replace("-fx-border-color: " + style.borderColor,
-                "-fx-border-color: " + style.accentColor + "; -fx-border-width: 2"));
-        }
-        
-        // Icon
-        Node avatar = IconUtils.createIcon(isParty ? IconUtils.Icon.PERSON : IconUtils.Icon.SKULL, 24, style.accentColor);
-        
-        // Info section
-        VBox info = new VBox(2);
-        HBox.setHgrow(info, Priority.ALWAYS);
-        
-        Label nameLabel = new Label(cs.getName());
-        nameLabel.setStyle(String.format("-fx-text-fill: %s; -fx-font-size: 13px; -fx-font-weight: bold;", style.accentColor));
-        
-        String classText = cs.getCharacterClass() != null ? cs.getCharacterClass() : "Unknown";
-        Label classLabel = new Label(classText);
-        classLabel.setStyle("-fx-text-fill: #888; -fx-font-size: 11px;");
-        
-        info.getChildren().addAll(nameLabel, classLabel);
-        
-        // HP section
-        VBox hpSection = new VBox(2);
-        hpSection.setAlignment(Pos.CENTER_RIGHT);
-        hpSection.setMinWidth(70);
-        
-        Label hpLabel = new Label(cs.getCurrentHP() + " / " + cs.getTotalHP());
-        hpLabel.setStyle("-fx-text-fill: #aaa; -fx-font-size: 10px;");
-        
-        ProgressBar miniHp = new ProgressBar((double) cs.getCurrentHP() / cs.getTotalHP());
-        miniHp.setPrefWidth(70);
-        miniHp.setPrefHeight(6);
-        styleHpBar(miniHp, cs.getCurrentHP(), cs.getTotalHP());
-        
-        hpSection.getChildren().addAll(hpLabel, miniHp);
-        
-        card.getChildren().addAll(avatar, info, hpSection);
-        
-        // Hover effect
-        final String normalStyle = card.getStyle();
-        card.setOnMouseEntered(e -> {
-            card.setStyle(normalStyle.replace(style.borderColor, style.accentColor));
-            card.setScaleX(1.02);
-            card.setScaleY(1.02);
-        });
-        card.setOnMouseExited(e -> {
-            card.setStyle(normalStyle);
-            card.setScaleX(1.0);
-            card.setScaleY(1.0);
-        });
-        
-        return card;
-    }
-    
-    private void styleHpBar(ProgressBar bar, int current, int max) {
-        double ratio = (double) current / max;
-        String color = ratio > 0.5 ? "#4CAF50" : ratio > 0.25 ? "#FF9800" : "#F44336";
-        bar.setStyle("-fx-accent: " + color + ";");
-    }
-    
-    private String adjustBrightness(String hexColor, int amount) {
-        String hex = hexColor.replace("#", "");
-        int r = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(0, 2), 16) + amount));
-        int g = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(2, 4), 16) + amount));
-        int b = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(4, 6), 16) + amount));
-        return String.format("#%02x%02x%02x", r, g, b);
+        return cards;
     }
 
-    private ScrollPane createEnemiesPanel() {
-        VBox content = new VBox(8);
-        content.setPadding(new Insets(10));
-        content.getStyleClass().add("panel");
-
-        String[] enemyNames = Enemy.listSavedEnemies();
-        boolean hasEnemies = enemyNames.length > 0;
-
-        for (String enemyName : enemyNames) {
+    private List<Node> buildEnemyCards() {
+        List<Node> cards = new ArrayList<>();
+        for (String enemyName : Enemy.listSavedEnemies()) {
             Enemy template = Enemy.load(enemyName);
-            if (template != null) {
-                final String key = "enemy:" + enemyName;
-                final String displayName = template.getName();
-                HBox card = createEnemySelectionCard(template, isPlacementSelectionActive(key));
-                final String name = enemyName;
-                card.setOnMouseClicked(e -> {
-                    startObjectPlacement(() -> {
-                        Enemy newEnemy = Enemy.load(name);
-                        if (newEnemy == null) {
-                            return null;
-                        }
-                        int instanceNum = enemyInstanceCounts.getOrDefault(name, 0) + 1;
-                        enemyInstanceCounts.put(name, instanceNum);
-                        newEnemy.setInstanceNumber(instanceNum);
-                        return newEnemy;
-                    }, key, displayName);
-                });
-                content.getChildren().add(card);
-            }
-        }
+            if (template == null) continue;
 
-        if (!hasEnemies) {
-            Label empty = new Label("No enemies available");
-            empty.setStyle("-fx-text-fill: #808080;");
-            content.getChildren().add(empty);
+            final String key = "enemy:" + enemyName;
+            final String displayName = template.getName();
+            final String name = enemyName;
+            Node icon = SpriteUtils.createEnemySprite(template, 40);
+            String tooltip = String.format("%s%nHP: %d   ATK: %d   MOB: %d",
+                displayName, template.getMaxHealth(), template.getAttackModifier(), template.getMovement());
+            cards.add(createHotbarCard(icon, displayName, tooltip,
+                "HP " + template.getMaxHealth(), "#d75f5f", key,
+                () -> startObjectPlacement(() -> {
+                    Enemy newEnemy = Enemy.load(name);
+                    if (newEnemy == null) {
+                        return null;
+                    }
+                    int instanceNum = enemyInstanceCounts.getOrDefault(name, 0) + 1;
+                    enemyInstanceCounts.put(name, instanceNum);
+                    newEnemy.setInstanceNumber(instanceNum);
+                    return newEnemy;
+                }, key, displayName)));
         }
-
-        ScrollPane scroll = new ScrollPane(content);
-        scroll.setFitToWidth(true);
-        return scroll;
+        return cards;
     }
-    
-    private HBox createEnemySelectionCard(Enemy enemy, boolean selected) {
-        CardUtils.CardStyle style = CardUtils.CardStyle.ENEMY;
-        
-        HBox card = new HBox(10);
-        card.setAlignment(Pos.CENTER_LEFT);
-        card.setPadding(new Insets(10, 15, 10, 15));
+
+    private List<Node> buildTerrainCards() {
+        List<Node> cards = new ArrayList<>();
+        for (TerrainObject terrain : UI.TerrainDatabase.getInstance().getAllTerrains()) {
+            final String key = "terrain:" + terrain.getType();
+            Node icon = SpriteUtils.createTerrainSprite(terrain, 40);
+            String tooltip = String.format("%s%nHP: %d", terrain.getType(), terrain.getHealth());
+            cards.add(createHotbarCard(icon, terrain.getType(), tooltip,
+                "HP " + terrain.getHealth(), "#8a8a8a", key,
+                () -> startObjectPlacement(() -> new TerrainObject(terrain), key, terrain.getType())));
+        }
+        return cards;
+    }
+
+    private List<Node> buildPickupCards() {
+        List<Node> cards = new ArrayList<>();
+        for (Weapon weapon : ItemDatabase.getInstance().getAllWeapons().values()) {
+            final String key = "pickup:weapon:" + weapon.getName();
+            String tooltip = String.format("%s (Weapon)%nDMG: %s",
+                weapon.getName(), String.join("/", weapon.getDamageDice()));
+            cards.add(createHotbarCard(createItemSwatch(weapon.getColor(), IconUtils.Icon.SWORDS),
+                weapon.getName(), tooltip, "WPN", "#e6b23c", key,
+                () -> startObjectPlacement(() -> new Pickup(0, 0, weapon), key, weapon.getName())));
+        }
+        for (Accessory accessory : ItemDatabase.getInstance().getAllAccessories().values()) {
+            final String key = "pickup:accessory:" + accessory.getName();
+            String tooltip = String.format("%s (Accessory)%nDEF: %d", accessory.getName(), accessory.getDefense());
+            cards.add(createHotbarCard(createItemSwatch(accessory.getColor(), IconUtils.Icon.SHIELD),
+                accessory.getName(), tooltip, "ACC", "#569cd6", key,
+                () -> startObjectPlacement(() -> new Pickup(0, 0, accessory), key, accessory.getName())));
+        }
+        for (Consumable consumable : ItemDatabase.getInstance().getAllConsumables().values()) {
+            final String key = "pickup:consumable:" + consumable.getName();
+            Status effect = consumable.getEffect();
+            String effectName = (effect != null) ? effect.getName() : "Heal";
+            String tooltip = String.format("%s (Consumable)%n%s: %d",
+                consumable.getName(), effectName, consumable.getHealAmount());
+            cards.add(createHotbarCard(createItemSwatch(consumable.getColor(), IconUtils.Icon.HEART),
+                consumable.getName(), tooltip, "USE", "#6fd66f", key,
+                () -> startObjectPlacement(() -> new Pickup(0, 0, consumable), key, consumable.getName())));
+        }
+        return cards;
+    }
+
+    /** Rounded color swatch with a small glyph, used for items without sprites. */
+    private Node createItemSwatch(String colorHex, IconUtils.Icon icon) {
+        StackPane swatch = new StackPane();
+        swatch.setMinSize(40, 40);
+        swatch.setMaxSize(40, 40);
+        String hex = EntityRes.ColorUtils.normalizeHex(colorHex, EntityRes.ColorUtils.DEFAULT_COLOR);
+        swatch.setStyle("-fx-background-color: " + hex + "; -fx-background-radius: 6;");
+        swatch.getChildren().add(IconUtils.createIcon(icon, 18, "#1e1e20"));
+        return swatch;
+    }
+
+    /**
+     * One square hotbar card: icon, ellipsized name, a small badge top-right,
+     * full details in the tooltip. Gold border while its key is the active
+     * placement selection.
+     */
+    private Node createHotbarCard(Node icon, String name, String tooltipText,
+            String badgeText, String badgeColor, String key, Runnable onClick) {
+        VBox body = new VBox(3);
+        body.setAlignment(Pos.CENTER);
+
+        StackPane iconWrap = new StackPane(icon);
+        iconWrap.setMinSize(42, 42);
+        iconWrap.setMaxSize(42, 42);
+        body.getChildren().add(iconWrap);
+
+        Label nameLabel = new Label(name);
+        nameLabel.setStyle("-fx-font-size: 9px; -fx-text-fill: #dcdcdc;");
+        nameLabel.setMaxWidth(64);
+        body.getChildren().add(nameLabel);
+
+        Label badge = new Label(badgeText);
+        badge.setStyle("-fx-font-size: 8px; -fx-font-weight: bold; -fx-text-fill: #1e1e20; " +
+            "-fx-background-color: " + badgeColor + "; -fx-background-radius: 3; -fx-padding: 1 3 1 3;");
+        StackPane.setAlignment(badge, Pos.TOP_RIGHT);
+        StackPane.setMargin(badge, new Insets(2, 2, 0, 0));
+
+        StackPane card = new StackPane(body, badge);
+        card.setPrefSize(72, 84);
+        card.setMinSize(72, 84);
+        card.setMaxSize(72, 84);
         card.setCursor(javafx.scene.Cursor.HAND);
-        card.setStyle(String.format(
-            "-fx-background-color: linear-gradient(to right, %s, %s); " +
-            "-fx-background-radius: 6; -fx-border-color: %s; -fx-border-radius: 6; -fx-border-width: 1;",
-            style.bgColor, adjustBrightness(style.bgColor, -10), style.borderColor
-        ));
-        if (selected) {
-            card.setStyle(card.getStyle().replace("-fx-border-color: " + style.borderColor,
-                "-fx-border-color: " + style.accentColor + "; -fx-border-width: 2"));
-        }
-        
-        // Icon
-        Node avatar = IconUtils.createIcon(IconUtils.Icon.SKULL, 24, style.accentColor);
-        
-        // Info section
-        VBox info = new VBox(2);
-        HBox.setHgrow(info, Priority.ALWAYS);
-        
-        Label nameLabel = new Label(enemy.getName());
-        nameLabel.setStyle(String.format("-fx-text-fill: %s; -fx-font-size: 13px; -fx-font-weight: bold;", style.accentColor));
-        
-        Label statsLabel = new Label(String.format("ATK: %d  •  MOB: %d", enemy.getAttackModifier(), enemy.getMovement()));
-        statsLabel.setStyle("-fx-text-fill: #888; -fx-font-size: 11px;");
-        
-        info.getChildren().addAll(nameLabel, statsLabel);
-        
-        // HP section
-        VBox hpSection = new VBox(2);
-        hpSection.setAlignment(Pos.CENTER_RIGHT);
-        hpSection.setMinWidth(60);
-        
-        HBox hpRow = new HBox(4);
-        hpRow.setAlignment(Pos.CENTER_RIGHT);
-        hpRow.getChildren().addAll(
-            IconUtils.createIcon(IconUtils.Icon.HEART, 12, "#F44336"),
-            new Label(String.valueOf(enemy.getMaxHealth())) {{
-                setStyle("-fx-text-fill: #F44336; -fx-font-weight: bold;");
-            }}
-        );
-        
-        hpSection.getChildren().add(hpRow);
-        
-        card.getChildren().addAll(avatar, info, hpSection);
-        
-        // Hover effect
-        final String normalStyle = card.getStyle();
-        card.setOnMouseEntered(e -> {
-            card.setStyle(normalStyle.replace(style.borderColor, style.accentColor));
-            card.setScaleX(1.02);
-            card.setScaleY(1.02);
-        });
-        card.setOnMouseExited(e -> {
-            card.setStyle(normalStyle);
-            card.setScaleX(1.0);
-            card.setScaleY(1.0);
-        });
-        
+        card.getStyleClass().add(isPlacementSelectionActive(key) ? "hotbar-card-selected" : "hotbar-card");
+
+        Tooltip tooltip = new Tooltip(tooltipText);
+        tooltip.setShowDelay(javafx.util.Duration.millis(300));
+        Tooltip.install(card, tooltip);
+
+        card.setOnMouseClicked(e -> onClick.run());
         return card;
-    }
-
-    private ScrollPane createTerrainPanel() {
-        VBox content = new VBox(5);
-        content.setPadding(new Insets(10));
-        content.getStyleClass().add("panel");
-
-        List<TerrainObject> availableTerrains = UI.TerrainDatabase.getInstance().getAllTerrains();
-
-        if (availableTerrains.isEmpty()) {
-            Label empty = new Label("No terrain objects available");
-            empty.setStyle("-fx-text-fill: #808080;");
-            content.getChildren().add(empty);
-        } else {
-            for (TerrainObject terrain : availableTerrains) {
-                String btnText = String.format("%s  |  HP: %d", terrain.getType(), terrain.getHealth());
-                String key = "terrain:" + terrain.getType();
-                Button btn = new Button(btnText);
-                btn.getStyleClass().add("button");
-                btn.setMaxWidth(Double.MAX_VALUE);
-                if (isPlacementSelectionActive(key)) {
-                    btn.setStyle("-fx-border-color: #daa520; -fx-border-width: 2;");
-                }
-                btn.setOnAction(e -> {
-                    startObjectPlacement(
-                        () -> new TerrainObject(terrain),
-                        key,
-                        terrain.getType()
-                    );
-                });
-                content.getChildren().add(btn);
-            }
-        }
-
-        ScrollPane scroll = new ScrollPane(content);
-        scroll.setFitToWidth(true);
-        return scroll;
-    }
-
-    private ScrollPane createPickupsPanel() {
-        VBox content = new VBox(5);
-        content.setPadding(new Insets(10));
-        content.getStyleClass().add("panel");
-
-        Map<String, Weapon> weapons = ItemDatabase.getInstance().getAllWeapons();
-        Map<String, Accessory> accessories = ItemDatabase.getInstance().getAllAccessories();
-        Map<String, Consumable> consumables = ItemDatabase.getInstance().getAllConsumables();
-
-        if (!weapons.isEmpty()) {
-            Label header = new Label("Weapons");
-            header.getStyleClass().add("label-header");
-            content.getChildren().add(header);
-
-            for (Weapon weapon : weapons.values()) {
-                String btnText = String.format("%s  |  DMG: %s", weapon.getName(), String.join("/", weapon.getDamageDice()));
-                String key = "pickup:weapon:" + weapon.getName();
-                Button btn = new Button(btnText);
-                btn.getStyleClass().add("button");
-                btn.setMaxWidth(Double.MAX_VALUE);
-                if (isPlacementSelectionActive(key)) {
-                    btn.setStyle("-fx-border-color: #daa520; -fx-border-width: 2;");
-                }
-                btn.setOnAction(e -> {
-                    startObjectPlacement(
-                        () -> new Pickup(0, 0, weapon),
-                        key,
-                        weapon.getName()
-                    );
-                });
-                content.getChildren().add(btn);
-            }
-        }
-
-        if (!accessories.isEmpty()) {
-            Label header = new Label("Accessories");
-            header.getStyleClass().add("label-header");
-            content.getChildren().add(header);
-
-            for (Accessory accessory : accessories.values()) {
-                String btnText = String.format("%s  |  DEF: %d",
-                        accessory.getName(), accessory.getDefense());
-                String key = "pickup:accessory:" + accessory.getName();
-                Button btn = new Button(btnText);
-                btn.getStyleClass().add("button");
-                btn.setMaxWidth(Double.MAX_VALUE);
-                if (isPlacementSelectionActive(key)) {
-                    btn.setStyle("-fx-border-color: #daa520; -fx-border-width: 2;");
-                }
-                btn.setOnAction(e -> {
-                    startObjectPlacement(
-                        () -> new Pickup(0, 0, accessory),
-                        key,
-                        accessory.getName()
-                    );
-                });
-                content.getChildren().add(btn);
-            }
-        }
-
-        if (!consumables.isEmpty()) {
-            Label header = new Label("Consumables");
-            header.getStyleClass().add("label-header");
-            content.getChildren().add(header);
-
-            for (Consumable consumable : consumables.values()) {
-                Status effect = consumable.getEffect();
-                String effectName = (effect != null) ? effect.getName() : "Heal";
-                String btnText = String.format("%s  |  %s: %d",
-                        consumable.getName(), effectName, consumable.getHealAmount());
-                String key = "pickup:consumable:" + consumable.getName();
-                Button btn = new Button(btnText);
-                btn.getStyleClass().add("button");
-                btn.setMaxWidth(Double.MAX_VALUE);
-                if (isPlacementSelectionActive(key)) {
-                    btn.setStyle("-fx-border-color: #daa520; -fx-border-width: 2;");
-                }
-                btn.setOnAction(e -> {
-                    startObjectPlacement(
-                        () -> new Pickup(0, 0, consumable),
-                        key,
-                        consumable.getName()
-                    );
-                });
-                content.getChildren().add(btn);
-            }
-        }
-
-        if (weapons.isEmpty() && accessories.isEmpty() && consumables.isEmpty()) {
-            Label empty = new Label("No pickup items available");
-            empty.setStyle("-fx-text-fill: #808080;");
-            content.getChildren().add(empty);
-        }
-
-        ScrollPane scroll = new ScrollPane(content);
-        scroll.setFitToWidth(true);
-        return scroll;
     }
 
     private void showAlert(Alert.AlertType type, String title, String content) {

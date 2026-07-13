@@ -3,7 +3,9 @@ package UI.Battle;
 import EntityRes.*;
 import Objects.*;
 import UI.SpriteUtils;
+import javafx.animation.AnimationTimer;
 import javafx.animation.PauseTransition;
+import javafx.geometry.VPos;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
@@ -12,16 +14,82 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.CycleMethod;
+import javafx.scene.paint.RadialGradient;
+import javafx.scene.paint.Stop;
+import javafx.scene.shape.ArcType;
+import javafx.scene.shape.StrokeLineCap;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.TextAlignment;
 import javafx.util.Duration;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 
 public class BattleGridCanvas extends Pane {
+
+    // Space reserved around the board for its frame and drop shadow
+    private static final double BOARD_MARGIN = 20;
+
+    // Movement tween pacing and floating combat text lifetime
+    private static final double TWEEN_MS_PER_TILE = 90;
+    private static final double FLOAT_TEXT_MS = 900;
+
+    /** A unit sliding from its old tile toward its current grid position. */
+    private static final class MoveTween {
+        final double fromRow, fromCol;
+        final long startNanos;
+        final double durationMs;
+
+        MoveTween(double fromRow, double fromCol, long startNanos, double durationMs) {
+            this.fromRow = fromRow;
+            this.fromCol = fromCol;
+            this.startNanos = startNanos;
+            this.durationMs = durationMs;
+        }
+    }
+
+    /** Combat text rising and fading above a tile. */
+    private static final class FloatingText {
+        final String text;
+        final Color color;
+        final int row, col;
+        final long startNanos;
+
+        FloatingText(String text, Color color, int row, int col, long startNanos) {
+            this.text = text;
+            this.color = color;
+            this.row = row;
+            this.col = col;
+            this.startNanos = startNanos;
+        }
+    }
+
+    private final Map<GridObject, MoveTween> moveTweens = new HashMap<>();
+    private final Map<GridObject, int[]> lastGridPositions = new HashMap<>();
+    private final List<FloatingText> floatingTexts = new ArrayList<>();
+
+    private GridTheme theme = GridTheme.byName("stone");
+
+    // Repaint cadence the current unit's turn animation needs this frame:
+    // 0 = passive, otherwise nanos between animation repaints. Set during
+    // redraw when the current unit is drawn.
+    private static final long TICK_WALK = 100_000_000L; // 2-frame walk cycle
+    private static final long TICK_BOB = 33_000_000L;   // smooth bob for static sprites
+    private long currentUnitTick;
+    private long lastIdleAnimRedraw;
 
     private final Canvas canvas;
     private final BattleGrid grid;
     private final TurnManager turnManager;
     private final BattleView battleView;
-    private final CombatLogPane combatLogPane;
     private GridObject selectedObject;
     private boolean battleStarted;
     private boolean attackMode;
@@ -38,13 +106,11 @@ public class BattleGridCanvas extends Pane {
     private final PauseTransition hoverDelay;
     private GridObject pendingHoverTarget;
 
-    public BattleGridCanvas(BattleGrid grid, TurnManager tm, BattleView battleView,
-                           CombatLogPane combatLogPane) {
+    public BattleGridCanvas(BattleGrid grid, TurnManager tm, BattleView battleView) {
         this.canvas = new Canvas();
         this.grid = grid;
         this.turnManager = tm;
         this.battleView = battleView;
-        this.combatLogPane = combatLogPane;
         this.selectedObject = null;
         this.battleStarted = false;
         this.attackMode = false;
@@ -62,7 +128,7 @@ public class BattleGridCanvas extends Pane {
         this.pendingHoverTarget = null;
 
         getChildren().add(canvas);
-        setStyle("-fx-background-color: white;");
+        setStyle("-fx-background-color: #1e1e20;");
 
         infoPopup.setPadding(new javafx.geometry.Insets(8, 10, 8, 10));
         infoPopup.setStyle("-fx-background-color: #2d2d30; -fx-border-color: #505052; " +
@@ -92,10 +158,35 @@ public class BattleGridCanvas extends Pane {
             pendingHoverTarget = null;
             hideInfoPopupIfNotPinned();
         });
+
+        // Render loop: full frame rate while movement tweens or floating
+        // combat text are active, a slow tick for idle sprite animation,
+        // and completely passive (event-driven redraws only) otherwise
+        AnimationTimer renderLoop = new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                if (!moveTweens.isEmpty() || !floatingTexts.isEmpty()) {
+                    redraw();
+                } else if (currentUnitTick > 0 && now - lastIdleAnimRedraw >= currentUnitTick) {
+                    lastIdleAnimRedraw = now;
+                    redraw();
+                }
+            }
+        };
+        renderLoop.start();
     }
 
     public void setBattleStarted(boolean started) {
         this.battleStarted = started;
+    }
+
+    public void setTheme(GridTheme theme) {
+        this.theme = theme;
+        redraw();
+    }
+
+    public GridTheme getTheme() {
+        return theme;
     }
 
     private void handleMousePressed(MouseEvent e) {
@@ -278,11 +369,9 @@ public class BattleGridCanvas extends Pane {
         if (obj instanceof Entity entity) {
             grid.removeEntity(entity);
             turnManager.removeEntity(entity);
-            combatLogPane.log(entity.getName() + " removed from the battlefield.", CombatLogPane.LogType.INFO);
         } else if (obj instanceof Enemy enemy) {
             grid.removeEnemy(enemy);
             turnManager.removeEnemy(enemy);
-            combatLogPane.log(enemy.getName() + " removed from the battlefield.", CombatLogPane.LogType.INFO);
         }
 
         if (selectedObject == obj) {
@@ -542,13 +631,10 @@ public class BattleGridCanvas extends Pane {
         if (consumable.getHealAmount() > 0) {
             int healAmount = (int) Math.ceil(consumable.getHealAmount() * efficacyPercent / 100.0);
             entity.getCharSheet().addCurrentHP(healAmount);
-            combatLogPane.log(entity.getName() + " used " + consumable.getName() + 
-                " (d10=" + roll + ", " + efficacyPercent + "% efficacy)", CombatLogPane.LogType.INFO);
-            combatLogPane.logHeal(entity.getName(), healAmount);
+            spawnFloatingText(entity, "+" + healAmount, Color.web("#6fd66f"));
         }
         if (consumable.getEffect() != null) {
             entity.getCharSheet().addStatus(consumable.getEffect());
-            combatLogPane.log("Applied effect: " + consumable.getEffect().getName(), CombatLogPane.LogType.INFO);
         }
         
         if (consumable.getQuantity() > 1) {
@@ -569,7 +655,6 @@ public class BattleGridCanvas extends Pane {
         movingEntity = null;
         pickupMode = true;
         pickupEntity = entity;
-        combatLogPane.log("Select an adjacent item to pick up...", CombatLogPane.LogType.INFO);
         redraw();
     }
 
@@ -644,14 +729,14 @@ public class BattleGridCanvas extends Pane {
     }
 
     private int[] getCellAtPoint(double mouseX, double mouseY) {
-        int rows = grid.getRows();
-        int cols = grid.getCols();
-        int cellSize = (int) Math.min(canvas.getWidth() / cols, canvas.getHeight() / rows);
+        double[] layout = getGridLayout();
+        double cellSize = layout[0];
+        double offsetX = layout[1];
+        double offsetY = layout[2];
+        if (cellSize <= 0) return null;
 
-        int gridWidth = cellSize * cols;
-        int gridHeight = cellSize * rows;
-        int offsetX = (int) ((canvas.getWidth() - gridWidth) / 2);
-        int offsetY = (int) ((canvas.getHeight() - gridHeight) / 2);
+        double gridWidth = cellSize * grid.getCols();
+        double gridHeight = cellSize * grid.getRows();
 
         if (mouseX < offsetX || mouseY < offsetY || mouseX > offsetX + gridWidth || mouseY > offsetY + gridHeight) {
             return null;
@@ -660,6 +745,20 @@ public class BattleGridCanvas extends Pane {
         int col = (int) ((mouseX - offsetX) / cellSize);
         int row = (int) ((mouseY - offsetY) / cellSize);
         return new int[]{row, col};
+    }
+
+    /**
+     * Shared board layout math: {cellSize, offsetX, offsetY}.
+     * Keeps drawing and mouse hit-testing in sync; reserves a margin
+     * around the board for the frame and drop shadow.
+     */
+    private double[] getGridLayout() {
+        double cellSize = Math.min(
+            (canvas.getWidth() - BOARD_MARGIN * 2) / grid.getCols(),
+            (canvas.getHeight() - BOARD_MARGIN * 2) / grid.getRows());
+        double offsetX = (canvas.getWidth() - cellSize * grid.getCols()) / 2;
+        double offsetY = (canvas.getHeight() - cellSize * grid.getRows()) / 2;
+        return new double[]{cellSize, offsetX, offsetY};
     }
 
     private void handleLeftClick(MouseEvent e) {
@@ -682,8 +781,7 @@ public class BattleGridCanvas extends Pane {
                 battleView.entityPlaced(newEntity);
                 return;
             } else if (clicked != null || grid.isBlocked(row, col)) {
-                // Invalid placement location - log message
-                combatLogPane.log("Cannot place here - tile is occupied", CombatLogPane.LogType.INFO);
+                spawnFloatingText(row, col, "Occupied", Color.web("#b8b8c0"));
                 return;
             }
             return;
@@ -696,8 +794,7 @@ public class BattleGridCanvas extends Pane {
                 battleView.objectPlaced(row, col);
                 return;
             } else {
-                // Invalid placement location
-                combatLogPane.log("Cannot place here - tile is occupied", CombatLogPane.LogType.INFO);
+                spawnFloatingText(row, col, "Occupied", Color.web("#b8b8c0"));
                 return;
             }
         }
@@ -716,9 +813,7 @@ public class BattleGridCanvas extends Pane {
                     pickupEntity.getCharSheet().addItem(item);
                     pickupEntity.getCharSheet().save();
                     grid.removePickup(pickup);
-                    
-                    combatLogPane.log(pickupEntity.getName() + " picked up " + item.getName(), CombatLogPane.LogType.INFO);
-                    
+
                     Entity entity = pickupEntity;
                     pickupMode = false;
                     pickupEntity = null;
@@ -734,7 +829,6 @@ public class BattleGridCanvas extends Pane {
             pickupMode = false;
             pickupEntity = null;
             selectedObject = entity;
-            combatLogPane.log("Pickup cancelled.", CombatLogPane.LogType.INFO);
             redraw();
             battleView.updateSelectedEntity(entity);
             return;
@@ -889,42 +983,25 @@ public class BattleGridCanvas extends Pane {
         GridObject target = outcome.target;
         
         // Consume ammo for ranged weapons (regardless of hit/miss)
-        String ammoConsumed = CombatManager.consumeAmmo(attacker);
-        if (ammoConsumed != null) {
-            combatLogPane.log(CombatManager.getAttackerName(attacker) + " used 1 " + ammoConsumed, CombatLogPane.LogType.INFO);
-        }
-        
+        CombatManager.consumeAmmo(attacker);
+
         if (outcome.hit) {
             // Apply damage
             CombatManager.applyDamage(target, outcome.totalDamage);
+            spawnFloatingText(target, "-" + outcome.totalDamage,
+                outcome.d20Roll == 20 ? Color.web("#FFD700") : Color.web("#ff7b6b"));
 
-            // Natural 20 critical tag in combat log.
-            if (outcome.d20Roll == 20) {
-                combatLogPane.log("CRIT! Natural 20 -> x1.5 damage", CombatLogPane.LogType.ATTACK);
-            }
-            
-            // Log the attack with detailed info
-            combatLogPane.logAttackRoll(
-                CombatManager.getAttackerName(attacker),
-                CombatManager.getTargetName(target),
-                outcome.d20Roll, outcome.modifier, outcome.targetAC,
-                outcome.margin, outcome.tier, outcome.totalDamage
-            );
-            
             // Check for defeat
             if (CombatManager.isTargetDead(target)) {
                 if (target instanceof Entity e) {
                     grid.removeEntity(e);
                     turnManager.removeEntity(e);
-                    combatLogPane.logDefeat(CombatManager.getTargetName(target));
                 } else if (target instanceof Enemy en) {
                     grid.removeEnemy(en);
                     turnManager.removeEnemy(en);
                     battleView.getBattleState().incrementEnemiesDefeated();
-                    combatLogPane.logDefeat(CombatManager.getTargetName(target));
                 } else if (target instanceof TerrainObject) {
                     grid.removeDestroyedTerrain();
-                    combatLogPane.logTerrainDestroyed();
                 }
             }
 
@@ -936,12 +1013,7 @@ public class BattleGridCanvas extends Pane {
                 battleView.getBattleState().addDamageTaken(outcome.totalDamage);
             }
         } else {
-            // Miss - log it
-            combatLogPane.logMiss(
-                CombatManager.getAttackerName(attacker),
-                CombatManager.getTargetName(target),
-                outcome.d20Roll, outcome.modifier, outcome.targetAC, outcome.margin
-            );
+            spawnFloatingText(target, "Miss", Color.web("#b8b8c0"));
         }
         
         // Clean up attack state
@@ -992,34 +1064,71 @@ public class BattleGridCanvas extends Pane {
         double width = canvas.getWidth();
         double height = canvas.getHeight();
 
-        // Clear
-        gc.setFill(Color.WHITE);
-        gc.fillRect(0, 0, width, height);
-
         if (width <= 0 || height <= 0) return;
+
+        // Keep pixel art crisp when scaled
+        gc.setImageSmoothing(false);
+
+        // Backdrop: darkened theme texture tiled across the whole canvas,
+        // then a vignette so the board reads as the lit center of a scene
+        gc.setFill(theme.backdropBase);
+        gc.fillRect(0, 0, width, height);
+        double bgTile = GridTheme.TILE_SIZE * 2;
+        for (double by = 0; by < height; by += bgTile) {
+            for (double bx = 0; bx < width; bx += bgTile) {
+                gc.drawImage(theme.backdropTexture, bx, by, bgTile, bgTile);
+            }
+        }
+        gc.setFill(new RadialGradient(0, 0, 0.5, 0.5, 0.75, true, CycleMethod.NO_CYCLE,
+            new Stop(0, Color.rgb(0, 0, 0, 0)),
+            new Stop(1, Color.rgb(0, 0, 0, 0.55))));
+        gc.fillRect(0, 0, width, height);
 
         int rows = grid.getRows();
         int cols = grid.getCols();
 
-        double cellSize = Math.min(width / cols, height / rows);
+        double[] layout = getGridLayout();
+        double cellSize = layout[0];
+        double offsetX = layout[1];
+        double offsetY = layout[2];
+        if (cellSize <= 0) return;
         double gridWidth = cellSize * cols;
         double gridHeight = cellSize * rows;
-        double offsetX = (width - gridWidth) / 2;
-        double offsetY = (height - gridHeight) / 2;
 
-        // Grid lines
-        gc.setStroke(Color.GRAY);
-        gc.setLineWidth(1);
-        for (int r = 0; r <= rows; r++) {
-            gc.strokeLine(offsetX, offsetY + r * cellSize, offsetX + gridWidth, offsetY + r * cellSize);
-        }
-        for (int c = 0; c <= cols; c++) {
-            gc.strokeLine(offsetX + c * cellSize, offsetY, offsetX + c * cellSize, offsetY + gridHeight);
+        // Board drop shadow and frame
+        double frame = Math.min(BOARD_MARGIN - 6, Math.max(6, cellSize * 0.16));
+        gc.setFill(Color.rgb(0, 0, 0, 0.45));
+        gc.fillRoundRect(offsetX - frame + 4, offsetY - frame + 6,
+            gridWidth + frame * 2, gridHeight + frame * 2, 12, 12);
+        gc.setFill(Color.web("#26262b"));
+        gc.fillRoundRect(offsetX - frame, offsetY - frame,
+            gridWidth + frame * 2, gridHeight + frame * 2, 12, 12);
+        gc.setStroke(Color.web("#4a4a52"));
+        gc.setLineWidth(1.5);
+        gc.strokeRoundRect(offsetX - frame, offsetY - frame,
+            gridWidth + frame * 2, gridHeight + frame * 2, 12, 12);
+
+        // Textured floor: one variant per cell from a position hash, with a
+        // subtle checker tint. Both cell edges are snapped to whole pixels so
+        // fractional cell widths can't leave seams.
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                int v = (int) (((r * 73856093L) ^ (c * 19349663L)) >>> 1) % theme.floorVariants.length;
+                double x0 = Math.round(offsetX + c * cellSize);
+                double y0 = Math.round(offsetY + r * cellSize);
+                double x1 = Math.round(offsetX + (c + 1) * cellSize);
+                double y1 = Math.round(offsetY + (r + 1) * cellSize);
+                gc.drawImage(theme.floorVariants[v], x0, y0, x1 - x0, y1 - y0);
+                if (((r + c) & 1) == 1) {
+                    gc.setFill(Color.rgb(0, 0, 0, 0.07));
+                    gc.fillRect(x0, y0, x1 - x0, y1 - y0);
+                }
+            }
         }
         
         // Placement mode highlight - show valid placement cells
         if (battleView.isPlacementMode()) {
-            gc.setFill(Color.rgb(100, 200, 255, 0.3));
+            gc.setFill(Color.rgb(90, 170, 230, 0.20));
             for (int r = 0; r < rows; r++) {
                 for (int c = 0; c < cols; c++) {
                     if (grid.getObjectAt(r, c) == null && !grid.isBlocked(r, c)) {
@@ -1037,7 +1146,7 @@ public class BattleGridCanvas extends Pane {
             int entityRow = movingEntity.getRow();
             int entityCol = movingEntity.getCol();
 
-            gc.setFill(Color.rgb(0, 255, 0, 0.3));
+            gc.setFill(Color.rgb(110, 200, 130, 0.22));
             for (int r = 0; r < rows; r++) {
                 for (int c = 0; c < cols; c++) {
                     int dist = Math.abs(entityRow - r) + Math.abs(entityCol - c);
@@ -1056,7 +1165,7 @@ public class BattleGridCanvas extends Pane {
             int entityRow = movingEnemy.getRow();
             int entityCol = movingEnemy.getCol();
 
-            gc.setFill(Color.rgb(0, 255, 0, 0.3));
+            gc.setFill(Color.rgb(110, 200, 130, 0.22));
             for (int r = 0; r < rows; r++) {
                 for (int c = 0; c < cols; c++) {
                     int dist = Math.abs(entityRow - r) + Math.abs(entityCol - c);
@@ -1071,15 +1180,15 @@ public class BattleGridCanvas extends Pane {
 
         // Attack targets highlight for Entity
         if (attackMode && attackingEntity != null) {
-            gc.setFill(Color.rgb(255, 0, 0, 0.3));
+            gc.setFill(Color.rgb(215, 95, 95, 0.22));
 
             for (Entity e : grid.getEntities()) {
                 if (e != attackingEntity) {
                     double x = offsetX + e.getCol() * cellSize;
                     double y = offsetY + e.getRow() * cellSize;
                     gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
-                    gc.setStroke(Color.RED);
-                    gc.setLineWidth(2);
+                    gc.setStroke(Color.rgb(215, 95, 95, 0.75));
+                    gc.setLineWidth(1.5);
                     gc.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
                 }
             }
@@ -1087,16 +1196,16 @@ public class BattleGridCanvas extends Pane {
                 double x = offsetX + en.getCol() * cellSize;
                 double y = offsetY + en.getRow() * cellSize;
                 gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
-                gc.setStroke(Color.RED);
-                gc.setLineWidth(2);
+                gc.setStroke(Color.rgb(215, 95, 95, 0.75));
+                gc.setLineWidth(1.5);
                 gc.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
             }
             for (TerrainObject t : grid.getTerrainObjects()) {
                 double x = offsetX + t.getCol() * cellSize;
                 double y = offsetY + t.getRow() * cellSize;
                 gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
-                gc.setStroke(Color.RED);
-                gc.setLineWidth(2);
+                gc.setStroke(Color.rgb(215, 95, 95, 0.75));
+                gc.setLineWidth(1.5);
                 gc.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
             }
             gc.setLineWidth(1);
@@ -1104,14 +1213,14 @@ public class BattleGridCanvas extends Pane {
 
         // Attack targets highlight for Enemy
         if (attackMode && attackingEnemy != null) {
-            gc.setFill(Color.rgb(255, 0, 0, 0.3));
+            gc.setFill(Color.rgb(215, 95, 95, 0.22));
 
             for (Entity e : grid.getEntities()) {
                 double x = offsetX + e.getCol() * cellSize;
                 double y = offsetY + e.getRow() * cellSize;
                 gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
-                gc.setStroke(Color.RED);
-                gc.setLineWidth(2);
+                gc.setStroke(Color.rgb(215, 95, 95, 0.75));
+                gc.setLineWidth(1.5);
                 gc.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
             }
             for (Enemy en : grid.getEnemies()) {
@@ -1119,8 +1228,8 @@ public class BattleGridCanvas extends Pane {
                     double x = offsetX + en.getCol() * cellSize;
                     double y = offsetY + en.getRow() * cellSize;
                     gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
-                    gc.setStroke(Color.RED);
-                    gc.setLineWidth(2);
+                    gc.setStroke(Color.rgb(215, 95, 95, 0.75));
+                    gc.setLineWidth(1.5);
                     gc.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
                 }
             }
@@ -1128,107 +1237,252 @@ public class BattleGridCanvas extends Pane {
                 double x = offsetX + t.getCol() * cellSize;
                 double y = offsetY + t.getRow() * cellSize;
                 gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
-                gc.setStroke(Color.RED);
-                gc.setLineWidth(2);
+                gc.setStroke(Color.rgb(215, 95, 95, 0.75));
+                gc.setLineWidth(1.5);
                 gc.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
             }
             gc.setLineWidth(1);
         }
 
-        // Terrain objects - render sprites or fallback
-        for (TerrainObject t : grid.getTerrainObjects()) {
-            double x = offsetX + t.getCol() * cellSize;
-            double y = offsetY + t.getRow() * cellSize;
-            
-            // Use sprite if available, otherwise fallback to colored display
-            SpriteUtils.drawTerrainSpriteOnCanvas(gc, t, x, y, cellSize);
-
-            if (t == selectedObject) {
-                gc.setStroke(Color.ORANGE);
-                gc.setLineWidth(2);
-                double padding = 2;
-                gc.strokeRect(x + padding, y + padding, cellSize - padding * 2, cellSize - padding * 2);
-            }
-        }
-
-        // Pickups - small black circles
+        // Pickups - floor items, drawn under everything that stands
         for (Pickup p : grid.getPickups()) {
             double x = offsetX + p.getCol() * cellSize;
             double y = offsetY + p.getRow() * cellSize;
             double circleSize = cellSize * 0.35;
             double offset = (cellSize - circleSize) / 2;
             String pickupColor = p.getItem() != null ? p.getItem().getColor() : EntityRes.ColorUtils.DEFAULT_COLOR;
+            gc.setFill(Color.rgb(0, 0, 0, 0.35));
+            gc.fillOval(x + offset, y + offset + circleSize * 0.15, circleSize, circleSize * 0.85);
             gc.setFill(Color.web(pickupColor));
             gc.fillOval(x + offset, y + offset, circleSize, circleSize);
         }
 
-        // Entities
-        for (Entity e : grid.getEntities()) {
-            double x = offsetX + e.getCol() * cellSize;
-            double y = offsetY + e.getRow() * cellSize;
-            double spriteSize = cellSize - 8;
-            double centerX = x + cellSize / 2;
-            double centerY = y + cellSize / 2;
-            
-            // Get fallback color
-            java.awt.Color awtColor = e.getCharSheet().getDisplayColor();
-            Color fallbackColor = Color.rgb(awtColor.getRed(), awtColor.getGreen(), awtColor.getBlue());
+        long frameNow = System.nanoTime();
+        syncMoveTweens(frameNow);
+        currentUnitTick = 0; // re-detected by drawUnit below
 
-            // Highlight whichever combatant's turn it currently is
-            if (turnManager.isCurrent(e)) {
-                gc.setFill(Color.rgb(255, 215, 0, 0.35));
-                gc.fillOval(x + 1, y + 1, cellSize - 2, cellSize - 2);
+        // Back-to-front pass: draw row by row so sprites that extend above
+        // their tile get overlapped by whatever stands in the row below
+        for (int r = 0; r < rows; r++) {
+            for (TerrainObject t : grid.getTerrainObjects()) {
+                if (t.getRow() != r) continue;
+                double x = offsetX + t.getCol() * cellSize;
+                double y = offsetY + r * cellSize;
+
+                SpriteUtils.drawTerrainSpriteOnCanvas(gc, t, x, y, cellSize);
+
+                if (t == selectedObject) {
+                    gc.setStroke(Color.ORANGE);
+                    gc.setLineWidth(2);
+                    double padding = 2;
+                    gc.strokeRect(x + padding, y + padding, cellSize - padding * 2, cellSize - padding * 2);
+                }
             }
-
-            // Draw sprite or fallback
-            SpriteUtils.drawSpriteOnCanvas(gc, e.getCharSheet().getSpritePath(),
-                centerX, centerY, spriteSize, fallbackColor, true);
-
-            if (e == selectedObject) {
-                gc.setStroke(Color.ORANGE);
-                gc.setLineWidth(3);
-                gc.strokeOval(x + 2, y + 2, cellSize - 4, cellSize - 4);
-                gc.setStroke(Color.YELLOW);
-                gc.setLineWidth(1);
-                gc.strokeOval(x + 1, y + 1, cellSize - 2, cellSize - 2);
+            for (Enemy en : grid.getEnemies()) {
+                if (en.getRow() != r) continue;
+                double[] pos = currentDrawPosition(en, en.getRow(), en.getCol(), frameNow);
+                drawUnit(gc, offsetX + pos[1] * cellSize, offsetY + pos[0] * cellSize, cellSize,
+                    en.getSpritePath(), Color.web(en.getColor()), false,
+                    turnManager.isCurrent(en), en == selectedObject,
+                    en.getHealth(), en.getMaxHealth(), frameNow);
+            }
+            for (Entity e : grid.getEntities()) {
+                if (e.getRow() != r) continue;
+                double[] pos = currentDrawPosition(e, e.getRow(), e.getCol(), frameNow);
+                java.awt.Color awtColor = e.getCharSheet().getDisplayColor();
+                drawUnit(gc, offsetX + pos[1] * cellSize, offsetY + pos[0] * cellSize, cellSize,
+                    e.getCharSheet().getSpritePath(),
+                    Color.rgb(awtColor.getRed(), awtColor.getGreen(), awtColor.getBlue()), true,
+                    turnManager.isCurrent(e), e == selectedObject,
+                    e.getCharSheet().getCurrentHP(), e.getCharSheet().getTotalHP(), frameNow);
             }
         }
 
-        // Enemies
+        // Floating combat text on top of everything
+        drawFloatingTexts(gc, frameNow, cellSize, offsetX, offsetY);
+
+        // Placement prompt banner at the top of the board
+        if (battleView.isPlacementMode() && battleView.getCurrentPlacingName() != null) {
+            drawPlacementBanner(gc, "Place " + battleView.getCurrentPlacingName() + " - click a tile",
+                offsetX + gridWidth / 2, offsetY + cellSize * 0.4);
+        }
+    }
+
+    /** Centered pill banner used for the party-placement prompt. */
+    private void drawPlacementBanner(GraphicsContext gc, String msg, double centerX, double centerY) {
+        Font font = Font.font("Consolas", FontWeight.BOLD, 15);
+        javafx.scene.text.Text measure = new javafx.scene.text.Text(msg);
+        measure.setFont(font);
+        double textW = measure.getLayoutBounds().getWidth();
+        double padX = 14, padY = 8;
+
+        gc.setFill(Color.rgb(20, 20, 24, 0.85));
+        gc.fillRoundRect(centerX - textW / 2 - padX, centerY - 12 - padY / 2,
+            textW + padX * 2, 24 + padY, 10, 10);
+        gc.setStroke(Color.web("#4a4a52"));
+        gc.setLineWidth(1);
+        gc.strokeRoundRect(centerX - textW / 2 - padX, centerY - 12 - padY / 2,
+            textW + padX * 2, 24 + padY, 10, 10);
+
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.setTextBaseline(VPos.CENTER);
+        gc.setFont(font);
+        gc.setFill(Color.web("#e8e8ec"));
+        gc.fillText(msg, centerX, centerY);
+    }
+
+    /**
+     * Detect grid position changes on any unit and start a slide tween from
+     * the old tile. Watching from the render side covers every movement
+     * source (player moves, enemy moves, teleports) without per-caller hooks.
+     */
+    private void syncMoveTweens(long now) {
+        Set<GridObject> live = new HashSet<>();
+        for (Entity e : grid.getEntities()) {
+            syncUnitPosition(e, e.getRow(), e.getCol(), now, live);
+        }
         for (Enemy en : grid.getEnemies()) {
-            double x = offsetX + en.getCol() * cellSize;
-            double y = offsetY + en.getRow() * cellSize;
-            double spriteSize = cellSize - 8;
-            double centerX = x + cellSize / 2;
-            double centerY = y + cellSize / 2;
-            
-            // Get fallback color
-            Color fallbackColor = Color.web(en.getColor());
+            syncUnitPosition(en, en.getRow(), en.getCol(), now, live);
+        }
+        // Drop state for units no longer on the grid (defeated, removed)
+        lastGridPositions.keySet().retainAll(live);
+        moveTweens.keySet().retainAll(live);
+    }
 
-            // Highlight whichever combatant's turn it currently is
-            if (turnManager.isCurrent(en)) {
-                gc.setFill(Color.rgb(255, 215, 0, 0.35));
-                gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
-            }
+    private void syncUnitPosition(GridObject obj, int row, int col, long now, Set<GridObject> live) {
+        live.add(obj);
+        int[] last = lastGridPositions.get(obj);
+        if (last != null && (last[0] != row || last[1] != col) && battleStarted) {
+            // Start from wherever the unit is currently drawn so an
+            // interrupted tween continues smoothly instead of snapping
+            double[] from = currentDrawPosition(obj, last[0], last[1], now);
+            int dist = Math.abs(last[0] - row) + Math.abs(last[1] - col);
+            double duration = Math.min(400, Math.max(140, dist * TWEEN_MS_PER_TILE));
+            moveTweens.put(obj, new MoveTween(from[0], from[1], now, duration));
+        }
+        lastGridPositions.put(obj, new int[]{row, col});
+    }
 
-            // Draw sprite or fallback (enemies use squares as fallback)
-            String spritePath = en.getSpritePath();
-            if (spritePath != null && SpriteUtils.spriteExists(spritePath)) {
-                SpriteUtils.drawSpriteOnCanvas(gc, spritePath, centerX, centerY, spriteSize, fallbackColor, false);
-            } else {
-                // Fallback to colored square for enemies
-                gc.setFill(fallbackColor);
-                gc.fillRect(x + 4, y + 4, cellSize - 8, cellSize - 8);
-            }
+    /**
+     * Where to draw a unit right now, in fractional grid coordinates
+     * {row, col}: its tween position while sliding, its tile otherwise.
+     */
+    private double[] currentDrawPosition(GridObject obj, int row, int col, long now) {
+        MoveTween t = moveTweens.get(obj);
+        if (t == null) {
+            return new double[]{row, col};
+        }
+        double p = (now - t.startNanos) / 1_000_000.0 / t.durationMs;
+        if (p >= 1) {
+            moveTweens.remove(obj);
+            return new double[]{row, col};
+        }
+        p = 1 - Math.pow(1 - p, 3); // ease-out
+        return new double[]{t.fromRow + (row - t.fromRow) * p, t.fromCol + (col - t.fromCol) * p};
+    }
 
-            if (en == selectedObject) {
-                gc.setStroke(Color.ORANGE);
-                gc.setLineWidth(3);
-                gc.strokeRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
-                gc.setStroke(Color.YELLOW);
-                gc.setLineWidth(1);
-                gc.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+    /** Queue combat text rising from the target's tile; the render loop animates it. */
+    private void spawnFloatingText(GridObject target, String text, Color color) {
+        spawnFloatingText(target.getRow(), target.getCol(), text, color);
+    }
+
+    /** Queue floating text on an arbitrary tile (e.g. placement feedback). */
+    private void spawnFloatingText(int row, int col, String text, Color color) {
+        floatingTexts.add(new FloatingText(text, color, row, col, System.nanoTime()));
+    }
+
+    private void drawFloatingTexts(GraphicsContext gc, long now, double cellSize, double offsetX, double offsetY) {
+        if (floatingTexts.isEmpty()) return;
+
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.setTextBaseline(VPos.CENTER);
+        gc.setFont(Font.font("Consolas", FontWeight.BOLD, Math.max(12, cellSize * 0.30)));
+
+        Iterator<FloatingText> it = floatingTexts.iterator();
+        while (it.hasNext()) {
+            FloatingText ft = it.next();
+            double p = (now - ft.startNanos) / 1_000_000.0 / FLOAT_TEXT_MS;
+            if (p >= 1) {
+                it.remove();
+                continue;
             }
+            double x = offsetX + (ft.col + 0.5) * cellSize;
+            double y = offsetY + ft.row * cellSize - p * cellSize * 0.6;
+            double alpha = p < 0.7 ? 1.0 : (1 - p) / 0.3; // hold, then fade out
+
+            gc.setFill(Color.rgb(0, 0, 0, 0.7 * alpha));
+            gc.fillText(ft.text, x + 1.5, y + 1.5);
+            gc.setFill(ft.color.deriveColor(0, 1, 1, alpha));
+            gc.fillText(ft.text, x, y);
+        }
+    }
+
+    /**
+     * Draw one unit on its tile: ground shadow, HP foot ring, and the
+     * bottom-anchored sprite (or fallback token). The current unit is
+     * indicated by motion alone - sheet sprites play their walk cycle,
+     * static sprites bob gently.
+     */
+    private void drawUnit(GraphicsContext gc, double x, double y, double cellSize,
+            String spritePath, Color fallbackColor, boolean isParty,
+            boolean isCurrent, boolean isSelected, int hp, int maxHp, long now) {
+        double centerX = x + cellSize / 2;
+        double footY = y + cellSize * 0.85;
+
+        boolean sheetSprite = SpriteUtils.isSheetRef(spritePath);
+        boolean turnActive = isCurrent && battleStarted;
+        if (turnActive) {
+            currentUnitTick = sheetSprite ? TICK_WALK : TICK_BOB;
+        }
+
+        // Ground shadow
+        double shadowW = cellSize * 0.64;
+        double shadowH = cellSize * 0.22;
+        gc.setFill(Color.rgb(0, 0, 0, 0.40));
+        gc.fillOval(centerX - shadowW / 2, footY - shadowH / 2, shadowW, shadowH);
+
+        // Foot ring doubles as the HP gauge: a dim faction-colored track with
+        // an HP arc on top that drains clockwise and shifts green->amber->red
+        double ringW = cellSize * 0.78;
+        double ringH = cellSize * 0.30;
+        double ringX = centerX - ringW / 2;
+        double ringY = footY - ringH / 2;
+
+        gc.setStroke(isParty ? Color.rgb(76, 175, 80, 0.45) : Color.rgb(215, 95, 95, 0.45));
+        gc.setLineWidth(1.5);
+        gc.strokeOval(ringX, ringY, ringW, ringH);
+
+        // Arc is inset inside the track so the faction color stays visible
+        // around it even at full HP
+        if (maxHp > 0) {
+            double pct = Math.max(0, Math.min(1, hp / (double) maxHp));
+            Color hpColor = pct > 0.5 ? Color.web("#4CAF50")
+                          : pct > 0.25 ? Color.web("#e6b23c")
+                          : Color.web("#d75f5f");
+            gc.setStroke(hpColor);
+            gc.setLineWidth(3.0);
+            gc.setLineCap(StrokeLineCap.ROUND);
+            gc.strokeArc(ringX + 3, ringY + 2.5, ringW - 6, ringH - 5, 90, -360 * pct, ArcType.OPEN);
+            gc.setLineCap(StrokeLineCap.BUTT);
+        }
+
+        // Selection: outer ring so it never hides the HP arc
+        if (isSelected) {
+            gc.setStroke(Color.ORANGE);
+            gc.setLineWidth(2);
+            gc.strokeOval(centerX - (ringW + 5) / 2, footY - (ringH + 4) / 2, ringW + 5, ringH + 4);
+        }
+
+        if (turnActive && !sheetSprite) {
+            // No walk frames to play - a gentle bob marks the active unit
+            double bob = Math.round(1.5 + 1.5 * Math.sin(now / 250_000_000.0));
+            gc.save();
+            gc.translate(0, -bob);
+            SpriteUtils.drawUnitSpriteOnCanvas(gc, spritePath, x, y, cellSize, fallbackColor, isParty, false);
+            gc.restore();
+        } else {
+            SpriteUtils.drawUnitSpriteOnCanvas(gc, spritePath, x, y, cellSize, fallbackColor, isParty,
+                turnActive && sheetSprite);
         }
     }
 
