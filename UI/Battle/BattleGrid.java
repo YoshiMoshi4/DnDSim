@@ -5,8 +5,13 @@ import java.util.*;
 
 public class BattleGrid {
 
+    public static final int MAX_ELEVATION = 3;
+
     private final int rows;
     private final int cols;
+
+    // Per-tile elevation level (0..MAX_ELEVATION); visual-only for now
+    private final int[][] elevation;
 
     private final List<Entity> entities = new ArrayList<>();
     private final List<Enemy> enemies = new ArrayList<>();
@@ -17,6 +22,7 @@ public class BattleGrid {
             List<TerrainObject> terrainObjects, List<Pickup> pickups) {
         this.rows = rows;
         this.cols = cols;
+        this.elevation = new int[rows][cols];
         this.entities.addAll(entities);
         this.terrainObjects.addAll(terrainObjects);
         this.pickups.addAll(pickups);
@@ -74,6 +80,20 @@ public class BattleGrid {
 
     public boolean inBounds(int r, int c) {
         return r >= 0 && r < rows && c >= 0 && c < cols;
+    }
+
+    public int getElevation(int r, int c) {
+        return inBounds(r, c) ? elevation[r][c] : 0;
+    }
+
+    public void setElevation(int r, int c, int level) {
+        if (inBounds(r, c)) {
+            elevation[r][c] = Math.max(0, Math.min(MAX_ELEVATION, level));
+        }
+    }
+
+    public void adjustElevation(int r, int c, int delta) {
+        setElevation(r, c, getElevation(r, c) + delta);
     }
 
     public TerrainObject getTerrainAt(int r, int c) {

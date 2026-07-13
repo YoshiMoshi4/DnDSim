@@ -10,7 +10,12 @@ import UI.IconUtils;
 import UI.SheetButton;
 import UI.SpriteUtils;
 import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.animation.TranslateTransition;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -42,6 +47,15 @@ public class BattleView {
     private ToggleButton battleTabBtn;
     private ToggleButton manageTabBtn;
     private boolean dicePanelShowing = false;
+
+    // Animated sidebar width: the column slides between these widths instead of
+    // snapping, since the Battle/Manage tabs (and the dice-roll panel) each want
+    // a different width and an instant resize reads as jarring.
+    private static final double SIDEBAR_WIDTH_BATTLE = 185;
+    private static final double SIDEBAR_WIDTH_MANAGE = 275;
+    private static final double SIDEBAR_WIDTH_DICE = 220;
+    private final DoubleProperty sidebarPanelWidth = new SimpleDoubleProperty(SIDEBAR_WIDTH_BATTLE);
+    private Timeline sidebarWidthAnim;
     private Button moveBtn;
     private Button attackBtn;
     private Button useItemBtn;
@@ -85,6 +99,11 @@ public class BattleView {
     private Supplier<Object> pendingObjectSupplier = null;
     private String pendingObjectKey = null;
     private String pendingObjectName = null;
+
+    // Elevation brush mode (visual tile heights)
+    private boolean elevationMode = false;
+    private int elevationBrushDelta = 0; // +1 raise, -1 lower, 0 flatten
+    private String elevationBrushKey = null;
 
     public BattleView(int rows, int cols, CharacterSheetView sheetView, AppController appController) {
         this(rows, cols, "stone", sheetView, appController);
@@ -151,18 +170,41 @@ public class BattleView {
         tabHeader.setAlignment(Pos.CENTER_LEFT);
 
         StackPane rightContent = new StackPane(actionPanel, managePanel, diceRollPanel);
-        rightContent.setAlignment(Pos.TOP_CENTER);
+        // Right-anchored, not centered: each panel's own max width follows its prefWidth
+        // (185/275/220), so whichever one is narrower than the currently-animating
+        // container needs to hug the right edge - matching the sidebar's own right-docked
+        // position - instead of centering with a gap on both sides that closes asymmetrically
+        // and reads as the whole panel drifting sideways.
+        rightContent.setAlignment(Pos.TOP_RIGHT);
+        // The column's width is driven entirely by sidebarPanelWidth (animated on tab/panel
+        // switches) rather than derived from whichever child happens to be managed, so a
+        // toggle slides smoothly instead of snapping straight to the new panel's width.
+        rightContent.prefWidthProperty().bind(sidebarPanelWidth);
+        rightContent.minWidthProperty().bind(sidebarPanelWidth);
+        rightContent.maxWidthProperty().bind(sidebarPanelWidth);
         VBox rightPanel = new VBox(8, tabHeader, rightContent);
+        // A VBox's default max width is unbounded, so rightWrap below (which must stay wide
+        // enough for the Add Objects drawer) would otherwise stretch rightPanel out to that
+        // full width and left-align its children within the leftover space - the exact gap
+        // being reported. Capping rightPanel to the same animated width closes that gap.
+        rightPanel.prefWidthProperty().bind(sidebarPanelWidth);
+        rightPanel.minWidthProperty().bind(sidebarPanelWidth);
+        rightPanel.maxWidthProperty().bind(sidebarPanelWidth);
 
-        // Add-objects drawer: a vertical panel that slides in from the right
-        // and covers the sidebar while placing objects. Width is tied to the
-        // sidebar so it covers it exactly and never widens the column.
+        // Add-objects drawer: a vertical panel that slides in from the right and covers
+        // the sidebar while placing objects. It's only ever opened from the Manage tab
+        // (see the "Add Objects" button in createManagePanel), so it's always exactly
+        // that tab's width - fixed explicitly rather than bound to rightPanel's own
+        // width, since rightPanel is a sibling of this panel in the same StackPane
+        // below and binding to a sibling's rendered width here is circular: it can
+        // only ever grow, never shrink back down once widened.
         addObjectsPanel = createAddObjectsPanel();
         addObjectsPanel.setVisible(false);
-        addObjectsPanel.prefWidthProperty().bind(rightPanel.widthProperty());
-        addObjectsPanel.maxWidthProperty().bind(rightPanel.widthProperty());
+        addObjectsPanel.setPrefWidth(SIDEBAR_WIDTH_MANAGE);
+        addObjectsPanel.setMaxWidth(SIDEBAR_WIDTH_MANAGE);
 
         StackPane rightWrap = new StackPane(rightPanel, addObjectsPanel);
+        rightWrap.setAlignment(Pos.TOP_RIGHT);
 
         BorderPane centerArea = new BorderPane();
         centerArea.setCenter(gridCanvas);
@@ -285,7 +327,57 @@ public class BattleView {
      * Check whether a specific add-objects menu item is currently selected for placement.
      */
     public boolean isPlacementSelectionActive(String key) {
-        return objectPlacementMode && key != null && key.equals(pendingObjectKey);
+        return (objectPlacementMode && key != null && key.equals(pendingObjectKey))
+            || (elevationMode && key != null && key.equals(elevationBrushKey));
+    }
+
+    /**
+     * Check if the elevation brush is active.
+     */
+    public boolean isElevationMode() {
+        return elevationMode;
+    }
+
+    /**
+     * Apply the active elevation brush to a tile.
+     */
+    public void applyElevationBrush(int row, int col) {
+        if (!elevationMode) return;
+        if (elevationBrushDelta == 0) {
+            grid.setElevation(row, col, 0);
+        } else {
+            grid.adjustElevation(row, col, elevationBrushDelta);
+        }
+        gridCanvas.redraw();
+    }
+
+    /**
+     * Stop elevation editing.
+     */
+    public void cancelElevationMode() {
+        if (!elevationMode) return;
+        elevationMode = false;
+        elevationBrushKey = null;
+        addStatusLabel.setText("Elevation editing finished");
+        refreshAddObjectsPanels();
+        gridCanvas.redraw();
+    }
+
+    private void startElevationBrush(int delta, String key, String name) {
+        // Clicking the active brush toggles it off
+        if (elevationMode && key.equals(elevationBrushKey)) {
+            cancelElevationMode();
+            return;
+        }
+        if (objectPlacementMode) {
+            cancelObjectPlacement();
+        }
+        elevationMode = true;
+        elevationBrushDelta = delta;
+        elevationBrushKey = key;
+        addStatusLabel.setText(name + " - click tiles on the grid (ESC to finish)");
+        refreshAddObjectsPanels();
+        gridCanvas.redraw();
     }
     
     /**
@@ -299,6 +391,9 @@ public class BattleView {
             return;
         }
 
+        if (elevationMode) {
+            cancelElevationMode();
+        }
         objectPlacementMode = true;
         pendingObjectSupplier = supplier;
         pendingObjectKey = key;
@@ -396,14 +491,15 @@ public class BattleView {
 
         // Category toggles, wrapping to fit the drawer width
         FlowPane tabRow = new FlowPane(4, 4);
-        tabRow.setPrefWrapLength(170);
+        tabRow.setPrefWrapLength(250);
         hotbarTabs = new ToggleGroup();
-        for (String category : new String[]{"Party", "Enemies", "Terrain", "Pickups"}) {
+        for (String category : new String[]{"Party", "Enemies", "Terrain", "Pickups", "Elevation"}) {
             ToggleButton tab = new ToggleButton(category);
             IconUtils.Icon categoryIcon = switch (category) {
                 case "Party" -> IconUtils.Icon.PARTY;
                 case "Enemies" -> IconUtils.Icon.SKULL;
                 case "Terrain" -> IconUtils.Icon.MAP;
+                case "Elevation" -> IconUtils.Icon.FLAG;
                 default -> IconUtils.Icon.CHEST;
             };
             tab.setGraphic(IconUtils.smallIcon(categoryIcon));
@@ -420,6 +516,9 @@ public class BattleView {
                 // Keep one category always selected
                 hotbarTabs.selectToggle(oldToggle);
             } else {
+                if (elevationMode) {
+                    cancelElevationMode();
+                }
                 activeHotbarCategory = (String) newToggle.getUserData();
                 refreshAddObjectsPanels();
             }
@@ -429,10 +528,18 @@ public class BattleView {
         addStatusLabel.getStyleClass().add("label-status");
         addStatusLabel.setWrapText(true);
         addStatusLabel.setStyle("-fx-font-size: 10px;");
+        addStatusLabel.setAlignment(Pos.TOP_LEFT);
+        // Fixed height (regardless of message length) so a longer "Selected: ..."
+        // message wrapping to more lines doesn't shrink the card scroll area below
+        // it and trigger its vertical scrollbar - that scrollbar's width was
+        // exactly enough to knock the card grid from 2 columns down to 1.
+        addStatusLabel.setMinHeight(40);
+        addStatusLabel.setPrefHeight(40);
+        addStatusLabel.setMaxHeight(40);
 
         // Cards wrap into columns and scroll vertically
         hotbarCardRow = new FlowPane(6, 6);
-        hotbarCardRow.setPrefWrapLength(170);
+        hotbarCardRow.setPrefWrapLength(250);
         hotbarCardRow.setPadding(new Insets(2));
 
         hotbarScroll = new ScrollPane(hotbarCardRow);
@@ -454,6 +561,9 @@ public class BattleView {
             panelExpanded = false;
             if (objectPlacementMode) {
                 cancelObjectPlacement();
+            }
+            if (elevationMode) {
+                cancelElevationMode();
             }
             TranslateTransition slide = new TranslateTransition(Duration.millis(220), addObjectsPanel);
             slide.setToX(offscreen);
@@ -480,6 +590,7 @@ public class BattleView {
             case "enemies" -> buildEnemyCards();
             case "terrain" -> buildTerrainCards();
             case "pickups" -> buildPickupCards();
+            case "elevation" -> buildElevationCards();
             default -> buildPartyCards();
         };
         if (cards.isEmpty()) {
@@ -493,9 +604,12 @@ public class BattleView {
 
     private VBox createActionPanel() {
         VBox panel = new VBox(8);
-        panel.setPadding(new Insets(10));
-        panel.setPrefWidth(185);
-        panel.setMinWidth(185);
+        panel.setPadding(new Insets(10, 10, 28, 10));
+        panel.setPrefWidth(SIDEBAR_WIDTH_BATTLE);
+        // Small, not SIDEBAR_WIDTH_BATTLE: the animated sidebarPanelWidth is what actually
+        // drives the column's width now, and a hard floor here would clamp the animation
+        // partway through a Manage -> Battle shrink instead of letting it slide smoothly.
+        panel.setMinWidth(60);
         panel.getStyleClass().add("panel");
         panel.setStyle("-fx-background-color: #2d2d30; -fx-border-color: #505052; -fx-border-width: 0 0 0 1;");
 
@@ -533,6 +647,7 @@ public class BattleView {
         healthTextLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: white; -fx-font-weight: bold;");
 
         healthPane.getChildren().addAll(healthBar, healthTextLabel);
+        attachHealthScrub(healthPane);
 
         Button healthPlusBtn = new Button();
         healthPlusBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.PLUS, 12, "#dcdcdc"));
@@ -584,9 +699,9 @@ public class BattleView {
         Label diceLabel = new Label("Damage Dice");
         diceLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
 
-        HBox tier1Row = createStatRow("T1", "#a0a0a0", "tier1Label", d -> adjustDice(0, d));
-        HBox tier2Row = createStatRow("T2", "#a0a0a0", "tier2Label", d -> adjustDice(1, d));
-        HBox tier3Row = createStatRow("T3", "#a0a0a0", "tier3Label", d -> adjustDice(2, d));
+        HBox tier1Row = createStatRow("T1", "#a0a0a0", "tier1Label", d -> adjustDice(0, d), false);
+        HBox tier2Row = createStatRow("T2", "#a0a0a0", "tier2Label", d -> adjustDice(1, d), false);
+        HBox tier3Row = createStatRow("T3", "#a0a0a0", "tier3Label", d -> adjustDice(2, d), false);
 
         Separator sep = new Separator();
         sep.setStyle("-fx-background-color: #505052;");
@@ -595,23 +710,27 @@ public class BattleView {
         actionsLabel.getStyleClass().add("label-title");
         actionsLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #808080;");
 
-        // Action buttons - condensed into a numpad-style grid of square icon buttons
+        // Action buttons - condensed into a numpad-style grid of square icon buttons,
+        // each shaded a distinct color so the four actions read apart at a glance
         moveBtn = createSquareActionButton(IconUtils.Icon.MOVE, "F");
         moveBtn.setDisable(true);
         moveBtn.setOnAction(e -> gridCanvas.startMoveMode());
+        moveBtn.getStyleClass().add("button-success");
 
         attackBtn = createSquareActionButton(IconUtils.Icon.TARGET, "E");
         attackBtn.setDisable(true);
         attackBtn.setOnAction(e -> gridCanvas.startAttackMode());
+        attackBtn.getStyleClass().add("button-danger");
 
         useItemBtn = createSquareActionButton(IconUtils.Icon.POTION, "R");
         useItemBtn.setDisable(true);
         useItemBtn.setOnAction(e -> gridCanvas.triggerUseItemForSelected());
+        useItemBtn.getStyleClass().add("button-accent");
 
-        pickupBtn = createSquareActionButton(IconUtils.Icon.POTION, "P");
+        pickupBtn = createSquareActionButton(IconUtils.Icon.HAND, "P");
         pickupBtn.setDisable(true);
         pickupBtn.setOnAction(e -> gridCanvas.startPickupMode());
-        pickupBtn.setStyle("-fx-background-color: #8B4513;");
+        pickupBtn.getStyleClass().add("button-earth");
 
         GridPane actionsGrid = new GridPane();
         actionsGrid.setHgap(8);
@@ -635,9 +754,19 @@ public class BattleView {
 
     /**
      * Build a compact, color-coded stat row: an abbreviation label matching the character sheet's
-     * stat colors, flanked by rounded spinner-style -/+ buttons around the live value.
+     * stat colors, flanked by rounded spinner-style -/+ buttons around the live value. Scrubbable
+     * by click-and-drag on the value itself for a faster bulk change.
      */
     private HBox createStatRow(String abbrev, String colorHex, String valueLabelId, java.util.function.IntConsumer onAdjust) {
+        return createStatRow(abbrev, colorHex, valueLabelId, onAdjust, true);
+    }
+
+    /**
+     * As above, with drag-scrubbing optional - tier-dice rows cycle a die *type*, not a
+     * numeric value, so dragging them wouldn't make sense and they pass false.
+     */
+    private HBox createStatRow(String abbrev, String colorHex, String valueLabelId,
+            java.util.function.IntConsumer onAdjust, boolean scrubbable) {
         Label abbrevLabel = new Label(abbrev);
         abbrevLabel.setMinWidth(30);
         abbrevLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: " + colorHex + ";");
@@ -655,6 +784,9 @@ public class BattleView {
         valueLabel.setMinWidth(30);
         valueLabel.setAlignment(Pos.CENTER);
         valueLabel.setStyle("-fx-font-size: 12px;");
+        if (scrubbable) {
+            attachStatScrub(valueLabel, onAdjust);
+        }
 
         Button plusBtn = new Button();
         plusBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.PLUS, 10, "#dcdcdc"));
@@ -883,15 +1015,95 @@ public class BattleView {
         return weapon.getName() + " (x" + ammoCount + ")";
     }
     
+    /**
+     * Turn the HP bar into a click-and-drag scrubber: press or drag anywhere along its
+     * width jumps current HP to the proportional value under the cursor, live; release
+     * commits the change once (see {@link #commitHealthChange()}).
+     */
+    private void attachHealthScrub(StackPane healthPane) {
+        healthPane.setCursor(javafx.scene.Cursor.HAND);
+        healthPane.setOnMousePressed(e -> {
+            healthPane.setCursor(javafx.scene.Cursor.CLOSED_HAND);
+            scrubHealthTo(e.getX(), healthPane.getWidth());
+        });
+        healthPane.setOnMouseDragged(e -> scrubHealthTo(e.getX(), healthPane.getWidth()));
+        healthPane.setOnMouseReleased(e -> {
+            healthPane.setCursor(javafx.scene.Cursor.HAND);
+            commitHealthChange();
+        });
+    }
+
+    /** Set the selected entity's/enemy's current HP to the value at a given x position along the health bar. */
+    private void scrubHealthTo(double x, double width) {
+        if (width <= 0) return;
+        int maxHP;
+        int currentHP;
+        if (selectedEntity instanceof Entity e) {
+            maxHP = e.getCharSheet().getTotalHP();
+            currentHP = e.getCharSheet().getCurrentHP();
+        } else if (selectedEntity instanceof Enemy en) {
+            maxHP = en.getMaxHealth();
+            currentHP = en.getHealth();
+        } else {
+            return;
+        }
+        double frac = Math.max(0, Math.min(1, x / width));
+        int target = (int) Math.round(frac * maxHP);
+        applyHealthDelta(target - currentHP);
+    }
+
+    private static final double STAT_DRAG_THRESHOLD = 4;
+    private static final double STAT_DRAG_PIXELS_PER_POINT = 8;
+
+    /**
+     * Let a stat row's value be click-and-dragged for a faster bulk change: horizontal drag
+     * distance (past a small threshold, so aiming a click doesn't nudge the value) maps to a
+     * point delta, applied incrementally through the same callback the +/- buttons use.
+     */
+    private void attachStatScrub(Label valueLabel, java.util.function.IntConsumer onAdjust) {
+        valueLabel.setCursor(javafx.scene.Cursor.H_RESIZE);
+        double[] pressX = new double[1];
+        int[] appliedDelta = new int[1];
+        boolean[] dragging = new boolean[1];
+
+        valueLabel.setOnMousePressed(e -> {
+            pressX[0] = e.getX();
+            appliedDelta[0] = 0;
+            dragging[0] = false;
+        });
+        valueLabel.setOnMouseDragged(e -> {
+            double dx = e.getX() - pressX[0];
+            if (!dragging[0]) {
+                if (Math.abs(dx) < STAT_DRAG_THRESHOLD) return;
+                dragging[0] = true;
+            }
+            int totalDelta = (int) (dx / STAT_DRAG_PIXELS_PER_POINT);
+            if (totalDelta != appliedDelta[0]) {
+                onAdjust.accept(totalDelta - appliedDelta[0]);
+                appliedDelta[0] = totalDelta;
+            }
+        });
+        valueLabel.setOnMouseReleased(e -> dragging[0] = false);
+    }
+
     private void adjustHealth(int delta) {
+        applyHealthDelta(delta);
+        commitHealthChange();
+    }
+
+    /**
+     * Apply an HP change in memory only (clamped, UI refreshed) without persisting.
+     * Lets a drag gesture update live on every tick without hitting disk each time;
+     * callers are expected to follow up with {@link #commitHealthChange()} once done.
+     */
+    private void applyHealthDelta(int delta) {
         if (selectedEntity == null) return;
-        
+
         if (selectedEntity instanceof Entity e) {
             int maxHP = e.getCharSheet().getTotalHP();
             int currentHP = e.getCharSheet().getCurrentHP();
             int newHP = Math.max(0, Math.min(maxHP, currentHP + delta));
             e.getCharSheet().setCurrentHP(newHP);
-            e.getCharSheet().save();
             refreshPartyHealth();
             gridCanvas.redraw();
             updateSelectedEntity(e);
@@ -902,6 +1114,13 @@ public class BattleView {
             en.setHealth(newHP);
             gridCanvas.redraw();
             updateSelectedEntity(en);
+        }
+    }
+
+    /** Persist the selected entity's current HP (Enemies aren't saved to disk). */
+    private void commitHealthChange() {
+        if (selectedEntity instanceof Entity e) {
+            e.getCharSheet().save();
         }
     }
 
@@ -1044,8 +1263,8 @@ public class BattleView {
     private VBox createManagePanel() {
         VBox panel = new VBox(10);
         panel.setPadding(new Insets(10));
-        panel.setPrefWidth(185);
-        panel.setMinWidth(185);
+        panel.setPrefWidth(SIDEBAR_WIDTH_MANAGE);
+        panel.setMinWidth(60);
         panel.getStyleClass().add("panel");
         panel.setStyle("-fx-background-color: #2d2d30; -fx-border-color: #505052; -fx-border-width: 0 0 0 1;");
 
@@ -1091,6 +1310,20 @@ public class BattleView {
         actionPanel.setManaged(!manage && !dicePanelShowing);
         managePanel.setVisible(manage && !dicePanelShowing);
         managePanel.setManaged(manage && !dicePanelShowing);
+
+        double targetWidth = dicePanelShowing ? SIDEBAR_WIDTH_DICE
+            : manage ? SIDEBAR_WIDTH_MANAGE : SIDEBAR_WIDTH_BATTLE;
+        animateSidebarWidth(targetWidth);
+    }
+
+    /** Slide the sidebar column to a new width instead of snapping to it. */
+    private void animateSidebarWidth(double targetWidth) {
+        if (sidebarWidthAnim != null) {
+            sidebarWidthAnim.stop();
+        }
+        sidebarWidthAnim = new Timeline(new KeyFrame(Duration.millis(220),
+            new KeyValue(sidebarPanelWidth, targetWidth, Interpolator.EASE_BOTH)));
+        sidebarWidthAnim.play();
     }
 
     private void handleBeginBattle() {
@@ -1504,6 +1737,23 @@ public class BattleView {
                 consumable.getName(), tooltip, "USE", "#6fd66f", key,
                 () -> startObjectPlacement(() -> new Pickup(0, 0, consumable), key, consumable.getName())));
         }
+        return cards;
+    }
+
+    private List<Node> buildElevationCards() {
+        List<Node> cards = new ArrayList<>();
+        cards.add(createHotbarCard(createItemSwatch("#6fd66f", IconUtils.Icon.PLUS),
+            "Raise", "Raise tiles by one level (max " + BattleGrid.MAX_ELEVATION + ")",
+            "+1", "#6fd66f", "elev:raise",
+            () -> startElevationBrush(1, "elev:raise", "Raising tiles")));
+        cards.add(createHotbarCard(createItemSwatch("#e6b23c", IconUtils.Icon.MINUS),
+            "Lower", "Lower tiles by one level",
+            "-1", "#e6b23c", "elev:lower",
+            () -> startElevationBrush(-1, "elev:lower", "Lowering tiles")));
+        cards.add(createHotbarCard(createItemSwatch("#8a8a8a", IconUtils.Icon.UNDO),
+            "Flatten", "Reset tiles to ground level",
+            "0", "#8a8a8a", "elev:flatten",
+            () -> startElevationBrush(0, "elev:flatten", "Flattening tiles")));
         return cards;
     }
 

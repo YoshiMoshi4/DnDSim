@@ -188,6 +188,51 @@ public class FormUtils {
         });
     }
     
+    // ==================== ROLL SLIDERS ====================
+
+    /**
+     * Binds a horizontal, integer-snapped Slider to an existing roll-input TextField so
+     * dragging the slider fills in the field and typing in the field moves the slider -
+     * both stay valid ways to enter the same roll, and the caller's existing
+     * validation/parsing/submit logic around the TextField keeps working unchanged.
+     */
+    public static Slider attachRollSlider(TextField field, int min, int max) {
+        int initial = parseClamped(field.getText(), min, max, min);
+        Slider slider = new Slider(min, max, initial);
+        slider.setSnapToTicks(true);
+        slider.setMajorTickUnit(1);
+        slider.setMinorTickCount(0);
+        slider.setBlockIncrement(1);
+        slider.setShowTickMarks(true);
+        slider.getStyleClass().add("roll-slider");
+
+        boolean[] syncing = {false};
+        slider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (syncing[0]) return;
+            syncing[0] = true;
+            field.setText(String.valueOf((int) Math.round(newVal.doubleValue())));
+            syncing[0] = false;
+        });
+        field.textProperty().addListener((obs, oldVal, newVal) -> {
+            if (syncing[0]) return;
+            int parsed = parseClamped(newVal, min, max, -1);
+            if (parsed < 0) return;
+            syncing[0] = true;
+            slider.setValue(parsed);
+            syncing[0] = false;
+        });
+
+        return slider;
+    }
+
+    private static int parseClamped(String text, int min, int max, int fallback) {
+        try {
+            return Math.max(min, Math.min(max, Integer.parseInt(text.trim())));
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
     // ==================== STYLED COMBO BOXES ====================
     
     /**

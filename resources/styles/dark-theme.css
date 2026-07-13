@@ -198,6 +198,34 @@
     -fx-background-color: linear-gradient(to bottom, #6FCF73, #5CBF60);
 }
 
+.button-accent {
+    -fx-background-color: linear-gradient(to bottom, #e8bd4a, #daa520);
+    -fx-text-fill: #1e1e20;
+    -fx-border-color: #f0cc6a;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-effect: dropshadow(gaussian, rgba(218, 165, 32, 0.4), 6, 0, 0, 2);
+}
+
+.button-accent:hover {
+    -fx-background-color: linear-gradient(to bottom, #f0cc6a, #e8bd4a);
+    -fx-effect: dropshadow(gaussian, rgba(218, 165, 32, 0.5), 8, 0, 0, 3);
+}
+
+.button-earth {
+    -fx-background-color: linear-gradient(to bottom, #9c5a24, #8B4513);
+    -fx-text-fill: white;
+    -fx-border-color: #ac6a34;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-effect: dropshadow(gaussian, rgba(139, 69, 19, 0.4), 6, 0, 0, 2);
+}
+
+.button-earth:hover {
+    -fx-background-color: linear-gradient(to bottom, #ac6a34, #9c5a24);
+    -fx-effect: dropshadow(gaussian, rgba(139, 69, 19, 0.5), 8, 0, 0, 3);
+}
+
 .button-large {
     -fx-font-size: 24px;
     -fx-font-weight: bold;
@@ -699,6 +727,34 @@
 
 .progress-bar-accent .bar {
     -fx-background-color: linear-gradient(to bottom, #6aabdf, #569cd6);
+}
+
+/* ===== SLIDER (used for roll-input dials) ===== */
+.slider .track {
+    -fx-background-color: #252528;
+    -fx-background-radius: 4;
+    -fx-pref-height: 4px;
+}
+
+.slider .thumb {
+    -fx-background-color: linear-gradient(to bottom, #6aabdf, #569cd6);
+    -fx-background-radius: 50%;
+    -fx-pref-width: 14px;
+    -fx-pref-height: 14px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 3, 0, 0, 1);
+}
+
+.slider .thumb:hover {
+    -fx-background-color: linear-gradient(to bottom, #7ab8e8, #6aabdf);
+    -fx-effect: dropshadow(gaussian, rgba(86, 156, 214, 0.5), 6, 0, 0, 2);
+}
+
+.slider .thumb:pressed {
+    -fx-background-color: linear-gradient(to bottom, #4a8bc4, #3d7eb5);
+}
+
+.slider .axis-tick-mark, .slider .axis-minor-tick-mark {
+    -fx-stroke: #606065;
 }
 
 /* ===== TOOLTIP WITH DEPTH ===== */

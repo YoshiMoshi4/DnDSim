@@ -175,17 +175,34 @@ public class TimelinePane extends HBox {
             nameLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #dcdcdc; -fx-font-weight: bold;");
             box.getChildren().add(nameLabel);
 
-            TextField field = new TextField();
-            field.setPrefWidth(48);
-            field.setMaxWidth(48);
-            field.setPromptText("d20");
+            TextField field = new TextField("10");
+            field.setPrefWidth(34);
+            field.setMaxWidth(34);
+            field.setAlignment(Pos.CENTER);
             field.getStyleClass().add("timeline-init-field");
             field.setTextFormatter(new TextFormatter<>(change ->
                 change.getControlNewText().matches("\\d{0,2}") ? change : null));
             field.textProperty().addListener((obs, o, n) ->
                 confirmBtn.setDisable(!allFieldsValid(fields)));
             fields.put(member, field);
-            box.getChildren().add(field);
+
+            Button minusBtn = new Button();
+            minusBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.MINUS, 10, "#dcdcdc"));
+            minusBtn.getStyleClass().addAll("spinner-button", "spinner-decrement");
+            minusBtn.setMinSize(18, 18);
+            minusBtn.setMaxSize(18, 18);
+            minusBtn.setOnAction(e -> nudgeInitiative(field, -1));
+
+            Button plusBtn = new Button();
+            plusBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.PLUS, 10, "#dcdcdc"));
+            plusBtn.getStyleClass().addAll("spinner-button", "spinner-increment");
+            plusBtn.setMinSize(18, 18);
+            plusBtn.setMaxSize(18, 18);
+            plusBtn.setOnAction(e -> nudgeInitiative(field, 1));
+
+            HBox tickerRow = new HBox(2, minusBtn, field, plusBtn);
+            tickerRow.setAlignment(Pos.CENTER);
+            box.getChildren().add(tickerRow);
 
             entitiesBox.getChildren().add(box);
         }
@@ -198,6 +215,18 @@ public class TimelinePane extends HBox {
         if (!partyMembers.isEmpty()) {
             javafx.application.Platform.runLater(() -> fields.get(partyMembers.get(0)).requestFocus());
         }
+    }
+
+    /** Nudge an initiative field's value by delta, clamped to the 1-20 d20 range. */
+    private void nudgeInitiative(TextField field, int delta) {
+        int current;
+        try {
+            current = Integer.parseInt(field.getText().trim());
+        } catch (NumberFormatException ex) {
+            current = 10;
+        }
+        int next = Math.max(1, Math.min(20, current + delta));
+        field.setText(String.valueOf(next));
     }
 
     private boolean allFieldsValid(Map<Entity, TextField> fields) {

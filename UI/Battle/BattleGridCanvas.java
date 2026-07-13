@@ -38,6 +38,23 @@ public class BattleGridCanvas extends Pane {
     // Space reserved around the board for its frame and drop shadow
     private static final double BOARD_MARGIN = 20;
 
+    // Camera: zoom multiplies the fit-to-view cell size, pan offsets the
+    // centered layout in screen pixels. (1.0, 0, 0) is exactly fit-to-view.
+    private static final double MIN_ZOOM = 0.5;
+    private static final double MAX_ZOOM = 4.0;
+    private static final double PAN_VISIBLE_MARGIN = 80;
+    private static final double DRAG_THRESHOLD = 5;
+    private double zoom = 1.0;
+    private double panX = 0;
+    private double panY = 0;
+    private double pressX, pressY;
+    private double lastDragX, lastDragY;
+    private boolean dragging;
+
+    // Tile under the cursor, for the +/- elevation hotkeys (-1 = none)
+    private int hoverRow = -1;
+    private int hoverCol = -1;
+
     // Movement tween pacing and floating combat text lifetime
     private static final double TWEEN_MS_PER_TILE = 90;
     private static final double FLOAT_TEXT_MS = 900;
@@ -143,8 +160,8 @@ public class BattleGridCanvas extends Pane {
         canvas.heightProperty().bind(heightProperty());
 
         // Redraw when size changes
-        widthProperty().addListener((obs, oldVal, newVal) -> { hideInfoPopup(); redraw(); });
-        heightProperty().addListener((obs, oldVal, newVal) -> { hideInfoPopup(); redraw(); });
+        widthProperty().addListener((obs, oldVal, newVal) -> { hideInfoPopup(); clampPan(); redraw(); });
+        heightProperty().addListener((obs, oldVal, newVal) -> { hideInfoPopup(); clampPan(); redraw(); });
 
         // Keyboard shortcuts for menu
         setFocusTraversable(true);
@@ -152,10 +169,15 @@ public class BattleGridCanvas extends Pane {
 
         // Mouse handlers
         canvas.setOnMousePressed(this::handleMousePressed);
+        canvas.setOnMouseDragged(this::handleMouseDragged);
+        canvas.setOnMouseReleased(this::handleMouseReleased);
+        canvas.setOnScroll(this::handleScroll);
         canvas.setOnMouseMoved(this::handleMouseMoved);
         canvas.setOnMouseExited(e -> {
             hoverDelay.stop();
             pendingHoverTarget = null;
+            hoverRow = -1;
+            hoverCol = -1;
             hideInfoPopupIfNotPinned();
         });
 
@@ -195,27 +217,75 @@ public class BattleGridCanvas extends Pane {
             return;
         }
         if (e.getButton() == MouseButton.PRIMARY) {
-            if (infoPopupPinned) {
-                hideInfoPopup();
+            // Selection/actions run on release; press only anchors a potential pan.
+            pressX = lastDragX = e.getX();
+            pressY = lastDragY = e.getY();
+            dragging = false;
+        }
+    }
+
+    private void handleMouseDragged(MouseEvent e) {
+        if (e.getButton() != MouseButton.PRIMARY) return;
+        if (!dragging) {
+            if (Math.hypot(e.getX() - pressX, e.getY() - pressY) < DRAG_THRESHOLD) return;
+            dragging = true;
+            hoverDelay.stop();
+            pendingHoverTarget = null;
+            hideInfoPopupIfNotPinned();
+            setCursor(javafx.scene.Cursor.CLOSED_HAND);
+            // Absorb the threshold distance so the board doesn't jump
+            lastDragX = e.getX();
+            lastDragY = e.getY();
+            return;
+        }
+        panX += e.getX() - lastDragX;
+        panY += e.getY() - lastDragY;
+        lastDragX = e.getX();
+        lastDragY = e.getY();
+        clampPan();
+        redraw();
+    }
+
+    private void handleMouseReleased(MouseEvent e) {
+        if (e.getButton() != MouseButton.PRIMARY) return;
+        if (dragging) {
+            dragging = false;
+            setCursor(javafx.scene.Cursor.DEFAULT);
+            return;
+        }
+        handlePrimaryAction(pressX, pressY);
+    }
+
+    /** The former on-press primary-button logic: select, or fall through to click actions. */
+    private void handlePrimaryAction(double x, double y) {
+        if (battleView.isElevationMode()) {
+            int[] cellInfo = getCellAtPoint(x, y);
+            if (cellInfo != null && grid.inBounds(cellInfo[0], cellInfo[1])) {
+                battleView.applyElevationBrush(cellInfo[0], cellInfo[1]);
+                requestFocus(); // so ESC can end the brush
             }
-            int[] cellInfo = getCellAtPoint(e.getX(), e.getY());
-            if (cellInfo != null) {
-                int row = cellInfo[0];
-                int col = cellInfo[1];
-                if (grid.inBounds(row, col)) {
-                    GridObject obj = grid.getObjectAt(row, col);
-                    if (obj != null && !moveMode && !attackMode && !pickupMode) {
-                        // Select the entity and update action panel
-                        selectedObject = obj;
-                        battleView.updateSelectedEntity(obj);
-                        requestFocus();
-                        redraw();
-                        return;
-                    }
+            return;
+        }
+        if (infoPopupPinned) {
+            hideInfoPopup();
+        }
+        int[] cellInfo = getCellAtPoint(x, y);
+        if (cellInfo != null) {
+            int row = cellInfo[0];
+            int col = cellInfo[1];
+            if (grid.inBounds(row, col)) {
+                GridObject obj = grid.getObjectAt(row, col);
+                if (obj != null && !moveMode && !attackMode && !pickupMode) {
+                    // Select the entity and update action panel
+                    selectedObject = obj;
+                    battleView.updateSelectedEntity(obj);
+                    requestFocus();
+                    redraw();
+                    return;
                 }
             }
-            handleLeftClick(e);
         }
+        handleLeftClick(x, y);
     }
 
     private void handleRightClick(MouseEvent e) {
@@ -241,10 +311,18 @@ public class BattleGridCanvas extends Pane {
      * cursor for a beat, show the (non-pinned) hover info popup.
      */
     private void handleMouseMoved(MouseEvent e) {
+        int[] cellInfo = getCellAtPoint(e.getX(), e.getY());
+        if (cellInfo != null && grid.inBounds(cellInfo[0], cellInfo[1])) {
+            hoverRow = cellInfo[0];
+            hoverCol = cellInfo[1];
+        } else {
+            hoverRow = -1;
+            hoverCol = -1;
+        }
+
         if (infoPopupPinned) return;
 
         GridObject obj = null;
-        int[] cellInfo = getCellAtPoint(e.getX(), e.getY());
         if (cellInfo != null && grid.inBounds(cellInfo[0], cellInfo[1])) {
             GridObject candidate = grid.getObjectAt(cellInfo[0], cellInfo[1]);
             if (candidate instanceof Entity || candidate instanceof Enemy) {
@@ -385,11 +463,44 @@ public class BattleGridCanvas extends Pane {
     }
 
     private void handleKeyPressed(javafx.scene.input.KeyEvent e) {
+        // Reset camera to fit-to-view
+        if (e.getCode() == javafx.scene.input.KeyCode.HOME) {
+            resetCamera();
+            e.consume();
+            return;
+        }
+
         // Handle ESCAPE for object placement mode
         if (battleView.isObjectPlacementMode() && e.getCode() == javafx.scene.input.KeyCode.ESCAPE) {
             battleView.cancelObjectPlacement();
             e.consume();
             return;
+        }
+
+        // Handle ESCAPE for the elevation brush
+        if (battleView.isElevationMode() && e.getCode() == javafx.scene.input.KeyCode.ESCAPE) {
+            battleView.cancelElevationMode();
+            e.consume();
+            return;
+        }
+
+        // Raise/lower the hovered tile
+        if (hoverRow >= 0) {
+            switch (e.getCode()) {
+                case EQUALS, PLUS, ADD -> {
+                    grid.adjustElevation(hoverRow, hoverCol, 1);
+                    redraw();
+                    e.consume();
+                    return;
+                }
+                case MINUS, SUBTRACT -> {
+                    grid.adjustElevation(hoverRow, hoverCol, -1);
+                    redraw();
+                    e.consume();
+                    return;
+                }
+                default -> {}
+            }
         }
         
         // Handle shortcuts when entity is selected
@@ -565,7 +676,10 @@ public class BattleGridCanvas extends Pane {
         rollInput.setPromptText("Enter d10 roll (1-10)");
         rollInput.setPrefWidth(150);
         rollInput.setStyle("-fx-font-size: 14px; -fx-alignment: center;");
-        
+
+        Slider rollSlider = UI.FormUtils.attachRollSlider(rollInput, 1, 10);
+        rollSlider.setPrefWidth(150);
+
         // Preview label for showing calculated heal
         Label previewLabel = new Label("");
         previewLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #4CAF50;");
@@ -588,7 +702,7 @@ public class BattleGridCanvas extends Pane {
             }
         });
         
-        content.getChildren().addAll(itemInfo, rollInfo, rollInput, previewLabel);
+        content.getChildren().addAll(itemInfo, rollInfo, rollSlider, rollInput, previewLabel);
         
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -753,16 +867,116 @@ public class BattleGridCanvas extends Pane {
      * around the board for the frame and drop shadow.
      */
     private double[] getGridLayout() {
-        double cellSize = Math.min(
-            (canvas.getWidth() - BOARD_MARGIN * 2) / grid.getCols(),
-            (canvas.getHeight() - BOARD_MARGIN * 2) / grid.getRows());
-        double offsetX = (canvas.getWidth() - cellSize * grid.getCols()) / 2;
-        double offsetY = (canvas.getHeight() - cellSize * grid.getRows()) / 2;
+        double cellSize = fitCellSize() * zoom;
+        double offsetX = (canvas.getWidth() - cellSize * grid.getCols()) / 2 + panX;
+        double offsetY = (canvas.getHeight() - cellSize * grid.getRows()) / 2 + panY;
         return new double[]{cellSize, offsetX, offsetY};
     }
 
-    private void handleLeftClick(MouseEvent e) {
-        int[] cellInfo = getCellAtPoint(e.getX(), e.getY());
+    // Upward screen shift per elevation level, as a fraction of a cell
+    private static final double ELEV_LIFT = 0.25;
+
+    /**
+     * Screen-pixel lift for a cell's elevation. Purely visual: hit testing
+     * intentionally ignores this, so clicks target the base grid position.
+     */
+    private double liftFor(int r, int c, double cellSize) {
+        return grid.getElevation(r, c) * cellSize * ELEV_LIFT;
+    }
+
+    /**
+     * Draw one elevated tile's visual: darkened side face down to the true grid line,
+     * floor texture on the lifted top, lit leading edge, and an outline. Called once in
+     * the base floor pass, and reasserted again in the back-to-front pass just before a
+     * row's own content draws, so a raised tile redraws over - and thus occludes -
+     * whatever from the row behind it (row - 1) already got drawn, e.g. a unit standing there.
+     */
+    private void drawElevatedTileFace(GraphicsContext gc, int r, int c, double offsetX, double offsetY, double cellSize) {
+        int v = (int) (((r * 73856093L) ^ (c * 19349663L)) >>> 1) % theme.floorVariants.length;
+        double x0 = Math.round(offsetX + c * cellSize);
+        double x1 = Math.round(offsetX + (c + 1) * cellSize);
+        double lift = liftFor(r, c, cellSize);
+        double yBase = Math.round(offsetY + (r + 1) * cellSize);
+        double yT0 = Math.round(offsetY + r * cellSize - lift);
+        double yT1 = Math.round(offsetY + (r + 1) * cellSize - lift);
+        gc.drawImage(theme.floorVariants[v], x0, yT1, x1 - x0, yBase - yT1);
+        gc.setFill(Color.rgb(0, 0, 0, 0.45));
+        gc.fillRect(x0, yT1, x1 - x0, yBase - yT1);
+        gc.drawImage(theme.floorVariants[v], x0, yT0, x1 - x0, yT1 - yT0);
+        if (((r + c) & 1) == 1) {
+            gc.setFill(Color.rgb(0, 0, 0, 0.07));
+            gc.fillRect(x0, yT0, x1 - x0, yT1 - yT0);
+        }
+        gc.setFill(Color.rgb(255, 255, 255, 0.10));
+        gc.fillRect(x0, yT0, x1 - x0, Math.max(2, cellSize * 0.045));
+        gc.setStroke(Color.rgb(0, 0, 0, 0.35));
+        gc.setLineWidth(1);
+        gc.strokeRect(x0 + 0.5, yT0 + 0.5, x1 - x0 - 1, yT1 - yT0 - 1);
+    }
+
+    /** Draw a single floor pickup token at its lifted position. */
+    private void drawPickup(GraphicsContext gc, Pickup p, double offsetX, double offsetY, double cellSize) {
+        double x = offsetX + p.getCol() * cellSize;
+        double y = offsetY + p.getRow() * cellSize - liftFor(p.getRow(), p.getCol(), cellSize);
+        double circleSize = cellSize * 0.35;
+        double offset = (cellSize - circleSize) / 2;
+        String pickupColor = p.getItem() != null ? p.getItem().getColor() : EntityRes.ColorUtils.DEFAULT_COLOR;
+        gc.setFill(Color.rgb(0, 0, 0, 0.35));
+        gc.fillOval(x + offset, y + offset + circleSize * 0.15, circleSize, circleSize * 0.85);
+        gc.setFill(Color.web(pickupColor));
+        gc.fillOval(x + offset, y + offset, circleSize, circleSize);
+    }
+
+    /** Cell size that fits the whole board in the canvas (zoom = 1.0). */
+    private double fitCellSize() {
+        return Math.min(
+            (canvas.getWidth() - BOARD_MARGIN * 2) / grid.getCols(),
+            (canvas.getHeight() - BOARD_MARGIN * 2) / grid.getRows());
+    }
+
+    /** Keep at least PAN_VISIBLE_MARGIN px of the board visible on each axis. */
+    private void clampPan() {
+        double cs = fitCellSize() * zoom;
+        double gridW = cs * grid.getCols();
+        double gridH = cs * grid.getRows();
+        double cx = (canvas.getWidth() - gridW) / 2;
+        double cy = (canvas.getHeight() - gridH) / 2;
+        panX = Math.max(PAN_VISIBLE_MARGIN - gridW - cx,
+               Math.min(canvas.getWidth() - PAN_VISIBLE_MARGIN - cx, panX));
+        panY = Math.max(PAN_VISIBLE_MARGIN - gridH - cy,
+               Math.min(canvas.getHeight() - PAN_VISIBLE_MARGIN - cy, panY));
+    }
+
+    /** Mouse-wheel zoom, keeping the board point under the cursor fixed. */
+    private void handleScroll(javafx.scene.input.ScrollEvent e) {
+        if (e.getDeltaY() == 0) return;
+        double[] layout = getGridLayout();
+        double newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM,
+            zoom * Math.exp(e.getDeltaY() * 0.002)));
+        if (newZoom == zoom) return;
+        double worldCol = (e.getX() - layout[1]) / layout[0];
+        double worldRow = (e.getY() - layout[2]) / layout[0];
+        zoom = newZoom;
+        double cs = fitCellSize() * zoom;
+        panX = e.getX() - worldCol * cs - (canvas.getWidth() - cs * grid.getCols()) / 2;
+        panY = e.getY() - worldRow * cs - (canvas.getHeight() - cs * grid.getRows()) / 2;
+        clampPan();
+        hideInfoPopup();
+        e.consume();
+        redraw();
+    }
+
+    /** Restore the default fit-to-view camera. */
+    public void resetCamera() {
+        zoom = 1.0;
+        panX = 0;
+        panY = 0;
+        hideInfoPopup();
+        redraw();
+    }
+
+    private void handleLeftClick(double x, double y) {
+        int[] cellInfo = getCellAtPoint(x, y);
         if (cellInfo == null) return;
 
         int row = cellInfo[0];
@@ -1115,13 +1329,18 @@ public class BattleGridCanvas extends Pane {
             for (int c = 0; c < cols; c++) {
                 int v = (int) (((r * 73856093L) ^ (c * 19349663L)) >>> 1) % theme.floorVariants.length;
                 double x0 = Math.round(offsetX + c * cellSize);
-                double y0 = Math.round(offsetY + r * cellSize);
                 double x1 = Math.round(offsetX + (c + 1) * cellSize);
-                double y1 = Math.round(offsetY + (r + 1) * cellSize);
-                gc.drawImage(theme.floorVariants[v], x0, y0, x1 - x0, y1 - y0);
-                if (((r + c) & 1) == 1) {
-                    gc.setFill(Color.rgb(0, 0, 0, 0.07));
-                    gc.fillRect(x0, y0, x1 - x0, y1 - y0);
+                double lift = liftFor(r, c, cellSize);
+                if (lift == 0) {
+                    double y0 = Math.round(offsetY + r * cellSize);
+                    double y1 = Math.round(offsetY + (r + 1) * cellSize);
+                    gc.drawImage(theme.floorVariants[v], x0, y0, x1 - x0, y1 - y0);
+                    if (((r + c) & 1) == 1) {
+                        gc.setFill(Color.rgb(0, 0, 0, 0.07));
+                        gc.fillRect(x0, y0, x1 - x0, y1 - y0);
+                    }
+                } else {
+                    drawElevatedTileFace(gc, r, c, offsetX, offsetY, cellSize);
                 }
             }
         }
@@ -1133,7 +1352,7 @@ public class BattleGridCanvas extends Pane {
                 for (int c = 0; c < cols; c++) {
                     if (grid.getObjectAt(r, c) == null && !grid.isBlocked(r, c)) {
                         double x = offsetX + c * cellSize;
-                        double y = offsetY + r * cellSize;
+                        double y = offsetY + r * cellSize - liftFor(r, c, cellSize);
                         gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
                     }
                 }
@@ -1152,7 +1371,7 @@ public class BattleGridCanvas extends Pane {
                     int dist = Math.abs(entityRow - r) + Math.abs(entityCol - c);
                     if (dist > 0 && dist <= mobilityLimit && !grid.isBlocked(r, c)) {
                         double x = offsetX + c * cellSize;
-                        double y = offsetY + r * cellSize;
+                        double y = offsetY + r * cellSize - liftFor(r, c, cellSize);
                         gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
                     }
                 }
@@ -1171,7 +1390,7 @@ public class BattleGridCanvas extends Pane {
                     int dist = Math.abs(entityRow - r) + Math.abs(entityCol - c);
                     if (dist > 0 && dist <= mobilityLimit && !grid.isBlocked(r, c)) {
                         double x = offsetX + c * cellSize;
-                        double y = offsetY + r * cellSize;
+                        double y = offsetY + r * cellSize - liftFor(r, c, cellSize);
                         gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
                     }
                 }
@@ -1185,7 +1404,7 @@ public class BattleGridCanvas extends Pane {
             for (Entity e : grid.getEntities()) {
                 if (e != attackingEntity) {
                     double x = offsetX + e.getCol() * cellSize;
-                    double y = offsetY + e.getRow() * cellSize;
+                    double y = offsetY + e.getRow() * cellSize - liftFor(e.getRow(), e.getCol(), cellSize);
                     gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
                     gc.setStroke(Color.rgb(215, 95, 95, 0.75));
                     gc.setLineWidth(1.5);
@@ -1194,7 +1413,7 @@ public class BattleGridCanvas extends Pane {
             }
             for (Enemy en : grid.getEnemies()) {
                 double x = offsetX + en.getCol() * cellSize;
-                double y = offsetY + en.getRow() * cellSize;
+                double y = offsetY + en.getRow() * cellSize - liftFor(en.getRow(), en.getCol(), cellSize);
                 gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
                 gc.setStroke(Color.rgb(215, 95, 95, 0.75));
                 gc.setLineWidth(1.5);
@@ -1202,7 +1421,7 @@ public class BattleGridCanvas extends Pane {
             }
             for (TerrainObject t : grid.getTerrainObjects()) {
                 double x = offsetX + t.getCol() * cellSize;
-                double y = offsetY + t.getRow() * cellSize;
+                double y = offsetY + t.getRow() * cellSize - liftFor(t.getRow(), t.getCol(), cellSize);
                 gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
                 gc.setStroke(Color.rgb(215, 95, 95, 0.75));
                 gc.setLineWidth(1.5);
@@ -1217,7 +1436,7 @@ public class BattleGridCanvas extends Pane {
 
             for (Entity e : grid.getEntities()) {
                 double x = offsetX + e.getCol() * cellSize;
-                double y = offsetY + e.getRow() * cellSize;
+                double y = offsetY + e.getRow() * cellSize - liftFor(e.getRow(), e.getCol(), cellSize);
                 gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
                 gc.setStroke(Color.rgb(215, 95, 95, 0.75));
                 gc.setLineWidth(1.5);
@@ -1226,7 +1445,7 @@ public class BattleGridCanvas extends Pane {
             for (Enemy en : grid.getEnemies()) {
                 if (en != attackingEnemy) {
                     double x = offsetX + en.getCol() * cellSize;
-                    double y = offsetY + en.getRow() * cellSize;
+                    double y = offsetY + en.getRow() * cellSize - liftFor(en.getRow(), en.getCol(), cellSize);
                     gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
                     gc.setStroke(Color.rgb(215, 95, 95, 0.75));
                     gc.setLineWidth(1.5);
@@ -1235,7 +1454,7 @@ public class BattleGridCanvas extends Pane {
             }
             for (TerrainObject t : grid.getTerrainObjects()) {
                 double x = offsetX + t.getCol() * cellSize;
-                double y = offsetY + t.getRow() * cellSize;
+                double y = offsetY + t.getRow() * cellSize - liftFor(t.getRow(), t.getCol(), cellSize);
                 gc.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
                 gc.setStroke(Color.rgb(215, 95, 95, 0.75));
                 gc.setLineWidth(1.5);
@@ -1246,15 +1465,7 @@ public class BattleGridCanvas extends Pane {
 
         // Pickups - floor items, drawn under everything that stands
         for (Pickup p : grid.getPickups()) {
-            double x = offsetX + p.getCol() * cellSize;
-            double y = offsetY + p.getRow() * cellSize;
-            double circleSize = cellSize * 0.35;
-            double offset = (cellSize - circleSize) / 2;
-            String pickupColor = p.getItem() != null ? p.getItem().getColor() : EntityRes.ColorUtils.DEFAULT_COLOR;
-            gc.setFill(Color.rgb(0, 0, 0, 0.35));
-            gc.fillOval(x + offset, y + offset + circleSize * 0.15, circleSize, circleSize * 0.85);
-            gc.setFill(Color.web(pickupColor));
-            gc.fillOval(x + offset, y + offset, circleSize, circleSize);
+            drawPickup(gc, p, offsetX, offsetY, cellSize);
         }
 
         long frameNow = System.nanoTime();
@@ -1264,10 +1475,22 @@ public class BattleGridCanvas extends Pane {
         // Back-to-front pass: draw row by row so sprites that extend above
         // their tile get overlapped by whatever stands in the row below
         for (int r = 0; r < rows; r++) {
+            // Re-draw this row's raised tiles now, so they redraw over - and thus
+            // occlude - whatever from the row above already got drawn (e.g. a unit
+            // standing there), before drawing this row's own terrain/units on top.
+            for (int c = 0; c < cols; c++) {
+                if (grid.getElevation(r, c) > 0) {
+                    drawElevatedTileFace(gc, r, c, offsetX, offsetY, cellSize);
+                    Pickup pickupHere = grid.getPickupAt(r, c);
+                    if (pickupHere != null) {
+                        drawPickup(gc, pickupHere, offsetX, offsetY, cellSize);
+                    }
+                }
+            }
             for (TerrainObject t : grid.getTerrainObjects()) {
                 if (t.getRow() != r) continue;
                 double x = offsetX + t.getCol() * cellSize;
-                double y = offsetY + r * cellSize;
+                double y = offsetY + r * cellSize - liftFor(r, t.getCol(), cellSize);
 
                 SpriteUtils.drawTerrainSpriteOnCanvas(gc, t, x, y, cellSize);
 
@@ -1281,7 +1504,8 @@ public class BattleGridCanvas extends Pane {
             for (Enemy en : grid.getEnemies()) {
                 if (en.getRow() != r) continue;
                 double[] pos = currentDrawPosition(en, en.getRow(), en.getCol(), frameNow);
-                drawUnit(gc, offsetX + pos[1] * cellSize, offsetY + pos[0] * cellSize, cellSize,
+                double lift = liftFor((int) Math.round(pos[0]), (int) Math.round(pos[1]), cellSize);
+                drawUnit(gc, offsetX + pos[1] * cellSize, offsetY + pos[0] * cellSize, cellSize, lift,
                     en.getSpritePath(), Color.web(en.getColor()), false,
                     turnManager.isCurrent(en), en == selectedObject,
                     en.getHealth(), en.getMaxHealth(), frameNow);
@@ -1289,8 +1513,9 @@ public class BattleGridCanvas extends Pane {
             for (Entity e : grid.getEntities()) {
                 if (e.getRow() != r) continue;
                 double[] pos = currentDrawPosition(e, e.getRow(), e.getCol(), frameNow);
+                double lift = liftFor((int) Math.round(pos[0]), (int) Math.round(pos[1]), cellSize);
                 java.awt.Color awtColor = e.getCharSheet().getDisplayColor();
-                drawUnit(gc, offsetX + pos[1] * cellSize, offsetY + pos[0] * cellSize, cellSize,
+                drawUnit(gc, offsetX + pos[1] * cellSize, offsetY + pos[0] * cellSize, cellSize, lift,
                     e.getCharSheet().getSpritePath(),
                     Color.rgb(awtColor.getRed(), awtColor.getGreen(), awtColor.getBlue()), true,
                     turnManager.isCurrent(e), e == selectedObject,
@@ -1410,7 +1635,7 @@ public class BattleGridCanvas extends Pane {
                 continue;
             }
             double x = offsetX + (ft.col + 0.5) * cellSize;
-            double y = offsetY + ft.row * cellSize - p * cellSize * 0.6;
+            double y = offsetY + ft.row * cellSize - liftFor(ft.row, ft.col, cellSize) - p * cellSize * 0.6;
             double alpha = p < 0.7 ? 1.0 : (1 - p) / 0.3; // hold, then fade out
 
             gc.setFill(Color.rgb(0, 0, 0, 0.7 * alpha));
@@ -1426,11 +1651,13 @@ public class BattleGridCanvas extends Pane {
      * indicated by motion alone - sheet sprites play their walk cycle,
      * static sprites bob gently.
      */
-    private void drawUnit(GraphicsContext gc, double x, double y, double cellSize,
+    private void drawUnit(GraphicsContext gc, double x, double y, double cellSize, double lift,
             String spritePath, Color fallbackColor, boolean isParty,
             boolean isCurrent, boolean isSelected, int hp, int maxHp, long now) {
         double centerX = x + cellSize / 2;
-        double footY = y + cellSize * 0.85;
+        // A unit standing on a raised tile stands on ITS surface, not down at
+        // ground level - shadow, ring, and sprite all lift together.
+        double footY = y + cellSize * 0.85 - lift;
 
         boolean sheetSprite = SpriteUtils.isSheetRef(spritePath);
         boolean turnActive = isCurrent && battleStarted;
@@ -1438,7 +1665,7 @@ public class BattleGridCanvas extends Pane {
             currentUnitTick = sheetSprite ? TICK_WALK : TICK_BOB;
         }
 
-        // Ground shadow
+        // Ground shadow, cast on whatever surface the unit is standing on
         double shadowW = cellSize * 0.64;
         double shadowH = cellSize * 0.22;
         gc.setFill(Color.rgb(0, 0, 0, 0.40));
@@ -1481,10 +1708,10 @@ public class BattleGridCanvas extends Pane {
             double bob = Math.round(1.5 + 1.5 * Math.sin(now / 250_000_000.0));
             gc.save();
             gc.translate(0, -bob);
-            SpriteUtils.drawUnitSpriteOnCanvas(gc, spritePath, x, y, cellSize, fallbackColor, isParty, false);
+            SpriteUtils.drawUnitSpriteOnCanvas(gc, spritePath, x, y - lift, cellSize, fallbackColor, isParty, false);
             gc.restore();
         } else {
-            SpriteUtils.drawUnitSpriteOnCanvas(gc, spritePath, x, y, cellSize, fallbackColor, isParty,
+            SpriteUtils.drawUnitSpriteOnCanvas(gc, spritePath, x, y - lift, cellSize, fallbackColor, isParty,
                 turnActive && sheetSprite);
         }
     }

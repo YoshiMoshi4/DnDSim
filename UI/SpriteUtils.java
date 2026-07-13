@@ -406,17 +406,15 @@ public class SpriteUtils {
     }
 
     /**
-     * Integer multiple of the native size keeps pixels square; only falls
-     * back to fractional scale when the tile is smaller than the sprite.
+     * Continuous scale so sprite size tracks the camera smoothly while
+     * zooming, rather than jumping only at whole-multiple thresholds.
      * Scales by HEIGHT with a slight overshoot: sheet frames carry a lot of
      * transparent horizontal padding, so width-based scaling made characters
      * look too small in their tiles. Heads may poke above the tile - that's
      * the intended 3/4-view look.
      */
     private static double unitSpriteScale(Image sprite, double cellSize) {
-        double target = cellSize * 1.10;
-        double scale = Math.floor(target / sprite.getHeight());
-        return scale < 1 ? target / sprite.getHeight() : scale;
+        return cellSize * 1.10 / sprite.getHeight();
     }
 
     /**

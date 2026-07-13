@@ -153,8 +153,11 @@ public class DiceRollPanel extends VBox {
                 d20Input.setText(newVal.replaceAll("[^\\d]", ""));
             }
         });
-        
-        inputArea.getChildren().addAll(d20Label, d20Input);
+
+        Slider d20Slider = UI.FormUtils.attachRollSlider(d20Input, 1, 20);
+        d20Slider.setPrefWidth(170);
+
+        inputArea.getChildren().addAll(d20Label, d20Slider, d20Input);
         
         // Result area (initially hidden) - a colored banner stating just the outcome, no math
         resultLabel = new Label("");
@@ -395,7 +398,7 @@ public class DiceRollPanel extends VBox {
                     input.setText(newVal.replaceAll("[^\\d]", ""));
                 }
             });
-            
+
             final int index = i;
             input.setOnAction(e -> {
                 // Focus next field or submit
@@ -405,9 +408,11 @@ public class DiceRollPanel extends VBox {
                     handleSubmit();
                 }
             });
-            
+
             damageInputs.add(input);
-            row.getChildren().addAll(dieLabel, input);
+            Slider dieSlider = UI.FormUtils.attachRollSlider(input, 1, getMaxValue(die));
+            dieSlider.setPrefWidth(90);
+            row.getChildren().addAll(dieLabel, dieSlider, input);
             damageInputArea.getChildren().add(row);
         }
         

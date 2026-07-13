@@ -34,7 +34,7 @@ public class IconUtils {
         SWORDS, PERSON, GEAR, PLUS, MINUS, TARGET, MOVE, FLAG, HEART, SHIELD, SKULL,
         DICE, PLAY, STOP, UNDO, SAVE, DELETE, EDIT, VIEW, LIGHTNING, POTION,
         CHEST, MAP, PARTY, CLOCK, INFO, WARNING, CHECK, CLOSE, BACK, MENU, FAST_FORWARD,
-        SCRIPT, WRENCH
+        SCRIPT, WRENCH, HAND
     }
 
     /**
@@ -116,6 +116,7 @@ public class IconUtils {
             case FAST_FORWARD -> MaterialDesignF.FAST_FORWARD;
             case SCRIPT -> MaterialDesignS.SCRIPT_TEXT;
             case WRENCH -> MaterialDesignW.WRENCH;
+            case HAND -> MaterialDesignH.HAND_BACK_RIGHT;
         };
     }
 
