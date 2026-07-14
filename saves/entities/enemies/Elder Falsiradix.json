@@ -15,6 +15,9 @@
   "color": "#80B380",
   "instanceNumber": 0,
   "baseName": "Elder Falsiradix",
+  "tags": [
+    "Beast"
+  ],
   "attackDamage": 0,
   "row": 0,
   "col": 0

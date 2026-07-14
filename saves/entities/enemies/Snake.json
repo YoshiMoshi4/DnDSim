@@ -12,9 +12,12 @@
   ],
   "initiative": 7,
   "dexterity": 7,
-  "color": 8,
+  "color": "#008000",
   "instanceNumber": 0,
   "baseName": "Snake",
+  "tags": [
+    "Beast"
+  ],
   "attackDamage": 0,
   "row": 0,
   "col": 0

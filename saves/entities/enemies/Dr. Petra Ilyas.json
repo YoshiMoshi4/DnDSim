@@ -15,6 +15,9 @@
   "color": "#80334D",
   "instanceNumber": 0,
   "baseName": "Dr. Petra Ilyas",
+  "tags": [
+    "Humanoid"
+  ],
   "attackDamage": 0,
   "row": 0,
   "col": 0

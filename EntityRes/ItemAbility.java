@@ -21,7 +21,13 @@ public class ItemAbility {
     
     public static final String[] TRIGGER_TYPES = {PASSIVE, ON_TURN_START, ON_HIT, ON_EQUIP, ON_DAMAGED};
     public static final String[] EFFECT_TYPES = {EFFECT_HEAL, EFFECT_DAMAGE, EFFECT_STAT_BOOST, EFFECT_STATUS};
-    
+
+    // Ability type - how the ability is categorized/used (not yet wired into combat for ACTIVE/SPECIAL)
+    public static final String TYPE_PASSIVE = "PASSIVE";
+    public static final String TYPE_ACTIVE = "ACTIVE";
+    public static final String TYPE_SPECIAL = "SPECIAL";
+    public static final String[] ABILITY_TYPES = {TYPE_PASSIVE, TYPE_ACTIVE, TYPE_SPECIAL};
+
     private String name;
     private String description;
     private String triggerType;
@@ -29,7 +35,8 @@ public class ItemAbility {
     private int magnitude;
     private int targetAttribute; // For STAT_BOOST: 0=STR, 1=DEX, 2=CON, 3=INT, 4=WIS, 5=CHA
     private String statusName;   // For STATUS effect: name of status to apply
-    
+    private String abilityType;  // TYPE_PASSIVE / TYPE_ACTIVE / TYPE_SPECIAL
+
     // Default constructor for Gson
     public ItemAbility() {
         this.name = "Unnamed Ability";
@@ -39,8 +46,9 @@ public class ItemAbility {
         this.magnitude = 0;
         this.targetAttribute = 0;
         this.statusName = null;
+        this.abilityType = TYPE_PASSIVE;
     }
-    
+
     public ItemAbility(String name, String description, String triggerType, String effectType, int magnitude) {
         this.name = name;
         this.description = description;
@@ -49,10 +57,11 @@ public class ItemAbility {
         this.magnitude = magnitude;
         this.targetAttribute = 0;
         this.statusName = null;
+        this.abilityType = TYPE_PASSIVE;
     }
-    
+
     // Full constructor
-    public ItemAbility(String name, String description, String triggerType, String effectType, 
+    public ItemAbility(String name, String description, String triggerType, String effectType,
                        int magnitude, int targetAttribute, String statusName) {
         this.name = name;
         this.description = description;
@@ -61,6 +70,20 @@ public class ItemAbility {
         this.magnitude = magnitude;
         this.targetAttribute = targetAttribute;
         this.statusName = statusName;
+        this.abilityType = TYPE_PASSIVE;
+    }
+
+    // Full constructor with ability type
+    public ItemAbility(String name, String description, String triggerType, String effectType,
+                       int magnitude, int targetAttribute, String statusName, String abilityType) {
+        this.name = name;
+        this.description = description;
+        this.triggerType = triggerType;
+        this.effectType = effectType;
+        this.magnitude = magnitude;
+        this.targetAttribute = targetAttribute;
+        this.statusName = statusName;
+        this.abilityType = abilityType != null ? abilityType : TYPE_PASSIVE;
     }
     
     // Getters and setters
@@ -115,16 +138,24 @@ public class ItemAbility {
     public String getStatusName() {
         return statusName;
     }
-    
+
     public void setStatusName(String statusName) {
         this.statusName = statusName;
     }
-    
+
+    public String getAbilityType() {
+        return abilityType != null ? abilityType : TYPE_PASSIVE;
+    }
+
+    public void setAbilityType(String abilityType) {
+        this.abilityType = abilityType != null ? abilityType : TYPE_PASSIVE;
+    }
+
     /**
      * Creates a copy of this ability
      */
     public ItemAbility copy() {
-        return new ItemAbility(name, description, triggerType, effectType, magnitude, targetAttribute, statusName);
+        return new ItemAbility(name, description, triggerType, effectType, magnitude, targetAttribute, statusName, getAbilityType());
     }
     
     /**

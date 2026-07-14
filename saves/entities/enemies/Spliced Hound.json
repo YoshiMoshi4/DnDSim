@@ -15,6 +15,10 @@
   "color": "#FF6666",
   "instanceNumber": 0,
   "baseName": "Spliced Hound",
+  "tags": [
+    "Optimized",
+    "Beast"
+  ],
   "attackDamage": 0,
   "row": 0,
   "col": 0

@@ -15,10 +15,17 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class CharacterSheetView {
 
@@ -27,40 +34,90 @@ public class CharacterSheetView {
     private final ArrayList<SheetButton> sheets = new ArrayList<>();
     private final ArrayList<Enemy> enemies = new ArrayList<>();
     private BattleView battleView;
-    private TabPane listTabs;
+    private VBox partyListBox;
     private StackPane displayPane;
     private VBox partyPopup;
     private boolean partyPopupVisible = false;
 
+    // Enemies browser (full-width mode)
+    private VBox enemyGridContainer;
+    private TextField enemySearchField;
+    private ComboBox<String> enemySortCombo;
+    private Button enemySortDirectionBtn;
+    private boolean enemySortAscending = true;
+    private FlowPane enemyTagFilterBar;
+    private Label enemySummaryLabel;
+    private final Set<String> activeTagFilters = new LinkedHashSet<>();
+
     public CharacterSheetView(AppController appController) {
         this.appController = appController;
-        
+
         root = new BorderPane();
         root.getStyleClass().add("panel-dark");
         root.setPadding(new Insets(10));
-        
+
         // Top button panel
         HBox buttonPanel = createButtonPanel();
         root.setTop(buttonPanel);
-        
-        // Main split pane
-        SplitPane splitPane = new SplitPane();
-        
-        // Left: tabbed list of characters
-        listTabs = new TabPane();
-        listTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        listTabs.setPrefWidth(200);
-        
-        // Right: sheet display area
+
+        VBox centerArea = new VBox(10);
+
+        // Characters mode: party list + detail pane
+        partyListBox = new VBox(8);
+        partyListBox.setPadding(new Insets(5));
+        ScrollPane partyScroll = new ScrollPane(partyListBox);
+        partyScroll.setFitToWidth(true);
+        partyScroll.setPrefWidth(200);
+
         displayPane = new StackPane();
         displayPane.getStyleClass().add("panel");
-        
-        splitPane.getItems().addAll(listTabs, displayPane);
-        splitPane.setDividerPositions(0.25);
-        
-        root.setCenter(splitPane);
-        
+
+        SplitPane charactersView = new SplitPane(partyScroll, displayPane);
+        charactersView.setDividerPositions(0.25);
+
+        // Enemies mode: full-width searchable/taggable card browser
+        VBox enemiesView = createEnemyBrowser();
+        enemiesView.setVisible(false);
+        enemiesView.setManaged(false);
+
+        StackPane modeContent = new StackPane(charactersView, enemiesView);
+        VBox.setVgrow(modeContent, Priority.ALWAYS);
+
+        HBox modeSwitch = createModeSwitch(charactersView, enemiesView);
+
+        centerArea.getChildren().addAll(modeSwitch, modeContent);
+        root.setCenter(centerArea);
+
         autoLoadSheets();
+    }
+
+    private HBox createModeSwitch(Node charactersView, Node enemiesView) {
+        ToggleGroup group = new ToggleGroup();
+
+        ToggleButton charactersBtn = new ToggleButton("Characters");
+        charactersBtn.getStyleClass().add("hotbar-tab");
+        charactersBtn.setToggleGroup(group);
+        charactersBtn.setSelected(true);
+        charactersBtn.setOnAction(e -> {
+            charactersView.setVisible(true);
+            charactersView.setManaged(true);
+            enemiesView.setVisible(false);
+            enemiesView.setManaged(false);
+        });
+
+        ToggleButton enemiesBtn = new ToggleButton("Enemies");
+        enemiesBtn.getStyleClass().add("hotbar-tab");
+        enemiesBtn.setToggleGroup(group);
+        enemiesBtn.setOnAction(e -> {
+            enemiesView.setVisible(true);
+            enemiesView.setManaged(true);
+            charactersView.setVisible(false);
+            charactersView.setManaged(false);
+        });
+
+        HBox switchBar = new HBox(8, charactersBtn, enemiesBtn);
+        switchBar.setPadding(new Insets(0, 0, 8, 0));
+        return switchBar;
     }
 
     public BorderPane getRoot() {
@@ -111,11 +168,28 @@ public class CharacterSheetView {
     private void autoLoadSheets() {
         loadEntitiesFromFolder("party");
         loadEnemies();
-        updateSheetLists();
-        
+        updatePartyList();
+        rebuildTagFilterBar();
+        rebuildEnemyGrid();
+
         if (!sheets.isEmpty()) {
             showSheet(sheets.get(0));
+        } else {
+            displayPane.getChildren().setAll(createEmptyState());
         }
+    }
+
+    private Node createEmptyState() {
+        VBox empty = new VBox(10);
+        empty.setAlignment(Pos.CENTER);
+        empty.setPadding(new Insets(40));
+
+        Node icon = IconUtils.createIcon(IconUtils.Icon.PERSON, 48, "#606060");
+        Label hint = new Label("Select a character or create one to get started");
+        hint.getStyleClass().add("empty-state-text");
+
+        empty.getChildren().addAll(icon, hint);
+        return empty;
     }
 
     private void loadEntitiesFromFolder(String folder) {
@@ -130,7 +204,9 @@ public class CharacterSheetView {
                     CharSheet loaded = CharSheet.load(charName, isParty);
                     if (loaded != null) {
                         CharacterSheetPane pane = new CharacterSheetPane(loaded);
-                        sheets.add(new SheetButton(pane, loaded.getName()));
+                        SheetButton sheetBtn = new SheetButton(pane, loaded.getName());
+                        pane.setOnDelete(() -> deleteSheet(loaded, sheetBtn));
+                        sheets.add(sheetBtn);
                     }
                 }
             }
@@ -148,32 +224,14 @@ public class CharacterSheetView {
         }
     }
 
-    private void updateSheetLists() {
-        listTabs.getTabs().clear();
-        
-        // Party characters list
-        VBox partyList = new VBox(5);
-        partyList.setPadding(new Insets(5));
+    private void updatePartyList() {
+        partyListBox.getChildren().clear();
+        int partyIndex = 0;
         for (SheetButton sheetBtn : sheets) {
-            Button btn = createListButton(sheetBtn);
-            partyList.getChildren().add(btn);
+            Node row = createListButton(sheetBtn);
+            partyListBox.getChildren().add(row);
+            AnimationUtils.slideIn(row, AnimationUtils.SlideDirection.UP, Duration.millis(200), Duration.millis(partyIndex++ * 40));
         }
-        ScrollPane partyScroll = new ScrollPane(partyList);
-        partyScroll.setFitToWidth(true);
-        Tab partyTab = new Tab("Characters", partyScroll);
-        listTabs.getTabs().add(partyTab);
-        
-        // Enemies list
-        VBox enemyList = new VBox(5);
-        enemyList.setPadding(new Insets(5));
-        for (Enemy enemy : enemies) {
-            Button btn = createEnemyListButton(enemy);
-            enemyList.getChildren().add(btn);
-        }
-        ScrollPane enemyScroll = new ScrollPane(enemyList);
-        enemyScroll.setFitToWidth(true);
-        Tab enemyTab = new Tab("Enemies", enemyScroll);
-        listTabs.getTabs().add(enemyTab);
     }
     
     /**
@@ -271,6 +329,7 @@ public class CharacterSheetView {
         ListView<String> availableList = new ListView<>(availableItems);
         availableList.setPrefHeight(250);
         availableList.setPrefWidth(150);
+        styleNameListView(availableList);
         setupDragSource(availableList);
         setupDragTarget(availableList, partyItems, availableItems, false);
         
@@ -285,6 +344,7 @@ public class CharacterSheetView {
         ListView<String> partyList = new ListView<>(partyItems);
         partyList.setPrefHeight(250);
         partyList.setPrefWidth(150);
+        styleNameListView(partyList);
         setupDragSource(partyList);
         setupDragTarget(partyList, availableItems, partyItems, true);
         
@@ -325,10 +385,43 @@ public class CharacterSheetView {
         arrowBox.getChildren().addAll(addToPartyBtn, removeFromPartyBtn);
         
         container.getChildren().addAll(availableBox, arrowBox, partyBox);
-        
+
         return container;
     }
-    
+
+    private CharSheet findCharSheetByName(String name) {
+        for (SheetButton sheetBtn : sheets) {
+            if (sheetBtn.getSheet().getCharSheet().getName().equals(name)) {
+                return sheetBtn.getSheet().getCharSheet();
+            }
+        }
+        return null;
+    }
+
+    private void styleNameListView(ListView<String> listView) {
+        listView.setCellFactory(lv -> new ListCell<String>() {
+            @Override
+            protected void updateItem(String name, boolean empty) {
+                super.updateItem(name, empty);
+                if (empty || name == null) {
+                    setText(null);
+                    setGraphic(null);
+                } else {
+                    CharSheet cs = findCharSheetByName(name);
+                    Node avatar = cs != null
+                        ? SpriteUtils.createCharacterSprite(cs, 24)
+                        : SpriteUtils.createFallbackAvatar("#888888", 24, true);
+                    Label nameLabel = new Label(name);
+                    nameLabel.getStyleClass().add("entity-card-name");
+                    HBox row = new HBox(8, avatar, nameLabel);
+                    row.setAlignment(Pos.CENTER_LEFT);
+                    setText(null);
+                    setGraphic(row);
+                }
+            }
+        });
+    }
+
     private void setupDragSource(ListView<String> listView) {
         listView.setOnDragDetected(event -> {
             String selected = listView.getSelectionModel().getSelectedItem();
@@ -410,20 +503,28 @@ public class CharacterSheetView {
         });
     }
 
-    private Button createListButton(SheetButton sheetBtn) {
-        Button btn = new Button(sheetBtn.getText());
-        btn.getStyleClass().add("button");
-        btn.setMaxWidth(Double.MAX_VALUE);
-        btn.setOnAction(e -> showSheet(sheetBtn));
-        return btn;
-    }
+    private Node createListButton(SheetButton sheetBtn) {
+        CharSheet charSheet = sheetBtn.getSheet().getCharSheet();
 
-    private Button createEnemyListButton(Enemy enemy) {
-        Button btn = new Button(enemy.getName());
-        btn.getStyleClass().add("button");
-        btn.setMaxWidth(Double.MAX_VALUE);
-        btn.setOnAction(e -> showEnemyPane(enemy));
-        return btn;
+        Node avatar = SpriteUtils.createCharacterSprite(charSheet, 36);
+
+        Label nameLabel = new Label(sheetBtn.getLabelText());
+        nameLabel.getStyleClass().add("entity-card-name");
+
+        String className = charSheet.getCharacterClass();
+        String subtitle = (className != null && !className.equals("None")) ? className : "Level " + charSheet.getLevel();
+        Label subtitleLabel = new Label(subtitle);
+        subtitleLabel.getStyleClass().add("entity-card-subtitle");
+
+        VBox textBox = new VBox(2, nameLabel, subtitleLabel);
+
+        HBox row = new HBox(10, avatar, textBox);
+        row.getStyleClass().addAll("entity-card", "entity-card-party");
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setCursor(javafx.scene.Cursor.HAND);
+        row.setOnMouseClicked(e -> showSheet(sheetBtn));
+        AnimationUtils.addHoverAnimation(row, Color.web("#4CAF50"));
+        return row;
     }
 
     private void showSheet(SheetButton sheetBtn) {
@@ -432,95 +533,213 @@ public class CharacterSheetView {
         displayPane.getChildren().add(sheetBtn.getSheet());
     }
 
-    private void showEnemyPane(Enemy enemy) {
-        displayPane.getChildren().clear();
-        displayPane.getChildren().add(createEnemyDisplayPane(enemy));
+    /**
+     * Builds the full-width Enemies browser: search + tag filters + sort at top,
+     * a summary bar, then a card grid (or grouped-by-tag sections).
+     */
+    private VBox createEnemyBrowser() {
+        VBox browser = new VBox(12);
+        browser.setPadding(new Insets(10));
+
+        HBox topBar = new HBox(10);
+        topBar.setAlignment(Pos.CENTER_LEFT);
+
+        enemySearchField = FormUtils.createStyledTextField("Search enemies...", null, 220);
+        enemySearchField.textProperty().addListener((obs, oldVal, newVal) -> rebuildEnemyGrid());
+
+        Label sortLabel = new Label("Sort by:");
+        sortLabel.getStyleClass().add("form-label");
+
+        enemySortCombo = new ComboBox<>();
+        enemySortCombo.getItems().addAll("Name", "HP", "AC", "Initiative");
+        enemySortCombo.getSelectionModel().select("Name");
+        enemySortCombo.getStyleClass().add("styled-combo-box");
+        enemySortCombo.setOnAction(e -> rebuildEnemyGrid());
+
+        enemySortDirectionBtn = new Button();
+        enemySortDirectionBtn.getStyleClass().add("button");
+        enemySortDirectionBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.SORT_ASCENDING, 14, "#dcdcdc"));
+        enemySortDirectionBtn.setOnAction(e -> {
+            enemySortAscending = !enemySortAscending;
+            enemySortDirectionBtn.setGraphic(IconUtils.createIcon(
+                enemySortAscending ? IconUtils.Icon.SORT_ASCENDING : IconUtils.Icon.SORT_DESCENDING, 14, "#dcdcdc"));
+            rebuildEnemyGrid();
+        });
+
+        topBar.getChildren().addAll(enemySearchField, sortLabel, enemySortCombo, enemySortDirectionBtn);
+
+        enemyTagFilterBar = new FlowPane(6, 6);
+
+        enemySummaryLabel = new Label();
+        enemySummaryLabel.getStyleClass().add("enemy-summary-text");
+        HBox summaryBar = new HBox(enemySummaryLabel);
+        summaryBar.getStyleClass().add("enemy-summary-bar");
+
+        enemyGridContainer = new VBox(14);
+        enemyGridContainer.setPadding(new Insets(4, 0, 0, 0));
+
+        ScrollPane gridScroll = new ScrollPane(enemyGridContainer);
+        gridScroll.setFitToWidth(true);
+        VBox.setVgrow(gridScroll, Priority.ALWAYS);
+
+        browser.getChildren().addAll(topBar, enemyTagFilterBar, summaryBar, gridScroll);
+        return browser;
     }
 
-    private Node createEnemyDisplayPane(Enemy enemy) {
-        VBox pane = new VBox(15);
-        pane.setPadding(new Insets(20));
-        pane.getStyleClass().add("card");
-        
-        // Header with color indicator
-        HBox header = new HBox(15);
-        header.setAlignment(Pos.CENTER_LEFT);
-        
-        // Color swatch
-        javafx.scene.shape.Rectangle colorSwatch = new javafx.scene.shape.Rectangle(30, 30);
-        String colorHex = enemy.getColor();
-        colorSwatch.setFill(javafx.scene.paint.Color.web(colorHex));
-        colorSwatch.setArcWidth(6);
-        colorSwatch.setArcHeight(6);
-        colorSwatch.setStroke(javafx.scene.paint.Color.web(brightenColor(colorHex, 30)));
-        colorSwatch.setStrokeWidth(2);
-        
-        Label nameLabel = new Label(enemy.getName());
-        nameLabel.getStyleClass().add("label-title");
-        nameLabel.setStyle("-fx-font-size: 28px;");
-        
-        header.getChildren().addAll(colorSwatch, nameLabel);
-        
-        // Stats grid
-        GridPane statsGrid = new GridPane();
-        statsGrid.setHgap(30);
-        statsGrid.setVgap(12);
-        statsGrid.setPadding(new Insets(15, 0, 15, 0));
-        
-        addStatRow(statsGrid, 0, "Health", enemy.getMaxHealth() + " HP", IconUtils.Icon.HEART, "#e74c3c");
-        addStatRow(statsGrid, 1, "Armor Class", String.valueOf(enemy.getAC()), IconUtils.Icon.SHIELD, "#3498db");
-        addStatRow(statsGrid, 2, "Mobility", String.valueOf(enemy.getMovement()), IconUtils.Icon.MOVE, "#2ecc71");
-        addStatRow(statsGrid, 3, "Dexterity", String.valueOf(enemy.getDexterity()), IconUtils.Icon.TARGET, "#e67e22");
-        
-        // Damage dice tiers
-        String[] dice = enemy.getDamageDice();
-        addStatRow(statsGrid, 4, "Tier 1 Die", dice[0], IconUtils.Icon.DICE, "#f39c12");
-        addStatRow(statsGrid, 5, "Tier 2 Die", dice[1], IconUtils.Icon.DICE, "#e74c3c");
-        addStatRow(statsGrid, 6, "Tier 3 Die", dice[2], IconUtils.Icon.DICE, "#8e44ad");
-        
-        // Action buttons
-        HBox btnBox = new HBox(10);
-        btnBox.setPadding(new Insets(15, 0, 0, 0));
-        
-        Button editBtn = new Button("Edit");
-        editBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.EDIT));
-        editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> showEnemyDialog(enemy));
-        
-        Button deleteBtn = new Button("Delete");
-        deleteBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.DELETE));
-        deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteEnemy(enemy));
-        
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        
-        pane.getChildren().addAll(header, new Separator(), statsGrid, btnBox);
-        return pane;
+    /**
+     * Rebuilds the tag filter chip row from the union of Enemy.PREDEFINED_TAGS and any
+     * custom tags currently in use across saved enemies. Call whenever the available tag
+     * set may have changed (load, create, edit).
+     */
+    private void rebuildTagFilterBar() {
+        enemyTagFilterBar.getChildren().clear();
+
+        Button addTagBtn = new Button("+ Add Tag");
+        addTagBtn.getStyleClass().add("tag-chip");
+        addTagBtn.setOnAction(e -> promptAddNewTag());
+        enemyTagFilterBar.getChildren().add(addTagBtn);
+
+        Set<String> allTags = new LinkedHashSet<>(Arrays.asList(Enemy.PREDEFINED_TAGS));
+        allTags.addAll(EnemyTagRegistry.getAll());
+        for (Enemy enemy : enemies) {
+            allTags.addAll(enemy.getTags());
+        }
+
+        for (String tag : allTags) {
+            ToggleButton chip = new ToggleButton(tag);
+            chip.getStyleClass().add("tag-chip");
+            boolean active = activeTagFilters.contains(tag);
+            chip.setSelected(active);
+            if (active) {
+                chip.getStyleClass().add("tag-chip-selected");
+            }
+            chip.setOnAction(e -> {
+                if (chip.isSelected()) {
+                    activeTagFilters.add(tag);
+                    if (!chip.getStyleClass().contains("tag-chip-selected")) {
+                        chip.getStyleClass().add("tag-chip-selected");
+                    }
+                } else {
+                    activeTagFilters.remove(tag);
+                    chip.getStyleClass().remove("tag-chip-selected");
+                }
+                rebuildEnemyGrid();
+            });
+            enemyTagFilterBar.getChildren().add(chip);
+        }
     }
 
-    private void addStatRow(GridPane grid, int row, String label, String value, IconUtils.Icon icon, String iconColor) {
-        HBox labelBox = new HBox(8);
-        labelBox.setAlignment(Pos.CENTER_LEFT);
-        labelBox.getChildren().addAll(
-            IconUtils.createIcon(icon, 18, iconColor),
-            new Label(label + ":")
-        );
-        labelBox.getChildren().get(1).getStyleClass().add("form-label");
-        
-        Label valueLabel = new Label(value);
-        valueLabel.getStyleClass().add("label");
-        valueLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        
-        grid.add(labelBox, 0, row);
-        grid.add(valueLabel, 1, row);
+    /**
+     * Prompts for a brand-new tag name and permanently registers it (via EnemyTagRegistry)
+     * so it stays available as a filter/selection chip even before any enemy uses it.
+     */
+    private void promptAddNewTag() {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Add Tag");
+        dialog.setHeaderText(null);
+        dialog.setContentText("New tag name:");
+        dialog.getDialogPane().getStylesheets().add(new File("resources/styles/dark-theme.css").toURI().toString());
+        dialog.showAndWait().ifPresent(tag -> {
+            String trimmed = tag.trim();
+            if (!trimmed.isEmpty()) {
+                EnemyTagRegistry.addTag(trimmed);
+                rebuildTagFilterBar();
+            }
+        });
     }
 
-    private String brightenColor(String hex, int amount) {
-        hex = hex.replace("#", "");
-        int r = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(0, 2), 16) + amount));
-        int g = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(2, 4), 16) + amount));
-        int b = Math.max(0, Math.min(255, Integer.parseInt(hex.substring(4, 6), 16) + amount));
-        return String.format("#%02x%02x%02x", r, g, b);
+    /**
+     * Re-filters/sorts/renders the enemy card grid from the current search text,
+     * active tag filters (OR semantics), and sort selection.
+     */
+    private void rebuildEnemyGrid() {
+        enemyGridContainer.getChildren().clear();
+
+        String searchText = enemySearchField.getText() == null ? "" : enemySearchField.getText().trim().toLowerCase();
+
+        List<Enemy> filtered = new ArrayList<>();
+        for (Enemy enemy : enemies) {
+            if (!searchText.isEmpty() && !enemy.getName().toLowerCase().contains(searchText)) {
+                continue;
+            }
+            if (!activeTagFilters.isEmpty()) {
+                boolean matchesAnyTag = false;
+                for (String tag : enemy.getTags()) {
+                    if (activeTagFilters.contains(tag)) {
+                        matchesAnyTag = true;
+                        break;
+                    }
+                }
+                if (!matchesAnyTag) {
+                    continue;
+                }
+            }
+            filtered.add(enemy);
+        }
+
+        Comparator<Enemy> comparator = switch (enemySortCombo.getValue()) {
+            case "HP" -> Comparator.comparingInt(Enemy::getMaxHealth);
+            case "AC" -> Comparator.comparingInt(Enemy::getAC);
+            case "Initiative" -> Comparator.comparingInt(Enemy::getInitiative);
+            default -> Comparator.comparing(Enemy::getName, String.CASE_INSENSITIVE_ORDER);
+        };
+        if (!enemySortAscending) {
+            comparator = comparator.reversed();
+        }
+        filtered.sort(comparator);
+
+        if (filtered.isEmpty()) {
+            enemySummaryLabel.setText(enemies.isEmpty() ? "No enemies yet." : "No enemies match the current filters.");
+            enemyGridContainer.getChildren().add(createEmptyState());
+            return;
+        }
+
+        double avgHp = filtered.stream().mapToInt(Enemy::getMaxHealth).average().orElse(0);
+        double avgAc = filtered.stream().mapToInt(Enemy::getAC).average().orElse(0);
+        enemySummaryLabel.setText(String.format("%d enemies  •  avg HP %.0f  •  avg AC %.0f", filtered.size(), avgHp, avgAc));
+
+        if (activeTagFilters.isEmpty()) {
+            Map<String, List<Enemy>> groups = new LinkedHashMap<>();
+            for (Enemy enemy : filtered) {
+                String group = enemy.getTags().isEmpty() ? "Untagged" : enemy.getTags().get(0);
+                groups.computeIfAbsent(group, k -> new ArrayList<>()).add(enemy);
+            }
+            if (groups.size() > 1) {
+                // Untagged always renders first, regardless of sort field/direction.
+                List<Enemy> untaggedGroup = groups.remove("Untagged");
+                if (untaggedGroup != null) {
+                    Label untaggedLabel = new Label("Untagged");
+                    untaggedLabel.getStyleClass().add("card-header-title");
+                    enemyGridContainer.getChildren().addAll(untaggedLabel, buildEnemyFlowPane(untaggedGroup));
+                }
+                for (Map.Entry<String, List<Enemy>> entry : groups.entrySet()) {
+                    Label groupLabel = new Label(entry.getKey());
+                    groupLabel.getStyleClass().add("card-header-title");
+                    enemyGridContainer.getChildren().addAll(groupLabel, buildEnemyFlowPane(entry.getValue()));
+                }
+                return;
+            }
+        }
+
+        enemyGridContainer.getChildren().add(buildEnemyFlowPane(filtered));
+    }
+
+    private FlowPane buildEnemyFlowPane(List<Enemy> list) {
+        FlowPane grid = new FlowPane(12, 12);
+        for (Enemy enemy : list) {
+            grid.getChildren().add(CardUtils.createEnemyCard(enemy,
+                () -> showEnemyDialog(enemy),
+                () -> deleteEnemy(enemy)));
+        }
+        return grid;
+    }
+
+    private void deleteSheet(CharSheet sheetToDelete, SheetButton sheetBtn) {
+        sheetToDelete.delete();
+        PartyConfig.removeMember(sheetToDelete.getName());
+        sheets.remove(sheetBtn);
+        updatePartyList();
+        displayPane.getChildren().setAll(createEmptyState());
     }
 
     private void deleteEnemy(Enemy enemy) {
@@ -535,8 +754,8 @@ public class CharacterSheetView {
                 file.delete();
             }
             loadEnemies();
-            updateSheetLists();
-            displayPane.getChildren().clear();
+            rebuildTagFilterBar();
+            rebuildEnemyGrid();
         }
     }
 
@@ -707,8 +926,9 @@ public class CharacterSheetView {
                 
                 CharacterSheetPane pane = new CharacterSheetPane(newSheet);
                 SheetButton sheetBtn = new SheetButton(pane, nameField.getText());
+                pane.setOnDelete(() -> deleteSheet(newSheet, sheetBtn));
                 sheets.add(sheetBtn);
-                updateSheetLists();
+                updatePartyList();
                 newSheet.save();
                 showSheet(sheetBtn);
                 dialog.close();
@@ -829,7 +1049,61 @@ public class CharacterSheetView {
         refreshSpritePicker.run();
         colorPicker.setOnAction(e -> refreshSpritePicker.run());
         grid.add(spritePickerContainer, 1, row++);
-        
+
+        // Tags - predefined chips plus custom tag entry
+        grid.add(new Label("Tags:"), 0, row);
+        FlowPane tagChipRow = new FlowPane(6, 6);
+        Set<String> selectedTags = new LinkedHashSet<>(existing != null ? existing.getTags() : List.of());
+
+        Runnable[] refreshTagChips = new Runnable[1];
+        refreshTagChips[0] = () -> {
+            tagChipRow.getChildren().clear();
+            Set<String> allTags = new LinkedHashSet<>(Arrays.asList(Enemy.PREDEFINED_TAGS));
+            allTags.addAll(EnemyTagRegistry.getAll());
+            allTags.addAll(selectedTags);
+            for (String tag : allTags) {
+                ToggleButton chip = new ToggleButton(tag);
+                chip.getStyleClass().add("tag-chip");
+                boolean active = selectedTags.contains(tag);
+                chip.setSelected(active);
+                if (active) {
+                    chip.getStyleClass().add("tag-chip-selected");
+                }
+                chip.setOnAction(e -> {
+                    if (chip.isSelected()) {
+                        selectedTags.add(tag);
+                        if (!chip.getStyleClass().contains("tag-chip-selected")) {
+                            chip.getStyleClass().add("tag-chip-selected");
+                        }
+                    } else {
+                        selectedTags.remove(tag);
+                        chip.getStyleClass().remove("tag-chip-selected");
+                    }
+                });
+                tagChipRow.getChildren().add(chip);
+            }
+        };
+        refreshTagChips[0].run();
+        grid.add(tagChipRow, 1, row++);
+
+        grid.add(new Label("Custom Tag:"), 0, row);
+        HBox customTagBox = new HBox(6);
+        TextField customTagField = new TextField();
+        customTagField.setPromptText("e.g. Flying");
+        Button addTagBtn = new Button("Add");
+        addTagBtn.getStyleClass().add("button");
+        addTagBtn.setOnAction(e -> {
+            String customTag = customTagField.getText().trim();
+            if (!customTag.isEmpty()) {
+                selectedTags.add(customTag);
+                EnemyTagRegistry.addTag(customTag);
+                customTagField.clear();
+                refreshTagChips[0].run();
+            }
+        });
+        customTagBox.getChildren().addAll(customTagField, addTagBtn);
+        grid.add(customTagBox, 1, row++);
+
         HBox btnBox = new HBox(10);
         Button saveBtn = new Button("Save");
         saveBtn.getStyleClass().add("button-primary");
@@ -842,6 +1116,7 @@ public class CharacterSheetView {
                         dexSpinner.getValue(), dexSpinner.getValue(),
                     ColorUtils.toHex(colorPicker.getValue()));
                 enemy.setSpritePath(spritePath[0]);
+                enemy.setTags(new ArrayList<>(selectedTags));
                 if (!enemy.save()) {
                     showAlert(Alert.AlertType.ERROR, "Save Failed",
                         "Could not save \"" + name + "\" - the name may contain characters " +
@@ -849,8 +1124,8 @@ public class CharacterSheetView {
                     return;
                 }
                 loadEnemies();
-                updateSheetLists();
-                showEnemyPane(enemy);
+                rebuildTagFilterBar();
+                rebuildEnemyGrid();
                 dialog.close();
             }
         });

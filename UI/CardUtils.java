@@ -508,10 +508,51 @@ public class CardUtils {
         
         card.getChildren().addAll(header, type, actions);
         addCardHoverEffect(card);
-        
+
         return card;
     }
-    
+
+    /**
+     * Creates a stat-forward enemy card for the Enemies browser grid.
+     */
+    public static VBox createEnemyCard(Objects.Enemy enemy, CardAction onEdit, CardAction onDelete) {
+        CardStyle style = CardStyle.ENEMY;
+
+        VBox card = createBaseCard(style);
+        card.setMinWidth(150);
+        card.setMaxWidth(170);
+
+        HBox header = createCardHeader(enemy.getName(), style, SpriteUtils.createEnemySprite(enemy, 32));
+
+        HBox statBadges = new HBox(6);
+        statBadges.getChildren().addAll(
+            createBadge("HP " + enemy.getMaxHealth(), style.accentColor),
+            createBadge("AC " + enemy.getAC(), style.accentColor),
+            createBadge("Init " + enemy.getInitiative(), style.accentColor)
+        );
+
+        card.getChildren().addAll(header, statBadges);
+
+        if (!enemy.getTags().isEmpty()) {
+            HBox tagRow = new HBox(4);
+            for (String tag : enemy.getTags()) {
+                Label chip = new Label(tag);
+                chip.getStyleClass().add("tag-chip");
+                tagRow.getChildren().add(chip);
+            }
+            card.getChildren().add(tagRow);
+        }
+
+        HBox actions = createCardFooter(
+            createActionButton("Edit", IconUtils.Icon.EDIT, false, onEdit),
+            createActionButton("Delete", IconUtils.Icon.CLOSE, true, onDelete)
+        );
+        card.getChildren().add(actions);
+
+        addCardHoverEffect(card);
+        return card;
+    }
+
     /**
      * Creates an action button for cards.
      */

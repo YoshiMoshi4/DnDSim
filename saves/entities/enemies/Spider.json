@@ -12,9 +12,12 @@
   ],
   "initiative": 9,
   "dexterity": 9,
-  "color": 9,
+  "color": "#0000FF",
   "instanceNumber": 0,
   "baseName": "Spider",
+  "tags": [
+    "Beast"
+  ],
   "attackDamage": 0,
   "row": 0,
   "col": 0

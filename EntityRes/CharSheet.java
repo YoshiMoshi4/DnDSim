@@ -840,7 +840,7 @@ public class CharSheet {
         if (!isParty) {
             return;
         }
-        
+
         String dir = "saves/entities/party";
         new File(dir).mkdirs();
         String filePath = dir + "/" + name.replaceAll("[^a-zA-Z0-9]", "_") + ".json";
@@ -849,6 +849,20 @@ public class CharSheet {
             gson.toJson(this, writer);
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Deletes this sheet's save file from disk. Only applicable to party entities.
+     */
+    public void delete() {
+        if (!isParty) {
+            return;
+        }
+        String filePath = "saves/entities/party/" + name.replaceAll("[^a-zA-Z0-9]", "_") + ".json";
+        File file = new File(filePath);
+        if (file.exists()) {
+            file.delete();
         }
     }
 

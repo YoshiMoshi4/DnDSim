@@ -29,11 +29,19 @@ public class AnimationUtils {
      * Adds hover animation to a button with a custom glow color.
      */
     public static void addButtonHoverAnimation(Button button, Color glowColor) {
-        ScaleTransition scaleUp = new ScaleTransition(BUTTON_HOVER_DURATION, button);
+        addHoverAnimation(button, glowColor);
+    }
+
+    /**
+     * Adds hover animation (scale up + glow effect) to any node - e.g. a card-style
+     * list row that isn't a Button but should still feel clickable.
+     */
+    public static void addHoverAnimation(Node node, Color glowColor) {
+        ScaleTransition scaleUp = new ScaleTransition(BUTTON_HOVER_DURATION, node);
         scaleUp.setToX(1.05);
         scaleUp.setToY(1.05);
 
-        ScaleTransition scaleDown = new ScaleTransition(BUTTON_HOVER_DURATION, button);
+        ScaleTransition scaleDown = new ScaleTransition(BUTTON_HOVER_DURATION, node);
         scaleDown.setToX(1.0);
         scaleDown.setToY(1.0);
 
@@ -42,13 +50,13 @@ public class AnimationUtils {
         glow.setRadius(15);
         glow.setSpread(0.3);
 
-        button.setOnMouseEntered(e -> {
-            button.setEffect(glow);
+        node.setOnMouseEntered(e -> {
+            node.setEffect(glow);
             scaleUp.playFromStart();
         });
 
-        button.setOnMouseExited(e -> {
-            button.setEffect(null);
+        node.setOnMouseExited(e -> {
+            node.setEffect(null);
             scaleDown.playFromStart();
         });
     }
@@ -83,8 +91,16 @@ public class AnimationUtils {
      * Slides a node in from a direction with custom duration.
      */
     public static void slideIn(Node node, SlideDirection direction, Duration duration) {
+        slideIn(node, direction, duration, Duration.ZERO);
+    }
+
+    /**
+     * Slides a node in from a direction with a custom duration and start delay -
+     * use an increasing delay per item to stagger a list's entrance.
+     */
+    public static void slideIn(Node node, SlideDirection direction, Duration duration, Duration delay) {
         double startX = 0, startY = 0;
-        
+
         switch (direction) {
             case LEFT -> startX = -50;
             case RIGHT -> startX = 50;
@@ -106,6 +122,7 @@ public class AnimationUtils {
         fade.setToValue(1);
 
         ParallelTransition parallel = new ParallelTransition(translate, fade);
+        parallel.setDelay(delay);
         parallel.play();
     }
 

@@ -666,6 +666,44 @@
     -fx-border-width: 2;
 }
 
+/* ===== ENEMY BROWSER: TAG CHIPS & SUMMARY BAR ===== */
+.tag-chip {
+    -fx-background-color: #3c3c3e;
+    -fx-text-fill: #b8b8c0;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 12;
+    -fx-padding: 3 9 3 9;
+    -fx-cursor: hand;
+    -fx-border-color: #505052;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+}
+
+.tag-chip:hover {
+    -fx-border-color: #d75f5f;
+}
+
+.tag-chip-selected {
+    -fx-background-color: linear-gradient(to bottom, #e07070, #d75f5f);
+    -fx-text-fill: white;
+    -fx-border-color: #e88080;
+}
+
+.enemy-summary-bar {
+    -fx-background-color: #252528;
+    -fx-border-color: #3c3c3e;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 8 14 8 14;
+}
+
+.enemy-summary-text {
+    -fx-text-fill: #b0b0b0;
+    -fx-font-size: 11px;
+}
+
 /* ===== TITLED PANE WITH DEPTH ===== */
 .titled-pane {
     -fx-text-fill: #dcdcdc;
@@ -1165,6 +1203,157 @@
 
 .entity-card-enemy:hover {
     -fx-border-color: #d75f5f;
+}
+
+.entity-card-name {
+    -fx-text-fill: #e0e0e0;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.entity-card-subtitle {
+    -fx-text-fill: #888888;
+    -fx-font-size: 10px;
+}
+
+/* Ability Rows (Passive / Active / Special) */
+.ability-list {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-control-inner-background: transparent;
+}
+
+.ability-row {
+    -fx-background-color: linear-gradient(to bottom right, #2d2d30, #252528);
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-width: 0 0 0 3;
+    -fx-padding: 6 10 6 10;
+}
+
+.ability-row-passive {
+    -fx-border-color: #4CAF50;
+}
+
+.ability-row-active {
+    -fx-border-color: #569cd6;
+}
+
+.ability-row-special {
+    -fx-border-color: #9c27b0;
+}
+
+.ability-name {
+    -fx-text-fill: #e0e0e0;
+    -fx-font-weight: bold;
+}
+
+.ability-desc {
+    -fx-text-fill: #888888;
+    -fx-font-size: 11px;
+}
+
+.ability-trigger {
+    -fx-text-fill: #4ec9b0;
+    -fx-font-size: 10px;
+}
+
+/* Equipment slot cards */
+.slot-card {
+    -fx-background-color: linear-gradient(to bottom right, #2d2d30, #252528);
+    -fx-border-color: #3c3c3e;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10;
+}
+
+.slot-card:hover {
+    -fx-border-color: #569cd6;
+}
+
+/* AC badge */
+.ac-badge {
+    -fx-background-color: #2d2d30;
+    -fx-border-color: #3c3c3e;
+    -fx-border-width: 1;
+    -fx-border-radius: 14;
+    -fx-background-radius: 14;
+    -fx-padding: 4 10 4 10;
+}
+
+/* Attribute grid wrapper (sits below the radar chart) */
+.attribute-card {
+    -fx-background-color: #252528;
+    -fx-border-color: #3c3c3e;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10;
+}
+
+/* Empty state placeholder */
+.empty-state-text {
+    -fx-text-fill: #888888;
+    -fx-font-size: 13px;
+}
+
+/* Editable name/class fields living in the character sheet header */
+.header-name-field {
+    -fx-background-color: transparent;
+    -fx-text-fill: #dcdcdc;
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-border-color: transparent;
+    -fx-padding: 2 4 2 4;
+}
+
+.header-name-field:focused {
+    -fx-background-color: #2d2d30;
+    -fx-border-color: #569cd6;
+    -fx-border-width: 0 0 1 0;
+}
+
+.header-class-field {
+    -fx-background-color: transparent;
+    -fx-text-fill: #888888;
+    -fx-font-size: 11px;
+    -fx-border-color: transparent;
+    -fx-padding: 2 4 2 4;
+}
+
+.header-class-field:focused {
+    -fx-background-color: #2d2d30;
+    -fx-border-color: #569cd6;
+    -fx-border-width: 0 0 1 0;
+}
+
+/* Color picker restyled to match the dark theme instead of the default white swatch chrome */
+.styled-color-picker {
+    -fx-color-label-visible: false;
+    -fx-background-color: #3c3c3e;
+    -fx-background-radius: 4;
+    -fx-border-color: #555555;
+    -fx-border-radius: 4;
+    -fx-mark-color: #dcdcdc;
+}
+
+.styled-color-picker .arrow-button {
+    -fx-background-color: transparent;
+}
+
+.styled-color-picker .color-picker-label {
+    -fx-padding: 4 6 4 6;
+}
+
+.styled-color-picker .picker-color {
+    -fx-padding: 4;
+}
+
+.styled-color-picker .picker-color-rect {
+    -fx-stroke: #555555;
+    -fx-arc-width: 4;
+    -fx-arc-height: 4;
 }
 
 /* Card Header */

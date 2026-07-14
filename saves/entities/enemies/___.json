@@ -15,6 +15,10 @@
   "color": "#943B3B",
   "instanceNumber": 0,
   "baseName": "???",
+  "tags": [
+    "Android",
+    "Optimized"
+  ],
   "attackDamage": 0,
   "row": 0,
   "col": 0

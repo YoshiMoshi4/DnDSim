@@ -15,6 +15,10 @@
   "color": "#FFA500",
   "instanceNumber": 0,
   "baseName": "Legendary Elder Falsiradix",
+  "tags": [
+    "Boss",
+    "Beast"
+  ],
   "attackDamage": 0,
   "row": 0,
   "col": 0

@@ -4,8 +4,14 @@ import EntityRes.ColorUtils;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Enemy extends GridObject {
+
+    // Suggested tags shown as toggleable chips when creating/editing an enemy; the tags field
+    // itself is a free list so custom tags work identically to these.
+    public static final String[] PREDEFINED_TAGS = {"Boss", "Beast", "Undead", "Humanoid", "Dragon", "Construct", "Elemental"};
 
     private String name;
     private int health;
@@ -23,6 +29,7 @@ public class Enemy extends GridObject {
     private transient int acAdjustment = 0;  // Temporary in-battle AC tweak; not persisted, resets each battle
     private transient int dexAdjustment = 0;  // Temporary in-battle Dexterity tweak; not persisted, resets each battle
     private transient String[] diceOverride = new String[3];  // Temporary in-battle damage dice tweaks per tier; null = use real die
+    private List<String> tags = new ArrayList<>();  // Free-form + predefined tags for filtering; empty list default covers legacy saves
 
     // Legacy field for backward compatibility
     private int attackDamage;
@@ -297,6 +304,17 @@ public class Enemy extends GridObject {
 
     public String getSpritePath() {
         return spritePath;
+    }
+
+    public List<String> getTags() {
+        if (tags == null) {
+            tags = new ArrayList<>();
+        }
+        return tags;
+    }
+
+    public void setTags(List<String> tags) {
+        this.tags = tags != null ? tags : new ArrayList<>();
     }
 
     public void setInstanceNumber(int number) {

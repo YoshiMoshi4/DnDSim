@@ -15,6 +15,9 @@
   "color": "#4D804D",
   "instanceNumber": 0,
   "baseName": "Falsiradix",
+  "tags": [
+    "Beast"
+  ],
   "attackDamage": 0,
   "row": 0,
   "col": 0
