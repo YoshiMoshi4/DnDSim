@@ -19,6 +19,9 @@ public class CardUtils {
 
     // ==================== COLOR SCHEMES ====================
     
+    // Hexes here mirror resources/styles/dark-theme.css's -fx-theme-* tokens
+    // (bg-mid/border-dark/accent-blue etc.) - keep the two in sync by hand,
+    // since these get baked into per-card inline styles via String.format.
     public enum CardStyle {
         DEFAULT("#2d2d30", "#3c3c3e", "#569cd6"),
         PARTY("#2d3530", "#3c4540", "#4CAF50"),
@@ -362,6 +365,45 @@ public class CardUtils {
     }
     
     /**
+     * Creates a detailed accessory card (defense + attribute mods, same shape as a weapon/armor card).
+     */
+    public static VBox createAccessoryCard(Accessory accessory, CardAction onEdit, CardAction onDelete) {
+        CardStyle style = getItemRarityStyle(accessory);
+
+        VBox card = createBaseCard(style);
+        card.setMinWidth(180);
+        card.setMaxWidth(220);
+
+        HBox header = createCardHeader(accessory.getName(), style,
+            IconUtils.createIcon(IconUtils.Icon.SHIELD, 18, style.accentColor));
+
+        HBox rarityRow = new HBox();
+        rarityRow.getChildren().add(createBadge(getItemRarity(accessory), style.accentColor));
+
+        VBox stats = new VBox(4);
+        stats.setPadding(new Insets(8, 0, 0, 0));
+        addDetailRow(stats, "Defense", "+" + accessory.getDefense());
+
+        int[] attrs = accessory.getModifiedAttributes();
+        String[] attrNames = {"STR", "DEX", "CON", "INT", "WIS", "CHA"};
+        for (int i = 0; i < attrs.length && i < attrNames.length; i++) {
+            if (attrs[i] != 0) {
+                addDetailRow(stats, attrNames[i], (attrs[i] > 0 ? "+" : "") + attrs[i]);
+            }
+        }
+
+        HBox actions = createCardFooter(
+            createActionButton("Edit", IconUtils.Icon.EDIT, false, onEdit),
+            createActionButton("Delete", IconUtils.Icon.CLOSE, true, onDelete)
+        );
+
+        card.getChildren().addAll(header, rarityRow, stats, actions);
+        addCardHoverEffect(card);
+
+        return card;
+    }
+
+    /**
      * Creates a detailed armor card.
      */
     public static VBox createArmorCard(Armor armor, CardAction onEdit, CardAction onDelete) {
@@ -470,7 +512,7 @@ public class CardUtils {
             IconUtils.createIcon(IconUtils.Icon.GEAR, 18, CardStyle.DEFAULT.accentColor));
         
         Label category = new Label(item.getCraftingCategory());
-        category.setStyle("-fx-text-fill: #888; -fx-font-size: 11px;");
+        category.getStyleClass().add("card-detail-label");
         category.setPadding(new Insets(4, 0, 0, 0));
         
         HBox actions = createCardFooter(
@@ -578,12 +620,15 @@ public class CardUtils {
         row.setAlignment(Pos.CENTER_LEFT);
         
         Label labelNode = new Label(label + ":");
-        labelNode.setStyle("-fx-text-fill: #888; -fx-font-size: 11px;");
+        labelNode.getStyleClass().add("card-detail-label");
         labelNode.setMinWidth(60);
-        
+
         Label valueNode = new Label(value);
-        valueNode.setStyle("-fx-text-fill: #dcdcdc; -fx-font-size: 11px;");
-        
+        valueNode.getStyleClass().add("card-detail-value");
+        valueNode.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(valueNode, Priority.ALWAYS);
+        Tooltip.install(valueNode, new Tooltip(value));
+
         row.getChildren().addAll(labelNode, valueNode);
         container.getChildren().add(row);
     }
@@ -599,6 +644,10 @@ public class CardUtils {
             if (a.getDefense() >= 10) return CardStyle.LEGENDARY;
             if (a.getDefense() >= 5) return CardStyle.RARE;
             if (a.getDefense() >= 2) return CardStyle.UNCOMMON;
+        } else if (item instanceof Accessory acc) {
+            if (acc.getDefense() >= 10) return CardStyle.LEGENDARY;
+            if (acc.getDefense() >= 5) return CardStyle.RARE;
+            if (acc.getDefense() >= 2) return CardStyle.UNCOMMON;
         }
         return CardStyle.COMMON;
     }
@@ -616,6 +665,7 @@ public class CardUtils {
     private static IconUtils.Icon getItemIcon(Item item) {
         if (item instanceof Weapon) return IconUtils.Icon.SWORDS;
         if (item instanceof Armor) return IconUtils.Icon.SHIELD;
+        if (item instanceof Accessory) return IconUtils.Icon.SHIELD;
         if (item instanceof Consumable) return IconUtils.Icon.POTION;
         if (item instanceof KeyItem) return IconUtils.Icon.CHEST;
         if (item instanceof Ammunition) return IconUtils.Icon.TARGET;

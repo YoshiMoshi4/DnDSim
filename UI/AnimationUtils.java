@@ -13,10 +13,14 @@ import javafx.util.Duration;
  */
 public class AnimationUtils {
 
-    // Default durations
-    private static final Duration BUTTON_HOVER_DURATION = Duration.millis(100);
+    // Default durations - shared so ad-hoc Timelines elsewhere use consistent timing
+    public static final Duration FAST = Duration.millis(100);
+    public static final Duration MEDIUM = Duration.millis(180);
+    public static final Duration SLIDE = Duration.millis(250);
+
+    private static final Duration BUTTON_HOVER_DURATION = FAST;
     private static final Duration PROGRESS_BAR_DURATION = Duration.millis(300);
-    private static final Duration SLIDE_DURATION = Duration.millis(250);
+    private static final Duration SLIDE_DURATION = SLIDE;
 
     /**
      * Adds hover animation to a button (scale up + glow effect).
@@ -124,6 +128,27 @@ public class AnimationUtils {
         ParallelTransition parallel = new ParallelTransition(translate, fade);
         parallel.setDelay(delay);
         parallel.play();
+    }
+
+    /**
+     * Fades a node in from fully transparent, using the default MEDIUM duration.
+     */
+    public static void fadeIn(Node node) {
+        fadeIn(node, MEDIUM);
+    }
+
+    /**
+     * Fades a node in from fully transparent with a custom duration. Resets opacity
+     * to 1 once finished so a node reused later (e.g. a cached view) never gets
+     * stuck invisible if this animation is interrupted mid-flight.
+     */
+    public static void fadeIn(Node node, Duration duration) {
+        node.setOpacity(0);
+        FadeTransition fade = new FadeTransition(duration, node);
+        fade.setFromValue(0);
+        fade.setToValue(1);
+        fade.setOnFinished(e -> node.setOpacity(1));
+        fade.play();
     }
 
     /**

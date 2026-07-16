@@ -2,10 +2,11 @@
 /* Version 2.0 - Advanced CSS with Custom Properties */
 
 /* ===== CSS CUSTOM PROPERTIES (THEME VARIABLES) =====
- * These can be overridden for theming support
+ * Looked-up colors inherit from the root node; defining them
+ * here (instead of on *) resolves them once for the scene graph.
  * ================================================== */
 
-* {
+.root {
     /* Primary Colors */
     -fx-theme-bg-darkest: #1e1e20;
     -fx-theme-bg-dark: #252528;
@@ -120,6 +121,38 @@
 .label-danger {
     -fx-text-fill: -fx-theme-danger;
     -fx-font-weight: bold;
+}
+
+.label-caption {
+    -fx-font-size: 10px;
+}
+
+/* Battle sidebar section headings (gold, replaces per-call-site inline gold) */
+.section-header {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-theme-accent-orange;
+}
+
+/* Attribute-block stat colors (character sheet) */
+.stat-str { -fx-text-fill: -fx-theme-danger; -fx-font-weight: bold; }
+.stat-dex { -fx-text-fill: -fx-theme-success; -fx-font-weight: bold; }
+.stat-con { -fx-text-fill: -fx-theme-info; -fx-font-weight: bold; }
+.stat-int { -fx-text-fill: -fx-theme-warning; -fx-font-weight: bold; }
+.stat-wis { -fx-text-fill: -fx-theme-accent-teal; -fx-font-weight: bold; }
+.stat-cha { -fx-text-fill: #c586c0; -fx-font-weight: bold; }
+.stat-lvl { -fx-text-fill: -fx-theme-accent-orange; -fx-font-weight: bold; }
+.stat-points { -fx-text-fill: #ce9178; -fx-font-weight: bold; }
+
+/* Card detail rows (CardUtils) */
+.card-detail-label {
+    -fx-text-fill: -fx-theme-text-muted;
+    -fx-font-size: 11px;
+}
+
+.card-detail-value {
+    -fx-text-fill: -fx-theme-text-primary;
+    -fx-font-size: 11px;
 }
 
 .label-info {
@@ -248,8 +281,9 @@
 }
 
 .text-field:focused, .text-area:focused {
-    -fx-border-color: #505052;
-    -fx-effect: innershadow(gaussian, rgba(0, 0, 0, 0.3), 4, 0, 0, 1);
+    -fx-border-color: -fx-theme-accent-blue;
+    -fx-effect: innershadow(gaussian, rgba(0, 0, 0, 0.3), 4, 0, 0, 1),
+                dropshadow(gaussian, rgba(86, 156, 214, 0.35), 6, 0, 0, 0);
 }
 
 .text-field:hover, .text-area:hover {
@@ -295,6 +329,30 @@
     -fx-text-fill: #569cd6;
 }
 
+.combo-box:focused {
+    -fx-border-color: -fx-theme-accent-blue;
+}
+
+/* ===== TOGGLE BUTTON (base fallback; most toggles opt into .hotbar-tab etc.) ===== */
+.toggle-button {
+    -fx-background-color: linear-gradient(to bottom, #3e3e40, #353537);
+    -fx-text-fill: -fx-theme-text-primary;
+    -fx-border-color: -fx-theme-border-mid;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-padding: 6 12 6 12;
+}
+
+.toggle-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #464648, #3e3e40);
+}
+
+.toggle-button:selected {
+    -fx-background-color: -fx-theme-accent-blue;
+    -fx-text-fill: white;
+}
+
 /* ===== CHECKBOX WITH DEPTH ===== */
 .check-box {
     -fx-text-fill: #dcdcdc;
@@ -337,7 +395,6 @@
     -fx-border-radius: 6 6 0 0;
     -fx-padding: 10 18 10 18;
 }
-}
 
 .tab .tab-label {
     -fx-text-fill: #909095;
@@ -359,6 +416,19 @@
 .tab:selected .tab-label {
     -fx-text-fill: #569cd6;
     -fx-font-weight: bold;
+}
+
+/* Compact embedded tab strip (character-sheet ability/inventory sections) */
+.styled-tab-pane .tab-header-area {
+    -fx-padding: 0 0 4 0;
+}
+
+.styled-tab-pane .tab {
+    -fx-padding: 6 12 6 12;
+}
+
+.styled-tab-pane .tab-content-area {
+    -fx-background-color: -fx-theme-bg-dark;
 }
 
 .tab-pane .tab-content-area {
@@ -448,16 +518,7 @@
     -fx-border-width: 0 0 0 3;
 }
 
-/* ===== CONTEXT MENU WITH DEPTH ===== */
-.context-menu {
-    -fx-background-color: #2d2d30;
-    -fx-border-color: #464648;
-    -fx-border-radius: 6;
-    -fx-background-radius: 6;
-    -fx-padding: 6;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 16, 0, 0, 6);
-}
-
+/* ===== MENU ITEMS (context-menu shell styled in the ADVANCED section below) ===== */
 .menu-item {
     -fx-background-color: transparent;
     -fx-background-radius: 4;
@@ -516,6 +577,66 @@
 
 .panel-dark {
     -fx-background-color: #1e1e20;
+}
+
+/* Battle sidebar sub-panels (action/manage panels, add-objects drawer): flat
+   bg with a single left divider border, replacing the pasted-inline skin */
+.sidebar-panel {
+    -fx-background-color: -fx-theme-bg-mid;
+    -fx-border-color: -fx-theme-border-mid;
+    -fx-border-width: 0 0 0 1;
+}
+
+/* Canvas overlay popup (BattleGridCanvas info popup) */
+.info-popup {
+    -fx-background-color: -fx-theme-bg-mid;
+    -fx-border-color: -fx-theme-border-mid;
+    -fx-border-width: 1;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+}
+
+/* Gold-accented card (dice roll panel) */
+.card-gold {
+    -fx-background-color: linear-gradient(to bottom, #2d2d30, #252528);
+    -fx-border-color: -fx-theme-accent-orange;
+    -fx-border-width: 2;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
+/* Success-accented card (party management popup) */
+.card-accent-success {
+    -fx-border-color: -fx-theme-success;
+    -fx-border-width: 2;
+}
+
+/* Sprite picker (character/enemy/terrain sprite selection) */
+.sprite-picker {
+    -fx-background-color: -fx-theme-bg-dark;
+    -fx-background-radius: 8;
+    -fx-border-color: -fx-theme-border-dark;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+
+.sprite-preview {
+    -fx-background-color: -fx-theme-bg-darkest;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-width: 2;
+}
+
+.sprite-preview-party {
+    -fx-border-color: -fx-theme-success;
+}
+
+.sprite-preview-enemy {
+    -fx-border-color: -fx-theme-danger;
+}
+
+.sprite-picker .text-field {
+    -fx-font-size: 11px;
 }
 
 /* Card variants with different elevation levels */
@@ -640,6 +761,12 @@
     -fx-cursor: hand;
 }
 
+/* Compact 3-across variant (battle sidebar's round-start toggles) */
+.round-start-toggle {
+    -fx-font-size: 10px;
+    -fx-padding: 4 6 4 6;
+}
+
 .hotbar-tab:selected {
     -fx-background-color: linear-gradient(to bottom, #c99b00, #b8860b);
     -fx-text-fill: #1e1e20;
@@ -704,39 +831,8 @@
     -fx-font-size: 11px;
 }
 
-/* ===== TITLED PANE WITH DEPTH ===== */
-.titled-pane {
-    -fx-text-fill: #dcdcdc;
-}
-
-.titled-pane > .title {
-    -fx-background-color: linear-gradient(to bottom, #3c3c3e, #353537);
-    -fx-background-radius: 6 6 0 0;
-    -fx-padding: 10 14 10 14;
-}
-
-.titled-pane > .title:hover {
-    -fx-background-color: linear-gradient(to bottom, #464648, #3c3c3e);
-}
-
-.titled-pane > .title > .arrow-button > .arrow {
-    -fx-background-color: #808085;
-}
-
-.titled-pane:expanded > .title > .arrow-button > .arrow {
-    -fx-background-color: #569cd6;
-}
-
-.titled-pane > .content {
-    -fx-background-color: #2d2d30;
-    -fx-border-color: #3c3c3e;
-    -fx-border-width: 0 1 1 1;
-    -fx-border-radius: 0 0 6 6;
-    -fx-background-radius: 0 0 6 6;
-    -fx-padding: 12;
-}
-
 /* ===== PROGRESS BAR WITH DEPTH ===== */
+/* (titled-pane styled once in the ADVANCED section below) */
 .progress-bar {
     -fx-background-color: #252528;
     -fx-background-radius: 4;
@@ -767,68 +863,31 @@
     -fx-background-color: linear-gradient(to bottom, #6aabdf, #569cd6);
 }
 
-/* ===== SLIDER (used for roll-input dials) ===== */
-.slider .track {
-    -fx-background-color: #252528;
-    -fx-background-radius: 4;
-    -fx-pref-height: 4px;
+.progress-bar-success .bar {
+    -fx-background-color: linear-gradient(to bottom, -fx-theme-success-light, -fx-theme-success);
 }
 
-.slider .thumb {
-    -fx-background-color: linear-gradient(to bottom, #6aabdf, #569cd6);
-    -fx-background-radius: 50%;
-    -fx-pref-width: 14px;
-    -fx-pref-height: 14px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 3, 0, 0, 1);
+/* Mini HP gauge (timeline cards): tight track, no outer chrome */
+.hp-bar {
+    -fx-background-color: transparent;
+    -fx-effect: none;
 }
 
-.slider .thumb:hover {
-    -fx-background-color: linear-gradient(to bottom, #7ab8e8, #6aabdf);
-    -fx-effect: dropshadow(gaussian, rgba(86, 156, 214, 0.5), 6, 0, 0, 2);
+.hp-bar .track {
+    -fx-background-color: -fx-theme-bg-darkest;
+    -fx-background-radius: 3;
+    -fx-border-color: -fx-theme-border-dark;
+    -fx-border-radius: 3;
 }
 
-.slider .thumb:pressed {
-    -fx-background-color: linear-gradient(to bottom, #4a8bc4, #3d7eb5);
-}
-
-.slider .axis-tick-mark, .slider .axis-minor-tick-mark {
-    -fx-stroke: #606065;
-}
-
-/* ===== TOOLTIP WITH DEPTH ===== */
-.tooltip {
-    -fx-background-color: #2d2d30;
-    -fx-text-fill: #dcdcdc;
-    -fx-border-color: #464648;
-    -fx-border-width: 1;
-    -fx-border-radius: 4;
-    -fx-background-radius: 4;
-    -fx-padding: 8 12 8 12;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 10, 0, 0, 4);
-}
-
-/* ===== SLIDER WITH DEPTH ===== */
-.slider .track {
-    -fx-background-color: #252528;
-    -fx-background-radius: 4;
-    -fx-effect: innershadow(gaussian, rgba(0, 0, 0, 0.3), 3, 0, 0, 1);
-}
-
-.slider .thumb {
-    -fx-background-color: linear-gradient(to bottom, #606065, #505052);
-    -fx-background-radius: 10;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 4, 0, 0, 1);
-}
-
-.slider .thumb:hover {
-    -fx-background-color: linear-gradient(to bottom, #707075, #606065);
-}
-
-.slider .thumb:pressed {
-    -fx-background-color: #569cd6;
+.hp-bar .bar {
+    -fx-background-insets: 1;
+    -fx-background-radius: 3;
+    -fx-padding: 3;
 }
 
 /* ===== SPINNER WITH DEPTH ===== */
+/* (slider and tooltip styled once in the ADVANCED section below) */
 .spinner {
     -fx-background-color: #252528;
     -fx-border-color: #505052;
@@ -922,7 +981,7 @@
 }
 
 .styled-text-field:focused {
-    -fx-border-color: #606065;
+    -fx-border-color: -fx-theme-accent-blue;
     -fx-background-color: linear-gradient(to bottom, #2d2d30, #282828);
 }
 
@@ -935,7 +994,7 @@
 }
 
 .styled-text-field.invalid {
-    -fx-border-color: #F44336;
+    -fx-border-color: -fx-theme-danger;
     -fx-background-color: linear-gradient(to bottom, #2d2828, #282525);
 }
 
@@ -946,7 +1005,7 @@
 }
 
 .error-label {
-    -fx-text-fill: #F44336;
+    -fx-text-fill: -fx-theme-danger;
     -fx-font-size: 10px;
 }
 
@@ -1103,7 +1162,7 @@
 }
 
 .styled-combo-box:focused {
-    -fx-border-color: #606065;
+    -fx-border-color: -fx-theme-accent-blue;
     -fx-effect: none;
 }
 
@@ -1328,30 +1387,36 @@
     -fx-border-width: 0 0 1 0;
 }
 
-/* Color picker restyled to match the dark theme instead of the default white swatch chrome */
-.styled-color-picker {
+/* Color picker restyled to match the dark theme instead of the default white
+   swatch chrome. Applies to the base control so every picker is themed without
+   opting in; .styled-color-picker kept as an alias for existing call sites. */
+.color-picker, .styled-color-picker {
     -fx-color-label-visible: false;
     -fx-background-color: #3c3c3e;
     -fx-background-radius: 4;
-    -fx-border-color: #555555;
+    -fx-border-color: -fx-theme-border-mid;
     -fx-border-radius: 4;
-    -fx-mark-color: #dcdcdc;
+    -fx-mark-color: -fx-theme-text-primary;
 }
 
-.styled-color-picker .arrow-button {
+.color-picker .arrow-button, .styled-color-picker .arrow-button {
     -fx-background-color: transparent;
 }
 
-.styled-color-picker .color-picker-label {
+.color-picker .color-picker-label, .styled-color-picker .color-picker-label {
     -fx-padding: 4 6 4 6;
 }
 
-.styled-color-picker .picker-color {
+.color-picker .color-picker-label .label, .styled-color-picker .color-picker-label .label {
+    -fx-text-fill: -fx-theme-text-primary;
+}
+
+.color-picker .picker-color, .styled-color-picker .picker-color {
     -fx-padding: 4;
 }
 
-.styled-color-picker .picker-color-rect {
-    -fx-stroke: #555555;
+.color-picker .picker-color-rect, .styled-color-picker .picker-color-rect {
+    -fx-stroke: -fx-theme-border-mid;
     -fx-arc-width: 4;
     -fx-arc-height: 4;
 }
@@ -1404,15 +1469,7 @@
     -fx-effect: dropshadow(gaussian, rgba(218, 165, 32, 0.4), 10, 0, 0, 0);
 }
 
-/* Rarity Badges */
-.badge {
-    -fx-padding: 3 8 3 8;
-    -fx-background-radius: 12;
-    -fx-font-size: 10px;
-    -fx-font-weight: bold;
-    -fx-text-fill: white;
-}
-
+/* Rarity Badges (base .badge defined once in BADGE VARIANTS below) */
 .badge-common {
     -fx-background-color: #555;
 }
@@ -1683,21 +1740,12 @@
     -fx-text-fill: white;
 }
 
-/* ===== FOCUS INDICATORS (DISABLED) ===== */
-.button:focused {
-    -fx-border-color: #606065;
-    -fx-border-width: 1;
-}
-
-.button-primary:focused {
-    -fx-border-color: #7ab8e8;
-    -fx-border-width: 1;
-}
-
-.button-danger:focused {
-    -fx-border-color: #e88080;
-    -fx-border-width: 1;
-}
+/* ===== FOCUS INDICATORS (DISABLED) =====
+ * Buttons intentionally show no focus ring: JavaFX keeps a button "focused"
+ * after it's clicked (until focus moves elsewhere), so a border here reads as
+ * a stuck selection outline on whatever was last clicked rather than useful
+ * keyboard-navigation feedback. Text fields/combos still get one (see above)
+ * since focus there is meaningful for longer. */
 
 /* ===== DISABLED STATES ===== */
 .button:disabled {
@@ -1715,8 +1763,7 @@
     -fx-cursor: default;
 }
 
-.check-box:disabled,
-.radio-button:disabled {
+.check-box:disabled {
     -fx-opacity: 0.5;
 }
 
@@ -1819,6 +1866,10 @@
     -fx-tick-label-fill: #808080;
 }
 
+.slider .axis-tick-mark, .slider .axis-minor-tick-mark {
+    -fx-stroke: -fx-theme-border-light;
+}
+
 /* ===== DATE PICKER STYLING ===== */
 .date-picker {
     -fx-background-color: linear-gradient(to bottom, #3e3e40, #353537);
@@ -1894,6 +1945,10 @@
 
 .titled-pane > .title > .arrow-button > .arrow {
     -fx-background-color: #808080;
+}
+
+.titled-pane:expanded > .title > .arrow-button > .arrow {
+    -fx-background-color: -fx-theme-accent-blue;
 }
 
 .titled-pane > .content {

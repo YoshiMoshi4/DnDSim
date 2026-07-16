@@ -29,9 +29,10 @@ public class AppController {
         this.rootContainer.getStyleClass().add("panel-dark");
         
         this.scene = new Scene(rootContainer, 1200, 800);
-        scene.getStylesheets().add(new java.io.File("resources/styles/dark-theme.css").toURI().toString());
-        
+        StyleUtils.applyTheme(scene);
+
         primaryStage.setTitle("Cassandralis Combat Simulator");
+        primaryStage.getIcons().addAll(IconUtils.createStageIcons());
         primaryStage.setScene(scene);
         primaryStage.setMinWidth(800);
         primaryStage.setMinHeight(600);
@@ -84,15 +85,19 @@ public class AppController {
     }
 
     public void navigateToBattle(int rows, int cols, String themeName) {
+        navigateToBattle(rows, cols, null, themeName);
+    }
+
+    public void navigateToBattle(int rows, int cols, boolean[][] mask, String themeName) {
         try {
             if (characterSheetView == null) {
                 characterSheetView = new CharacterSheetView(this);
             }
-            currentBattleView = new BattleView(rows, cols, themeName, characterSheetView, this);
+            currentBattleView = new BattleView(rows, cols, mask, themeName, characterSheetView, this);
             characterSheetView.setBattleView(currentBattleView);
             setContent(currentBattleView.getRoot());
             primaryStage.setTitle("Battle - Cassandralis");
-            
+
             // Auto-start party placement phase
             currentBattleView.startPlacementPhase();
         } catch (Exception e) {
@@ -147,9 +152,9 @@ public class AppController {
             }
         }
         
-        // Immediate switch - no animation
         rootContainer.getChildren().clear();
         rootContainer.getChildren().add(content);
+        AnimationUtils.fadeIn(content);
     }
 
     public Stage getPrimaryStage() {

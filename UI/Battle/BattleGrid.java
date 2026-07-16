@@ -13,6 +13,10 @@ public class BattleGrid {
     // Per-tile elevation level (0..MAX_ELEVATION); visual-only for now
     private final int[][] elevation;
 
+    // Which cells are part of the playable shape; null means every cell in the
+    // rows x cols rectangle is playable (the default, fully-backward-compatible case)
+    private final boolean[][] enabled;
+
     private final List<Entity> entities = new ArrayList<>();
     private final List<Enemy> enemies = new ArrayList<>();
     private final List<TerrainObject> terrainObjects = new ArrayList<>();
@@ -20,9 +24,15 @@ public class BattleGrid {
 
     public BattleGrid(int rows, int cols, List<Entity> entities,
             List<TerrainObject> terrainObjects, List<Pickup> pickups) {
+        this(rows, cols, null, entities, terrainObjects, pickups);
+    }
+
+    public BattleGrid(int rows, int cols, boolean[][] enabledMask, List<Entity> entities,
+            List<TerrainObject> terrainObjects, List<Pickup> pickups) {
         this.rows = rows;
         this.cols = cols;
         this.elevation = new int[rows][cols];
+        this.enabled = enabledMask;
         this.entities.addAll(entities);
         this.terrainObjects.addAll(terrainObjects);
         this.pickups.addAll(pickups);
@@ -56,7 +66,14 @@ public class BattleGrid {
         return null;
     }
 
+    public boolean isEnabled(int r, int c) {
+        return inBounds(r, c) && (enabled == null || enabled[r][c]);
+    }
+
     public boolean isBlocked(int r, int c) {
+        if (!isEnabled(r, c)) {
+            return true;
+        }
         for (TerrainObject t : terrainObjects) {
             if (t.getRow() == r && t.getCol() == c && !t.isDestroyed()) {
                 return t.blocksMovement();
@@ -197,7 +214,7 @@ public class BattleGrid {
     public void addTerrainAtNextAvailable(TerrainObject terrain) {
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
-                if (getObjectAt(r, c) == null) {
+                if (getObjectAt(r, c) == null && !isBlocked(r, c)) {
                     terrain.moveTo(r, c);
                     terrainObjects.add(terrain);
                     return;
@@ -209,7 +226,7 @@ public class BattleGrid {
     public void addPickupAtNextAvailable(Pickup pickup) {
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
-                if (getObjectAt(r, c) == null) {
+                if (getObjectAt(r, c) == null && !isBlocked(r, c)) {
                     pickup.moveTo(r, c);
                     pickups.add(pickup);
                     return;

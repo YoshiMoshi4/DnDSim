@@ -163,6 +163,7 @@ public class CharacterSheetPane extends BorderPane {
         confirm.setTitle("Delete Character");
         confirm.setHeaderText(null);
         confirm.setContentText("Delete " + sheet.getName() + "? This cannot be undone.");
+        DialogUtils.theme(confirm);
 
         if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK && onDelete != null) {
             onDelete.run();
@@ -338,16 +339,17 @@ public class CharacterSheetPane extends BorderPane {
         AnimationUtils.animateProgressBar(hpBar, targetProgress);
 
         // Change color based on HP
+        hpBar.getStyleClass().removeAll("progress-bar-success", "progress-bar-warning", "progress-bar-danger");
         if (ratio > 0.5) {
-            hpBar.setStyle("-fx-accent: #4CAF50;"); // Green
+            hpBar.getStyleClass().add("progress-bar-success");
             hpBar.setEffect(null);
         } else if (ratio > 0.25) {
-            hpBar.setStyle("-fx-accent: #FF9800;"); // Orange
+            hpBar.getStyleClass().add("progress-bar-warning");
             hpBar.setEffect(null);
         } else {
-            hpBar.setStyle("-fx-accent: #F44336;"); // Red
+            hpBar.getStyleClass().add("progress-bar-danger");
             DropShadow lowHpGlow = new DropShadow();
-            lowHpGlow.setColor(Color.web("#F44336"));
+            lowHpGlow.setColor(Color.web("#d75f5f"));
             lowHpGlow.setRadius(12);
             lowHpGlow.setSpread(0.4);
             hpBar.setEffect(lowHpGlow);
@@ -442,7 +444,7 @@ public class CharacterSheetPane extends BorderPane {
 
         // Level and soft point pool tracking
         Label levelLabel = new Label("LVL");
-        levelLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #c586c0;");
+        levelLabel.getStyleClass().add("stat-lvl");
         grid.add(levelLabel, 0, row);
         levelSpinner = new Spinner<>(1, 99, 1);
         levelSpinner.setEditable(true);
@@ -456,14 +458,14 @@ public class CharacterSheetPane extends BorderPane {
         });
         grid.add(levelSpinner, 1, row);
         pointsLabel = new Label();
-        pointsLabel.setStyle("-fx-text-fill: #ce9178; -fx-font-weight: bold;");
+        pointsLabel.getStyleClass().add("stat-points");
         grid.add(pointsLabel, 2, row);
         GridPane.setColumnSpan(pointsLabel, 2);
         row++;
         
         // STR
         Label strLabel = new Label("STR");
-        strLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #d75f5f;");
+        strLabel.getStyleClass().add("stat-str");
         grid.add(strLabel, 0, row);
         strBase = new Spinner<>(0, 99, 5);
         strBase.setEditable(true);
@@ -483,7 +485,7 @@ public class CharacterSheetPane extends BorderPane {
         
         // DEX
         Label dexLabel = new Label("DEX");
-        dexLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #4CAF50;");
+        dexLabel.getStyleClass().add("stat-dex");
         grid.add(dexLabel, 0, row);
         dexBase = new Spinner<>(0, 99, 5);
         dexBase.setEditable(true);
@@ -503,7 +505,7 @@ public class CharacterSheetPane extends BorderPane {
         
         // CON
         Label conLabel = new Label("CON");
-        conLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #2196F3;");
+        conLabel.getStyleClass().add("stat-con");
         grid.add(conLabel, 0, row);
         conBase = new Spinner<>(0, 99, 5);
         conBase.setEditable(true);
@@ -523,7 +525,7 @@ public class CharacterSheetPane extends BorderPane {
         
         // INT
         Label intLabel = new Label("INT");
-        intLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #FF9800;");
+        intLabel.getStyleClass().add("stat-int");
         grid.add(intLabel, 0, row);
         intBase = new Spinner<>(0, 99, 5);
         intBase.setEditable(true);
@@ -543,7 +545,7 @@ public class CharacterSheetPane extends BorderPane {
 
         // WIS
         Label wisLabel = new Label("WIS");
-        wisLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #4ec9b0;");
+        wisLabel.getStyleClass().add("stat-wis");
         grid.add(wisLabel, 0, row);
         wisBase = new Spinner<>(0, 99, 5);
         wisBase.setEditable(true);
@@ -563,7 +565,7 @@ public class CharacterSheetPane extends BorderPane {
 
         // CHA
         Label chaLabel = new Label("CHA");
-        chaLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #c586c0;");
+        chaLabel.getStyleClass().add("stat-cha");
         grid.add(chaLabel, 0, row);
         chaBase = new Spinner<>(0, 99, 5);
         chaBase.setEditable(true);
@@ -651,6 +653,7 @@ public class CharacterSheetPane extends BorderPane {
             private final Label triggerLabel = new Label();
             private final Region spacer = new Region();
             private final Button removeBtn = new Button();
+            private final Tooltip descTooltip = new Tooltip();
 
             {
                 removeBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.CLOSE, 12, "#ffffff"));
@@ -661,6 +664,9 @@ public class CharacterSheetPane extends BorderPane {
                 nameLabel.getStyleClass().add("ability-name");
                 descLabel.getStyleClass().add("ability-desc");
                 triggerLabel.getStyleClass().add("ability-trigger");
+                // Ellipsize instead of clipping/wrapping long descriptions; full text via tooltip
+                descLabel.maxWidthProperty().bind(listView.widthProperty().subtract(90));
+                Tooltip.install(descLabel, descTooltip);
 
                 textBox.getChildren().addAll(nameLabel, descLabel, triggerLabel);
 
@@ -685,6 +691,7 @@ public class CharacterSheetPane extends BorderPane {
                 } else {
                     nameLabel.setText(ability.getName());
                     descLabel.setText(ability.getDescription());
+                    descTooltip.setText(ability.getDescription());
                     if (EntityRes.ItemAbility.TYPE_PASSIVE.equals(ability.getAbilityType())) {
                         triggerLabel.setText(ability.getTriggerType() + " -> " + ability.getEffectType() +
                             (ability.getMagnitude() != 0 ? " (" + ability.getMagnitude() + ")" : ""));
@@ -705,8 +712,7 @@ public class CharacterSheetPane extends BorderPane {
         Dialog<EntityRes.ItemAbility> dialog = new Dialog<>();
         dialog.setTitle("Add Ability");
         dialog.setHeaderText("Create a new character ability");
-        dialog.getDialogPane().getStylesheets().addAll(getScene().getStylesheets());
-        dialog.getDialogPane().getStyleClass().add("panel-dark");
+        DialogUtils.theme(dialog);
 
         // Form fields
         TextField nameField = new TextField();
@@ -834,8 +840,7 @@ public class CharacterSheetPane extends BorderPane {
         HBox buttonBar = new HBox(10);
         buttonBar.setAlignment(Pos.CENTER_LEFT);
         Button addItemBtn = new Button("+ Add Item");
-        addItemBtn.getStyleClass().add("styled-button");
-        addItemBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-weight: bold;");
+        addItemBtn.getStyleClass().addAll("button", "button-success");
         addItemBtn.setOnAction(e -> showAddItemDialog());
         buttonBar.getChildren().add(addItemBtn);
         
@@ -936,9 +941,9 @@ public class CharacterSheetPane extends BorderPane {
         Dialog<Item> dialog = new Dialog<>();
         dialog.setTitle("Add Item");
         dialog.setHeaderText("Select an item to add to inventory");
-        dialog.getDialogPane().getStylesheets().addAll(getScene().getStylesheets());
-        dialog.getDialogPane().setStyle("-fx-background-color: #2d2d30;");
-        
+        DialogUtils.theme(dialog);
+
+
         // Category selection
         ComboBox<String> categoryCombo = new ComboBox<>();
         categoryCombo.getItems().addAll("Weapon", "Accessory", "Consumable", "Ammunition", "Crafting Item", "Key Item");
@@ -1075,7 +1080,7 @@ public class CharacterSheetPane extends BorderPane {
             confirm.setTitle("Remove Item");
             confirm.setHeaderText("Remove " + item.getName() + "?");
             confirm.setContentText("This will remove the item from inventory.");
-            confirm.getDialogPane().setStyle("-fx-background-color: #2d2d30;");
+            DialogUtils.theme(confirm);
             confirm.showAndWait().ifPresent(response -> {
                 if (response == ButtonType.OK) {
                     sheet.removeItem(item);
@@ -1087,15 +1092,16 @@ public class CharacterSheetPane extends BorderPane {
             Dialog<Integer> dialog = new Dialog<>();
             dialog.setTitle("Remove Item");
             dialog.setHeaderText("Remove " + item.getName());
-            dialog.getDialogPane().setStyle("-fx-background-color: #2d2d30;");
-            
+            DialogUtils.theme(dialog);
+
+
             Spinner<Integer> qtySpinner = new Spinner<>(1, item.getQuantity(), 1);
             qtySpinner.setEditable(true);
             qtySpinner.setPrefWidth(100);
             FormUtils.styleSpinner(qtySpinner);
             
             Button removeAllBtn = new Button("Remove All");
-            removeAllBtn.setStyle("-fx-background-color: #d75f5f; -fx-text-fill: white;");
+            removeAllBtn.getStyleClass().addAll("button", "button-danger");
             removeAllBtn.setOnAction(e -> qtySpinner.getValueFactory().setValue(item.getQuantity()));
             
             HBox content = new HBox(15);
@@ -1264,9 +1270,7 @@ public class CharacterSheetPane extends BorderPane {
         int pointBalance = sheet.getStatPointBalance();
         pointsLabel.setText("Points: " + sheet.getSpentStatPoints() + " / " + sheet.getAvailableStatPoints()
             + (pointBalance < 0 ? " (Over by " + Math.abs(pointBalance) + ")" : ""));
-        pointsLabel.setStyle(pointBalance < 0
-            ? "-fx-text-fill: #f44336; -fx-font-weight: bold;"
-            : "-fx-text-fill: #ce9178; -fx-font-weight: bold;");
+        pointsLabel.setStyle(pointBalance < 0 ? "-fx-text-fill: #d75f5f; -fx-font-weight: bold;" : "");
         
         // Inventory - populate ListViews
         consumablesData.clear();
@@ -1449,10 +1453,10 @@ public class CharacterSheetPane extends BorderPane {
             label.setStyle("-fx-text-fill: #4ec9b0;"); // Green for positive
         } else if (value < 0) {
             label.setText(String.valueOf(value)); // Already has minus sign
-            label.setStyle("-fx-text-fill: #e74c3c;"); // Red for negative
+            label.setStyle("-fx-text-fill: #d75f5f;"); // Red for negative
         } else {
             label.setText("0");
-            label.setStyle("-fx-text-fill: #888888;"); // Gray for zero
+            label.setStyle("-fx-text-fill: #808080;"); // Gray for zero
         }
     }
 }

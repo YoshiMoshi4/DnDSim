@@ -1,6 +1,7 @@
 package UI.Battle;
 
 import Objects.GridObject;
+import UI.AnimationUtils;
 import UI.IconUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -103,48 +104,43 @@ public class DiceRollPanel extends VBox {
         setPrefWidth(210);
         setMinWidth(200);
         setMaxWidth(230);
-        getStyleClass().add("card");
-        setStyle("-fx-background-color: linear-gradient(to bottom, #2d2d30, #252528); " +
-                "-fx-border-color: #daa520; -fx-border-width: 2; -fx-border-radius: 6; " +
-                "-fx-background-radius: 6;");
-        
+        getStyleClass().addAll("card", "card-gold");
+
         // Header
         HBox headerBox = new HBox(8);
         headerBox.setAlignment(Pos.CENTER_LEFT);
         headerBox.getChildren().add(IconUtils.createIcon(IconUtils.Icon.TARGET, 18, "#daa520"));
-        
+
         titleLabel = new Label("Attack Roll");
-        titleLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #daa520;");
+        titleLabel.getStyleClass().add("section-header");
+        titleLabel.setStyle("-fx-font-size: 15px;");
         DropShadow glow = new DropShadow();
         glow.setColor(Color.web("#daa52080"));
         glow.setRadius(6);
         titleLabel.setEffect(glow);
         headerBox.getChildren().add(titleLabel);
-        
+
         // Attacker/Target info
         attackerLabel = new Label("Attacker: --");
-        attackerLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #e0e0e0;");
-        
+        attackerLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #dcdcdc;");
+
         targetLabel = new Label("Target: --");
-        targetLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #e0e0e0;");
-        
+        targetLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #dcdcdc;");
+
         infoLabel = new Label("Modifier: +0 | AC: 10");
-        infoLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #888888;");
-        
+        infoLabel.getStyleClass().add("label-muted");
+
         Separator sep1 = new Separator();
-        sep1.setStyle("-fx-background-color: #505052;");
-        
+
         // Input area
         inputArea = new VBox(8);
-        
+
         Label d20Label = new Label("Enter d20 roll:");
-        d20Label.setStyle("-fx-font-size: 12px; -fx-text-fill: #e0e0e0;");
-        
+        d20Label.setStyle("-fx-font-size: 12px; -fx-text-fill: #dcdcdc;");
+
         d20Input = new TextField();
         d20Input.setPromptText("1-20");
         d20Input.setPrefWidth(80);
-        d20Input.setStyle("-fx-background-color: #1e1e20; -fx-text-fill: #ffffff; " +
-                         "-fx-border-color: #505052; -fx-border-radius: 4; -fx-background-radius: 4;");
         d20Input.setOnAction(e -> handleSubmit());
         
         // Restrict to numbers only
@@ -258,6 +254,7 @@ public class DiceRollPanel extends VBox {
         
         setVisible(true);
         setManaged(true);
+        AnimationUtils.slideIn(this, AnimationUtils.SlideDirection.RIGHT, AnimationUtils.MEDIUM);
         d20Input.requestFocus();
     }
     
@@ -298,7 +295,7 @@ public class DiceRollPanel extends VBox {
         if (margin < 0) {
             // Miss - just state the outcome, no breakdown
             currentState = State.RESULT_MISS;
-            setResultBanner("MISS", IconUtils.Icon.CLOSE, "#F44336", "rgba(244, 67, 54, 0.15)");
+            setResultBanner("MISS", IconUtils.Icon.CLOSE, "#d75f5f", "rgba(215, 95, 95, 0.15)");
             tierBox.setVisible(false);
             tierBox.setManaged(false);
             submitBtn.setText("OK");
@@ -358,9 +355,9 @@ public class DiceRollPanel extends VBox {
         diceListLabel.getChildren().clear();
 
         Text rollText = new Text("Roll: " + diceStr + "  ");
-        rollText.setStyle("-fx-fill: #e0e0e0; -fx-font-size: 12px;");
+        rollText.setStyle("-fx-fill: #dcdcdc; -fx-font-size: 12px;");
 
-        String bonusColor = abilityModifier > 0 ? "#4CAF50" : abilityModifier < 0 ? "#F44336" : "#888888";
+        String bonusColor = abilityModifier > 0 ? "#4CAF50" : abilityModifier < 0 ? "#d75f5f" : "#808080";
         String bonusSign = abilityModifier >= 0 ? "+" : "";
         Text bonusText = new Text(bonusSign + abilityModifier + " dmg");
         bonusText.setStyle("-fx-fill: " + bonusColor + "; -fx-font-size: 12px; -fx-font-weight: bold;");
@@ -373,7 +370,7 @@ public class DiceRollPanel extends VBox {
         damageInputs.clear();
         
         Label dmgLabel = new Label("Enter damage rolls:");
-        dmgLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #e0e0e0;");
+        dmgLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #dcdcdc;");
         damageInputArea.getChildren().add(dmgLabel);
         
         // Create a field for each die
@@ -383,15 +380,14 @@ public class DiceRollPanel extends VBox {
             row.setAlignment(Pos.CENTER_LEFT);
             
             Label dieLabel = new Label(die + ":");
-            dieLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #888888;");
+            dieLabel.getStyleClass().add("label-muted");
             dieLabel.setPrefWidth(35);
-            
+
             TextField input = new TextField();
             input.setPromptText(getMaxForDie(die));
             input.setPrefWidth(50);
-            input.setStyle("-fx-background-color: #1e1e20; -fx-text-fill: #ffffff; " +
-                          "-fx-border-color: #505052; -fx-border-radius: 4; -fx-background-radius: 4;");
-            
+
+
             // Restrict to numbers
             input.textProperty().addListener((obs, oldVal, newVal) -> {
                 if (!newVal.matches("\\d*")) {
@@ -521,7 +517,7 @@ public class DiceRollPanel extends VBox {
         String originalStyle = resultLabel.getStyle();
         
         resultLabel.setText(message);
-        resultLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #F44336;");
+        resultLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #d75f5f;");
         
         // Reset after delay
         javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(

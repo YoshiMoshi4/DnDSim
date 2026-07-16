@@ -300,8 +300,11 @@ public class TimelinePane extends HBox {
             }
             double pct = maxHp > 0 ? Math.max(0, Math.min(1, hp / (double) maxHp)) : 0;
             javafx.scene.control.ProgressBar bar = entry.getValue();
-            bar.setProgress(pct);
-            bar.setStyle("-fx-accent: " + (pct > 0.5 ? "#4CAF50" : pct > 0.25 ? "#e6b23c" : "#d75f5f") + ";");
+            if (Math.abs(bar.getProgress() - pct) > 0.001) {
+                AnimationUtils.animateProgressBar(bar, pct);
+            }
+            bar.getStyleClass().removeAll("progress-bar-success", "progress-bar-warning", "progress-bar-danger");
+            bar.getStyleClass().add(pct > 0.5 ? "progress-bar-success" : pct > 0.25 ? "progress-bar-warning" : "progress-bar-danger");
             Label hpText = hpLabels.get(combatant);
             if (hpText != null) {
                 hpText.setText(hp + "/" + maxHp);
@@ -477,7 +480,7 @@ public class TimelinePane extends HBox {
         box.getChildren().add(wrapPortrait(portrait, ringColor));
 
         Label nameLabel = new Label(name);
-        nameLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #dcdcdc; -fx-font-weight: bold;");
+        nameLabel.setStyle("-fx-font-weight: bold;");
 
         box.getChildren().add(nameLabel);
 
@@ -489,7 +492,7 @@ public class TimelinePane extends HBox {
             hpBar.setMaxHeight(7);
             hpBar.getStyleClass().add("hp-bar");
             Label hpText = new Label();
-            hpText.setStyle("-fx-font-size: 9px; -fx-text-fill: #b8b8c0;");
+            hpText.getStyleClass().addAll("label-muted", "label-caption");
             box.getChildren().addAll(hpBar, hpText);
             hpBars.put(combatant, hpBar);
             hpLabels.put(combatant, hpText);
@@ -505,19 +508,9 @@ public class TimelinePane extends HBox {
         Tooltip tooltip = new Tooltip(tooltipText);
         tooltip.setShowDelay(javafx.util.Duration.millis(200));
         Tooltip.install(box, tooltip);
-        
-        // Add subtle hover effect
-        box.setOnMouseEntered(e -> {
-            if (!box.getStyleClass().contains("timeline-entity-current")) {
-                box.setStyle(box.getStyle() + "-fx-background-color: linear-gradient(to bottom, #404045, #353538);");
-            }
-        });
-        box.setOnMouseExited(e -> {
-            if (!box.getStyleClass().contains("timeline-entity-current")) {
-                box.setStyle("");
-            }
-        });
-        
+
+        // Hover feedback is handled by .timeline-entity:hover in the stylesheet
+
         return box;
     }
 

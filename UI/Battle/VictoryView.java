@@ -54,7 +54,6 @@ public class VictoryView extends StackPane {
         this.onContinue = onContinue;
         
         // Semi-transparent dark overlay
-        setStyle("-fx-background-color: rgba(0, 0, 0, 0.85);");
         getStyleClass().add("victory-overlay");
         
         contentBox = new VBox(20);
@@ -102,12 +101,6 @@ public class VictoryView extends StackPane {
     private void createVictoryTitle() {
         Label title = new Label("Victory!");
         title.getStyleClass().add("victory-title");
-        title.setStyle(
-            "-fx-font-size: 48px; " +
-            "-fx-font-weight: bold; " +
-            "-fx-text-fill: linear-gradient(to bottom, #FFD700, #FFA500); " +
-            "-fx-font-family: 'Segoe UI', sans-serif;"
-        );
 
         // Golden glow effect
         DropShadow glow = new DropShadow();
@@ -146,12 +139,7 @@ public class VictoryView extends StackPane {
         
         Label quoteLabel = new Label("\"" + quote + "\"");
         quoteLabel.getStyleClass().add("victory-quote");
-        quoteLabel.setStyle(
-            "-fx-font-size: 16px; " +
-            "-fx-font-style: italic; " +
-            "-fx-text-fill: #c0a060; " +
-            "-fx-font-family: 'Georgia', serif;"
-        );
+        quoteLabel.setStyle("-fx-font-family: 'Georgia', serif;");
         
         contentBox.getChildren().add(quoteLabel);
         
@@ -168,22 +156,13 @@ public class VictoryView extends StackPane {
         VBox partyContainer = new VBox(12);
         partyContainer.setAlignment(Pos.CENTER);
         partyContainer.setPadding(new Insets(10));
-        partyContainer.setStyle(
-            "-fx-background-color: rgba(45, 45, 48, 0.8); " +
-            "-fx-background-radius: 10; " +
-            "-fx-border-color: #505052; " +
-            "-fx-border-radius: 10; " +
-            "-fx-border-width: 1;"
-        );
+        partyContainer.getStyleClass().add("victory-panel");
         partyContainer.setMaxWidth(450);
-        
+
         // Header
         Label partyHeader = new Label("Party Status");
-        partyHeader.setStyle(
-            "-fx-font-size: 14px; " +
-            "-fx-font-weight: bold; " +
-            "-fx-text-fill: #4CAF50;"
-        );
+        partyHeader.getStyleClass().add("label-success");
+        partyHeader.setStyle("-fx-font-size: 14px;");
         partyContainer.getChildren().add(partyHeader);
         
         // Party member rows
@@ -202,14 +181,7 @@ public class VictoryView extends StackPane {
         
         HBox row = new HBox(12);
         row.setAlignment(Pos.CENTER_LEFT);
-        row.setPadding(new Insets(8, 12, 8, 12));
-        row.setStyle(
-            "-fx-background-color: linear-gradient(to right, #2d3530, #283028); " +
-            "-fx-background-radius: 6; " +
-            "-fx-border-color: #3c4540; " +
-            "-fx-border-radius: 6; " +
-            "-fx-border-width: 1;"
-        );
+        row.getStyleClass().add("victory-party-row");
         row.setMaxWidth(420);
         row.setMinWidth(380);
         
@@ -240,8 +212,8 @@ public class VictoryView extends StackPane {
         
         // HP text
         Label hpText = new Label(cs.getCurrentHP() + " / " + cs.getTotalHP());
-        hpText.setStyle("-fx-font-size: 10px; -fx-text-fill: #909095;");
-        
+        hpText.getStyleClass().addAll("label-muted", "label-caption");
+
         // Progress bar
         ProgressBar hpBar = new ProgressBar();
         double hpRatio = (double) cs.getCurrentHP() / cs.getTotalHP();
@@ -249,10 +221,9 @@ public class VictoryView extends StackPane {
         hpBar.setPrefWidth(150);
         hpBar.setPrefHeight(14);
         hpBar.setMaxWidth(Double.MAX_VALUE);
-        
+
         // Color based on health
-        String barColor = hpRatio > 0.5 ? "#4CAF50" : hpRatio > 0.25 ? "#FF9800" : "#F44336";
-        hpBar.setStyle("-fx-accent: " + barColor + ";");
+        hpBar.getStyleClass().add(hpRatio > 0.5 ? "progress-bar-success" : hpRatio > 0.25 ? "progress-bar-warning" : "progress-bar-danger");
         
         healthContainer.getChildren().addAll(hpBar, hpText);
         row.getChildren().add(healthContainer);
@@ -324,11 +295,11 @@ public class VictoryView extends StackPane {
         if (name.contains("dead") || name.contains("unconscious")) {
             return "#d75f5f";
         } else if (name.contains("poison") || name.contains("bleed")) {
-            return "#9932CC";
+            return "#c586c0";
         } else if (name.contains("burn") || name.contains("fire")) {
-            return "#FF4500";
+            return "#FF9800";
         } else if (name.contains("freeze") || name.contains("cold") || name.contains("ice")) {
-            return "#00BFFF";
+            return "#2196F3";
         }
         
         return "#dcdcaa"; // Default gold/yellow
@@ -337,48 +308,9 @@ public class VictoryView extends StackPane {
     private void createContinueButton() {
         Button continueBtn = new Button("Continue");
         continueBtn.getStyleClass().add("button-primary");
-        continueBtn.setStyle(
-            "-fx-font-size: 16px; " +
-            "-fx-padding: 12 40; " +
-            "-fx-background-color: linear-gradient(to bottom, #569cd6, #4a8bc4); " +
-            "-fx-text-fill: white; " +
-            "-fx-background-radius: 6; " +
-            "-fx-border-color: #7ab8e8; " +
-            "-fx-border-radius: 6; " +
-            "-fx-border-width: 1; " +
-            "-fx-cursor: hand;"
-        );
+        continueBtn.setStyle("-fx-font-size: 16px; -fx-padding: 12 40;");
         continueBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.PLAY));
-        
-        // Hover effect
-        continueBtn.setOnMouseEntered(e -> {
-            continueBtn.setStyle(
-                "-fx-font-size: 16px; " +
-                "-fx-padding: 12 40; " +
-                "-fx-background-color: linear-gradient(to bottom, #6aacdf, #569cd6); " +
-                "-fx-text-fill: white; " +
-                "-fx-background-radius: 6; " +
-                "-fx-border-color: #9ac8f0; " +
-                "-fx-border-radius: 6; " +
-                "-fx-border-width: 1; " +
-                "-fx-cursor: hand; " +
-                "-fx-effect: dropshadow(gaussian, rgba(86, 156, 214, 0.5), 10, 0, 0, 0);"
-            );
-        });
-        continueBtn.setOnMouseExited(e -> {
-            continueBtn.setStyle(
-                "-fx-font-size: 16px; " +
-                "-fx-padding: 12 40; " +
-                "-fx-background-color: linear-gradient(to bottom, #569cd6, #4a8bc4); " +
-                "-fx-text-fill: white; " +
-                "-fx-background-radius: 6; " +
-                "-fx-border-color: #7ab8e8; " +
-                "-fx-border-radius: 6; " +
-                "-fx-border-width: 1; " +
-                "-fx-cursor: hand;"
-            );
-        });
-        
+
         continueBtn.setOnAction(e -> {
             if (onContinue != null) {
                 onContinue.run();

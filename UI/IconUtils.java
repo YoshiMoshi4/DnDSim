@@ -131,4 +131,25 @@ public class IconUtils {
     public static Node smallIcon(Icon icon) {
         return createIcon(icon, 16);
     }
+
+    /**
+     * Window/taskbar icons rendered from the app's crossed-swords glyph at
+     * several sizes so the OS can pick a crisp one. Must run on the FX thread.
+     */
+    public static java.util.List<javafx.scene.image.Image> createStageIcons() {
+        java.util.List<javafx.scene.image.Image> icons = new java.util.ArrayList<>();
+        javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
+        params.setFill(Color.TRANSPARENT);
+        for (double size : new double[]{16, 32, 64}) {
+            FontIcon glyph = FontIcon.of(MaterialDesignS.SWORD_CROSS,
+                (int) Math.round(size * 0.9), Color.web("#daa520"));
+            StackPane pane = new StackPane(glyph);
+            pane.setMinSize(size, size);
+            pane.setPrefSize(size, size);
+            pane.setMaxSize(size, size);
+            new javafx.scene.Scene(pane); // gives the node CSS/layout context for snapshot
+            icons.add(pane.snapshot(params, null));
+        }
+        return icons;
+    }
 }

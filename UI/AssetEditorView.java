@@ -230,224 +230,27 @@ public class AssetEditorView {
     }
 
     private VBox createWeaponCard(Weapon weapon) {
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(10));
-        card.setPrefWidth(180);
-        card.setStyle(getCardStyle());
-        
-        Label nameLabel = new Label(weapon.getName());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: white;");
-        card.getChildren().add(nameLabel);
-        
-        // Display damage dice tiers
-        String[] dice = weapon.getDamageDice();
-        Label diceLabel = new Label("Dice: " + dice[0] + "/" + dice[1] + "/" + dice[2]);
-        diceLabel.setStyle("-fx-text-fill: #cccccc;");
-        card.getChildren().add(diceLabel);
-        
-        Label statLabel = new Label("Stat: " + weapon.getStatType());
-        statLabel.setStyle("-fx-text-fill: #aaaaaa;");
-        card.getChildren().add(statLabel);
-        
-        // Show ammo type if ranged
-        if (weapon.isRanged()) {
-            Label ammoLabel = new Label("Ammo: " + weapon.getAmmoType());
-            ammoLabel.setStyle("-fx-text-fill: #f39c12;");
-            card.getChildren().add(ammoLabel);
-        }
-        
-        int[] attrs = weapon.getModifiedAttributes();
-        for (int i = 0; i < attrs.length && i < ATTRIBUTE_NAMES.length; i++) {
-            if (attrs[i] != 0) {
-                Label attrLabel = new Label(ATTRIBUTE_NAMES[i] + ": " + (attrs[i] > 0 ? "+" : "") + attrs[i]);
-                attrLabel.setStyle("-fx-text-fill: #aaaaaa;");
-                card.getChildren().add(attrLabel);
-            }
-        }
-        
-        // Display abilities
-        if (weapon.hasAbilities()) {
-            Label abilityHeader = new Label("Abilities:");
-            abilityHeader.setStyle("-fx-text-fill: #dcdcaa; -fx-font-weight: bold;");
-            card.getChildren().add(abilityHeader);
-            for (ItemAbility ability : weapon.getAbilities()) {
-                Label abilityLabel = new Label("  " + ability.getFormattedDescription());
-                abilityLabel.setStyle("-fx-text-fill: #9cdcfe; -fx-font-size: 11px;");
-                card.getChildren().add(abilityLabel);
-            }
-        }
-        
-        HBox btnBox = new HBox(5);
-        Button editBtn = new Button("Edit");
-        editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> editWeapon(weapon));
-        Button deleteBtn = new Button("Delete");
-        deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteItem(weapon));
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        card.getChildren().add(btnBox);
-        
-        return card;
+        return CardUtils.createWeaponCard(weapon, () -> editWeapon(weapon), () -> deleteItem(weapon));
     }
 
     private VBox createAccessoryCard(Accessory accessory) {
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(10));
-        card.setPrefWidth(180);
-        card.setStyle(getCardStyle());
-        
-        Label nameLabel = new Label(accessory.getName());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: white;");
-        card.getChildren().add(nameLabel);
-        
-        Label defLabel = new Label("Defense: " + accessory.getDefense());
-        defLabel.setStyle("-fx-text-fill: #cccccc;");
-        card.getChildren().add(defLabel);
-        int[] attrs = accessory.getModifiedAttributes();
-        for (int i = 0; i < attrs.length && i < ATTRIBUTE_NAMES.length; i++) {
-            if (attrs[i] != 0) {
-                Label attrLabel = new Label(ATTRIBUTE_NAMES[i] + ": " + (attrs[i] > 0 ? "+" : "") + attrs[i]);
-                attrLabel.setStyle("-fx-text-fill: #aaaaaa;");
-                card.getChildren().add(attrLabel);
-            }
-        }
-        
-        // Display abilities
-        if (accessory.hasAbilities()) {
-            Label abilityHeader = new Label("Abilities:");
-            abilityHeader.setStyle("-fx-text-fill: #dcdcaa; -fx-font-weight: bold;");
-            card.getChildren().add(abilityHeader);
-            for (ItemAbility ability : accessory.getAbilities()) {
-                Label abilityLabel = new Label("  " + ability.getFormattedDescription());
-                abilityLabel.setStyle("-fx-text-fill: #9cdcfe; -fx-font-size: 11px;");
-                card.getChildren().add(abilityLabel);
-            }
-        }
-        
-        HBox btnBox = new HBox(5);
-        Button editBtn = new Button("Edit");
-        editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> editAccessory(accessory));
-        Button deleteBtn = new Button("Delete");
-        deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteItem(accessory));
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        card.getChildren().add(btnBox);
-        
-        return card;
+        return CardUtils.createAccessoryCard(accessory, () -> editAccessory(accessory), () -> deleteItem(accessory));
     }
 
     private VBox createConsumableCard(Consumable item) {
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(10));
-        card.setPrefWidth(150);
-        card.setStyle(getCardStyle());
-        
-        Label nameLabel = new Label(item.getName());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: white;");
-        card.getChildren().add(nameLabel);
-        
-        Label healLabel = new Label("Heal: " + item.getHealAmount());
-        healLabel.setStyle("-fx-text-fill: #cccccc;");
-        card.getChildren().add(healLabel);
-        
-        HBox btnBox = new HBox(5);
-        Button editBtn = new Button("Edit");
-        editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> editConsumable(item));
-        Button deleteBtn = new Button("Delete");
-        deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteItem(item));
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        card.getChildren().add(btnBox);
-        
-        return card;
+        return CardUtils.createConsumableCard(item, () -> editConsumable(item), () -> deleteItem(item));
     }
 
     private VBox createAmmunitionCard(Ammunition item) {
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(10));
-        card.setPrefWidth(150);
-        card.setStyle(getCardStyle());
-        
-        Label nameLabel = new Label(item.getName());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: white;");
-        card.getChildren().add(nameLabel);
-        
-        Label typeLabel = new Label("Type: " + item.getAmmoType());
-        typeLabel.setStyle("-fx-text-fill: #cccccc;");
-        card.getChildren().add(typeLabel);
-        
-        HBox btnBox = new HBox(5);
-        Button editBtn = new Button("Edit");
-        editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> editAmmunition(item));
-        Button deleteBtn = new Button("Delete");
-        deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteItem(item));
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        card.getChildren().add(btnBox);
-        
-        return card;
+        return CardUtils.createAmmunitionCard(item, () -> editAmmunition(item), () -> deleteItem(item));
     }
 
     private VBox createCraftingCard(CraftingItem item) {
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(10));
-        card.setPrefWidth(150);
-        card.setStyle(getCardStyle());
-        
-        Label nameLabel = new Label(item.getName());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: white;");
-        card.getChildren().add(nameLabel);
-        
-        Label catLabel = new Label(item.getCraftingCategory());
-        catLabel.setStyle("-fx-text-fill: #cccccc;");
-        card.getChildren().add(catLabel);
-        
-        HBox btnBox = new HBox(5);
-        Button editBtn = new Button("Edit");
-        editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> editCraftingItem(item));
-        Button deleteBtn = new Button("Delete");
-        deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteItem(item));
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        card.getChildren().add(btnBox);
-        
-        return card;
+        return CardUtils.createCraftingItemCard(item, () -> editCraftingItem(item), () -> deleteItem(item));
     }
 
     private VBox createKeyItemCard(KeyItem item) {
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(10));
-        card.setPrefWidth(150);
-        card.setStyle(getCardStyle());
-        
-        Label nameLabel = new Label(item.getName());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: white;");
-        card.getChildren().add(nameLabel);
-        
-        Label typeLabel = new Label(item.isQuestRelated() ? "Quest Item" : "Key Item");
-        typeLabel.setStyle("-fx-text-fill: #cccccc;");
-        card.getChildren().add(typeLabel);
-        
-        HBox btnBox = new HBox(5);
-        Button editBtn = new Button("Edit");
-        editBtn.getStyleClass().add("button");
-        editBtn.setOnAction(e -> editKeyItem(item));
-        Button deleteBtn = new Button("Delete");
-        deleteBtn.getStyleClass().add("button-danger");
-        deleteBtn.setOnAction(e -> deleteItem(item));
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        card.getChildren().add(btnBox);
-        
-        return card;
-    }
-
-    private String getCardStyle() {
-        return "-fx-background-color: #3a3a3c; -fx-background-radius: 8; -fx-border-radius: 8; " +
-               "-fx-border-color: #505052; -fx-border-width: 1;";
+        return CardUtils.createKeyItemCard(item, () -> editKeyItem(item), () -> deleteItem(item));
     }
 
     // ==================== TERRAIN ====================
@@ -480,35 +283,49 @@ public class AssetEditorView {
     }
 
     private VBox createTerrainCard(TerrainObject terrain) {
-        VBox card = new VBox(5);
-        card.setPadding(new Insets(10));
-        card.setPrefWidth(180);
-        card.setStyle(getCardStyle());
-        
-        Label nameLabel = new Label(terrain.getType());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: white;");
-        card.getChildren().add(nameLabel);
-        
-        Label hpLabel = new Label("HP: " + terrain.getHealth());
-        hpLabel.setStyle("-fx-text-fill: #cccccc;");
-        card.getChildren().add(hpLabel);
-        Label blocksLabel = new Label("Blocks: " + (terrain.blocksMovement() ? "Yes" : "No"));
-        blocksLabel.setStyle("-fx-text-fill: #cccccc;");
-        card.getChildren().add(blocksLabel);
-        
-        HBox btnBox = new HBox(5);
+        CardUtils.CardStyle style = CardUtils.CardStyle.NEUTRAL;
+        VBox card = CardUtils.createBaseCard(style);
+        card.setMinWidth(160);
+        card.setMaxWidth(200);
+
+        HBox header = CardUtils.createCardHeader(terrain.getType(), style,
+            IconUtils.createIcon(IconUtils.Icon.MAP, 18, style.accentColor));
+
+        VBox stats = new VBox(4);
+        stats.setPadding(new Insets(8, 0, 0, 0));
+        addTerrainDetailRow(stats, "HP", String.valueOf(terrain.getHealth()));
+        addTerrainDetailRow(stats, "Blocks", terrain.blocksMovement() ? "Yes" : "No");
+
         Button editBtn = new Button("Edit");
         editBtn.getStyleClass().add("button");
+        editBtn.setStyle("-fx-padding: 4 10 4 10; -fx-font-size: 11px;");
+        editBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.EDIT, 12, "#dcdcdc"));
         editBtn.setOnAction(e -> editTerrain(terrain));
-        
+
         Button deleteBtn = new Button("Delete");
         deleteBtn.getStyleClass().add("button-danger");
+        deleteBtn.setStyle("-fx-padding: 4 10 4 10; -fx-font-size: 11px;");
+        deleteBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.CLOSE, 12, "#fff"));
         deleteBtn.setOnAction(e -> deleteTerrain(terrain));
-        
-        btnBox.getChildren().addAll(editBtn, deleteBtn);
-        card.getChildren().add(btnBox);
-        
+
+        HBox actions = CardUtils.createCardFooter(editBtn, deleteBtn);
+
+        card.getChildren().addAll(header, stats, actions);
+        CardUtils.addCardHoverEffect(card);
+
         return card;
+    }
+
+    private void addTerrainDetailRow(VBox container, String label, String value) {
+        HBox row = new HBox(8);
+        row.setAlignment(Pos.CENTER_LEFT);
+        Label labelNode = new Label(label + ":");
+        labelNode.getStyleClass().add("card-detail-label");
+        labelNode.setMinWidth(60);
+        Label valueNode = new Label(value);
+        valueNode.getStyleClass().add("card-detail-value");
+        row.getChildren().addAll(labelNode, valueNode);
+        container.getChildren().add(row);
     }
 
     // ==================== ITEM DIALOGS ====================
@@ -1136,7 +953,8 @@ public class AssetEditorView {
         confirm.setTitle("Delete Terrain");
         confirm.setHeaderText(null);
         confirm.setContentText("Delete " + terrain.getType() + "?");
-        
+        DialogUtils.theme(confirm);
+
         confirm.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 TerrainDatabase.getInstance().deleteTerrain(terrain);
@@ -1282,7 +1100,8 @@ public class AssetEditorView {
         confirm.setTitle("Delete Item");
         confirm.setHeaderText(null);
         confirm.setContentText("Delete " + item.getName() + "?");
-        
+        DialogUtils.theme(confirm);
+
         confirm.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 ItemDatabase.getInstance().deleteItem(item);
@@ -1310,8 +1129,14 @@ public class AssetEditorView {
     }
 
     private Scene createDialogScene(GridPane grid, int width, int height) {
-        Scene scene = new Scene(grid, width, height);
-        scene.getStylesheets().add(new java.io.File("resources/styles/dark-theme.css").toURI().toString());
+        // Wrapped in a fit-to-width ScrollPane so taller forms (weapon/accessory
+        // dialogs with an ability editor) scroll instead of clipping content.
+        ScrollPane scroll = new ScrollPane(grid);
+        scroll.setFitToWidth(true);
+        scroll.getStyleClass().add("panel-dark");
+        scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        Scene scene = new Scene(scroll, width, height);
+        StyleUtils.applyTheme(scene);
         return scene;
     }
 
@@ -1361,10 +1186,6 @@ public class AssetEditorView {
     }
 
     private void showAlert(Alert.AlertType type, String title, String content) {
-        Alert alert = new Alert(type);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(content);
-        alert.showAndWait();
+        DialogUtils.showAlert(type, title, content);
     }
 }

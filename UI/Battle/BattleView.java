@@ -6,6 +6,7 @@ import UI.AnimationUtils;
 import UI.AppController;
 import UI.CardUtils;
 import UI.CharacterSheetView;
+import UI.DialogUtils;
 import UI.IconUtils;
 import UI.SheetButton;
 import UI.SpriteUtils;
@@ -85,7 +86,7 @@ public class BattleView {
     private String activeHotbarCategory = "party";
     
     // Surprise round toggle
-    private Slider roundStartSlider;
+    private ToggleGroup roundStartGroup;
     
     // Placement mode (party)
     private boolean placementMode = false;
@@ -110,6 +111,10 @@ public class BattleView {
     }
 
     public BattleView(int rows, int cols, String themeName, CharacterSheetView sheetView, AppController appController) {
+        this(rows, cols, null, themeName, sheetView, appController);
+    }
+
+    public BattleView(int rows, int cols, boolean[][] mask, String themeName, CharacterSheetView sheetView, AppController appController) {
         this.appController = appController;
         this.sheetView = sheetView;
         this.battleState = new BattleState();
@@ -118,7 +123,7 @@ public class BattleView {
         List<TerrainObject> terrainObjects = new ArrayList<>();
         List<Pickup> pickups = new ArrayList<>();
 
-        grid = new BattleGrid(rows, cols, entities, terrainObjects, pickups);
+        grid = new BattleGrid(rows, cols, mask, entities, terrainObjects, pickups);
         turnManager = new TurnManager(entities);
         turnManager.setBattleStarted(false);
         
@@ -470,14 +475,12 @@ public class BattleView {
      */
     private VBox createAddObjectsPanel() {
         VBox panel = new VBox(6);
-        panel.getStyleClass().add("hotbar");
+        panel.getStyleClass().addAll("hotbar", "sidebar-panel");
         panel.setPadding(new Insets(8, 10, 8, 10));
-        panel.setStyle("-fx-border-color: #505052; -fx-border-width: 0 0 0 1; -fx-background-color: #2d2d30;");
 
         // Title row with close button
         Label title = new Label("Add Objects");
-        title.getStyleClass().add("label-title");
-        title.setStyle("-fx-font-size: 14px; -fx-text-fill: #daa520;");
+        title.getStyleClass().add("section-header");
         HBox.setHgrow(title, Priority.ALWAYS);
         title.setMaxWidth(Double.MAX_VALUE);
 
@@ -610,22 +613,20 @@ public class BattleView {
         // drives the column's width now, and a hard floor here would clamp the animation
         // partway through a Manage -> Battle shrink instead of letting it slide smoothly.
         panel.setMinWidth(60);
-        panel.getStyleClass().add("panel");
-        panel.setStyle("-fx-background-color: #2d2d30; -fx-border-color: #505052; -fx-border-width: 0 0 0 1;");
+        panel.getStyleClass().addAll("panel", "sidebar-panel");
 
         // Selected entity indicator
         Label selectLabel = new Label("Selected");
-        selectLabel.getStyleClass().add("label-title");
-        selectLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #daa520;");
+        selectLabel.getStyleClass().add("section-header");
 
         Label selectedEntityLabel = new Label("--");
         selectedEntityLabel.setId("selectedEntityLabel");
-        selectedEntityLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #e0e0e0; -fx-font-weight: bold;");
+        selectedEntityLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #dcdcdc; -fx-font-weight: bold;");
         selectedEntityLabel.setWrapText(true);
 
         // Health section with progress bar and adjustment buttons
         Label healthLabel = new Label("Health");
-        healthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
+        healthLabel.getStyleClass().add("label-muted");
 
         HBox healthRow = new HBox(5);
         healthRow.setAlignment(Pos.CENTER_LEFT);
@@ -641,7 +642,7 @@ public class BattleView {
         healthBar = new ProgressBar(0);
         healthBar.setPrefWidth(100);
         healthBar.setPrefHeight(20);
-        healthBar.setStyle("-fx-accent: #F44336;");
+        healthBar.getStyleClass().add("progress-bar-danger");
 
         healthTextLabel = new Label("-- / --");
         healthTextLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: white; -fx-font-weight: bold;");
@@ -658,7 +659,7 @@ public class BattleView {
 
         // Stats section - AC + all 6 basic stats, temporarily adjustable for this battle only
         Label statsLabel = new Label("Stats");
-        statsLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
+        statsLabel.getStyleClass().add("label-muted");
 
         HBox acRow = createStatRow("AC", "#FFD700", "acLabel", d -> adjustAC(d));
         HBox strRowLocal = createStatRow("STR", "#d75f5f", "strLabel", d -> adjustStat(CharSheet.STRENGTH, d));
@@ -675,16 +676,16 @@ public class BattleView {
 
         Label mobLabel = new Label("MOB: --");
         mobLabel.setId("mobLabel");
-        mobLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
+        mobLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #dcdcdc;");
 
         // Weapon section - shows the currently equipped (primary) weapon only, with a small
         // swap button next to it to bring the secondary weapon forward instead.
         Label weapLabel = new Label("Weapon");
-        weapLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
+        weapLabel.getStyleClass().add("label-muted");
 
         Label primaryLabel = new Label("--");
         primaryLabel.setId("primaryLabel");
-        primaryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #e0e0e0;");
+        primaryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #dcdcdc;");
         primaryLabel.setWrapText(true);
         HBox.setHgrow(primaryLabel, Priority.ALWAYS);
 
@@ -697,18 +698,16 @@ public class BattleView {
 
         // Damage dice section - one row per tier, temporarily cyclable through d4..d20
         Label diceLabel = new Label("Damage Dice");
-        diceLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #808080;");
+        diceLabel.getStyleClass().add("label-muted");
 
         HBox tier1Row = createStatRow("T1", "#a0a0a0", "tier1Label", d -> adjustDice(0, d), false);
         HBox tier2Row = createStatRow("T2", "#a0a0a0", "tier2Label", d -> adjustDice(1, d), false);
         HBox tier3Row = createStatRow("T3", "#a0a0a0", "tier3Label", d -> adjustDice(2, d), false);
 
         Separator sep = new Separator();
-        sep.setStyle("-fx-background-color: #505052;");
 
         Label actionsLabel = new Label("Actions");
-        actionsLabel.getStyleClass().add("label-title");
-        actionsLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #808080;");
+        actionsLabel.getStyleClass().add("section-header");
 
         // Action buttons - condensed into a numpad-style grid of square icon buttons,
         // each shaded a distinct color so the four actions read apart at a glance
@@ -921,7 +920,10 @@ public class BattleView {
             // Update health bar
             int maxHP = e.getCharSheet().getTotalHP();
             int currentHP = e.getCharSheet().getCurrentHP();
-            healthBar.setProgress(maxHP > 0 ? (double) currentHP / maxHP : 0);
+            double hpPct = maxHP > 0 ? (double) currentHP / maxHP : 0;
+            if (Math.abs(healthBar.getProgress() - hpPct) > 0.001) {
+                AnimationUtils.animateProgressBar(healthBar, hpPct);
+            }
             healthTextLabel.setText(currentHP + " / " + maxHP);
 
             boolean canAct = e.isParty() && battleState.isBattleStarted();
@@ -950,7 +952,10 @@ public class BattleView {
             // Update health bar for enemy
             int maxHP = en.getMaxHealth();
             int currentHP = en.getHealth();
-            healthBar.setProgress(maxHP > 0 ? (double) currentHP / maxHP : 0);
+            double hpPct = maxHP > 0 ? (double) currentHP / maxHP : 0;
+            if (Math.abs(healthBar.getProgress() - hpPct) > 0.001) {
+                AnimationUtils.animateProgressBar(healthBar, hpPct);
+            }
             healthTextLabel.setText(currentHP + " / " + maxHP);
 
             boolean canAct = battleState.isBattleStarted();
@@ -973,7 +978,7 @@ public class BattleView {
      */
     private void styleAdjustedValue(Label label, int adjustment) {
         if (label == null) return;
-        String color = adjustment > 0 ? "#4CAF50" : adjustment < 0 ? "#F44336" : "#ffffff";
+        String color = adjustment > 0 ? "#4CAF50" : adjustment < 0 ? "#d75f5f" : "#ffffff";
         label.setStyle("-fx-font-size: 12px; -fx-text-fill: " + color + ";");
     }
 
@@ -984,7 +989,7 @@ public class BattleView {
     private void styleAdjustedDie(Label label, String currentDie, String baseDie) {
         if (label == null) return;
         int diceIndexDelta = diceIndex(currentDie) - diceIndex(baseDie);
-        String color = diceIndexDelta > 0 ? "#4CAF50" : diceIndexDelta < 0 ? "#F44336" : "#ffffff";
+        String color = diceIndexDelta > 0 ? "#4CAF50" : diceIndexDelta < 0 ? "#d75f5f" : "#ffffff";
         label.setStyle("-fx-font-size: 12px; -fx-text-fill: " + color + ";");
     }
 
@@ -1225,38 +1230,49 @@ public class BattleView {
         HBox buttons = new HBox(6, battleToggleBtn, nextTurnBtn);
         buttons.setAlignment(Pos.CENTER_LEFT);
 
-        // Round-start mode slider: left = surprise (party first),
-        // middle = normal, right = ambush (enemies first). Locks once
-        // the battle begins.
-        roundStartSlider = new Slider(0, 2, 1);
-        roundStartSlider.setSnapToTicks(true);
-        roundStartSlider.setMajorTickUnit(1);
-        roundStartSlider.setMinorTickCount(0);
-        roundStartSlider.setPrefWidth(80);
-        roundStartSlider.setMaxWidth(80);
-        roundStartSlider.disableProperty().bind(battleState.battleStartedProperty());
+        // Round-start mode: Surprise (party first) / Normal / Ambush (enemies
+        // first). Three explicit toggles instead of an ambiguous slider so the
+        // discrete choice - and which one is active - is unmistakable at a glance.
+        // Locks once the battle begins.
+        roundStartGroup = new ToggleGroup();
+        ToggleButton surpriseBtn = createRoundStartToggle("Surp", TurnManager.RoundStartMode.SURPRISE,
+            "Surprise: party acts first");
+        ToggleButton normalBtn = createRoundStartToggle("Norm", TurnManager.RoundStartMode.NORMAL,
+            "Normal: standard initiative order");
+        ToggleButton ambushBtn = createRoundStartToggle("Amb", TurnManager.RoundStartMode.AMBUSH,
+            "Ambush: enemies act first");
+        normalBtn.setSelected(true);
 
-        Label modeLabel = new Label("Normal");
-        modeLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b8b8c0;");
-        roundStartSlider.valueProperty().addListener((obs, o, n) ->
-            modeLabel.setText(roundStartModeFromSlider().name().charAt(0)
-                + roundStartModeFromSlider().name().substring(1).toLowerCase()));
-        Tooltip.install(roundStartSlider, new Tooltip(
-            "Round start: Surprise (party acts first) / Normal / Ambush (enemies act first)"));
+        // Never allow the group to end up with nothing selected
+        roundStartGroup.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
+            if (newToggle == null) {
+                roundStartGroup.selectToggle(oldToggle);
+            }
+        });
 
-        HBox sliderRow = new HBox(6, roundStartSlider, modeLabel);
-        sliderRow.setAlignment(Pos.CENTER_LEFT);
+        HBox toggleRow = new HBox(4, surpriseBtn, normalBtn, ambushBtn);
+        toggleRow.setAlignment(Pos.CENTER_LEFT);
 
-        VBox controls = new VBox(5, buttons, sliderRow);
+        VBox controls = new VBox(5, buttons, toggleRow);
         controls.setAlignment(Pos.CENTER_LEFT);
         return controls;
     }
 
+    private ToggleButton createRoundStartToggle(String label, TurnManager.RoundStartMode mode, String tooltipText) {
+        ToggleButton btn = new ToggleButton(label);
+        btn.getStyleClass().addAll("hotbar-tab", "round-start-toggle");
+        btn.setUserData(mode);
+        btn.setToggleGroup(roundStartGroup);
+        btn.disableProperty().bind(battleState.battleStartedProperty());
+        Tooltip tooltip = new Tooltip(tooltipText);
+        tooltip.setShowDelay(javafx.util.Duration.millis(200));
+        btn.setTooltip(tooltip);
+        return btn;
+    }
+
     private TurnManager.RoundStartMode roundStartModeFromSlider() {
-        double v = roundStartSlider.getValue();
-        if (v < 0.5) return TurnManager.RoundStartMode.SURPRISE;
-        if (v > 1.5) return TurnManager.RoundStartMode.AMBUSH;
-        return TurnManager.RoundStartMode.NORMAL;
+        Toggle selected = roundStartGroup.getSelectedToggle();
+        return selected != null ? (TurnManager.RoundStartMode) selected.getUserData() : TurnManager.RoundStartMode.NORMAL;
     }
 
     /** The Manage sidebar tab: battlefield setup tools. */
@@ -1265,12 +1281,10 @@ public class BattleView {
         panel.setPadding(new Insets(10));
         panel.setPrefWidth(SIDEBAR_WIDTH_MANAGE);
         panel.setMinWidth(60);
-        panel.getStyleClass().add("panel");
-        panel.setStyle("-fx-background-color: #2d2d30; -fx-border-color: #505052; -fx-border-width: 0 0 0 1;");
+        panel.getStyleClass().addAll("panel", "sidebar-panel");
 
         Label title = new Label("Manage");
-        title.getStyleClass().add("label-title");
-        title.setStyle("-fx-font-size: 14px; -fx-text-fill: #daa520;");
+        title.getStyleClass().add("section-header");
 
         Button backBtn = new Button("Character Sheets");
         backBtn.setGraphic(IconUtils.smallIcon(IconUtils.Icon.PERSON));
@@ -1306,14 +1320,22 @@ public class BattleView {
     /** Show the active sidebar tab's content, unless the dice panel is up. */
     private void updateRightPanelContent() {
         boolean manage = manageTabBtn.isSelected();
-        actionPanel.setVisible(!manage && !dicePanelShowing);
-        actionPanel.setManaged(!manage && !dicePanelShowing);
-        managePanel.setVisible(manage && !dicePanelShowing);
-        managePanel.setManaged(manage && !dicePanelShowing);
+        showSidebarSubPanel(actionPanel, !manage && !dicePanelShowing);
+        showSidebarSubPanel(managePanel, manage && !dicePanelShowing);
 
         double targetWidth = dicePanelShowing ? SIDEBAR_WIDTH_DICE
             : manage ? SIDEBAR_WIDTH_MANAGE : SIDEBAR_WIDTH_BATTLE;
         animateSidebarWidth(targetWidth);
+    }
+
+    /** Toggle a sidebar sub-panel's visibility, fading it in only when it newly appears. */
+    private void showSidebarSubPanel(javafx.scene.layout.VBox panel, boolean visible) {
+        boolean wasVisible = panel.isVisible();
+        panel.setVisible(visible);
+        panel.setManaged(visible);
+        if (visible && !wasVisible) {
+            AnimationUtils.fadeIn(panel, AnimationUtils.MEDIUM);
+        }
     }
 
     /** Slide the sidebar column to a new width instead of snapping to it. */
@@ -1421,42 +1443,43 @@ public class BattleView {
         Dialog<List<GridObject>> dialog = new Dialog<>();
         dialog.setTitle("Initiative Tie");
         dialog.setHeaderText("These party members tied for initiative.\nClick to set turn order (first click goes first):");
-        
+        DialogUtils.theme(dialog);
+
         int initRoll = turnManager.getInitiativeRoll(tiedGroup.get(0));
-        
+
         VBox content = new VBox(10);
         content.setPadding(new Insets(10));
-        
+
         Label rollLabel = new Label("Initiative Roll: " + initRoll);
         rollLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #569cd6;");
         content.getChildren().add(rollLabel);
-        
+
         // Track selection order
-        List<GridObject> selectionOrder = new ArrayList<>();
+        javafx.collections.ObservableList<GridObject> selectionOrder = javafx.collections.FXCollections.observableArrayList();
         Map<GridObject, Button> buttonMap = new HashMap<>();
-        
+
         VBox buttonBox = new VBox(5);
         for (GridObject obj : tiedGroup) {
             String name = (obj instanceof Entity e) ? e.getName() : "Unknown";
             Button btn = new Button(name);
             btn.setPrefWidth(200);
             btn.getStyleClass().add("button");
-            
+
             btn.setOnAction(e -> {
                 if (!selectionOrder.contains(obj)) {
                     selectionOrder.add(obj);
                     btn.setText((selectionOrder.size()) + ". " + name);
                     btn.setDisable(true);
-                    btn.setStyle("-fx-opacity: 0.7;");
+                    btn.setOpacity(0.7);
                 }
             });
-            
+
             buttonMap.put(obj, btn);
             buttonBox.getChildren().add(btn);
         }
-        
+
         content.getChildren().add(buttonBox);
-        
+
         // Add reset button
         Button resetBtn = new Button("Reset");
         resetBtn.getStyleClass().add("button");
@@ -1467,43 +1490,26 @@ public class BattleView {
                 String name = (obj instanceof Entity en) ? en.getName() : "Unknown";
                 btn.setText(name);
                 btn.setDisable(false);
-                btn.setStyle("");
+                btn.setOpacity(1.0);
             }
         });
         content.getChildren().add(resetBtn);
-        
+
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        
+
         // Disable OK until all are selected
         Button okBtn = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
-        okBtn.setDisable(true);
-        
-        // Check selection completeness on each click
-        dialog.getDialogPane().addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-            if (event.getTarget() != okBtn && event.getTarget() != resetBtn) {
-                okBtn.setDisable(selectionOrder.size() < tiedGroup.size());
-            }
-        });
-        
-        // Also use a simple polling approach since the above may not catch everything
-        javafx.animation.Timeline checker = new javafx.animation.Timeline(
-            new javafx.animation.KeyFrame(javafx.util.Duration.millis(100), e -> {
-                okBtn.setDisable(selectionOrder.size() < tiedGroup.size());
-            })
-        );
-        checker.setCycleCount(javafx.animation.Animation.INDEFINITE);
-        checker.play();
-        
+        okBtn.disableProperty().bind(javafx.beans.binding.Bindings.size(selectionOrder).lessThan(tiedGroup.size()));
+
         dialog.setResultConverter(buttonType -> {
-            checker.stop();
             if (buttonType == ButtonType.OK && selectionOrder.size() == tiedGroup.size()) {
-                return selectionOrder;
+                return new ArrayList<>(selectionOrder);
             }
             // If cancelled or incomplete, use current order (random)
             return null;
         });
-        
+
         dialog.showAndWait().ifPresent(chosenOrder -> {
             if (chosenOrder != null) {
                 turnManager.applyTieResolution(tiedGroup, chosenOrder);
@@ -1603,6 +1609,7 @@ public class BattleView {
         confirm.setTitle("Confirm End Battle");
         confirm.setHeaderText(null);
         confirm.setContentText("End battle? Party entity states will be saved.");
+        DialogUtils.theme(confirm);
 
         Optional<ButtonType> result = confirm.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
@@ -1734,7 +1741,7 @@ public class BattleView {
             String tooltip = String.format("%s (Consumable)%n%s: %d",
                 consumable.getName(), effectName, consumable.getHealAmount());
             cards.add(createHotbarCard(createItemSwatch(consumable.getColor(), IconUtils.Icon.HEART),
-                consumable.getName(), tooltip, "USE", "#6fd66f", key,
+                consumable.getName(), tooltip, "USE", "#4CAF50", key,
                 () -> startObjectPlacement(() -> new Pickup(0, 0, consumable), key, consumable.getName())));
         }
         return cards;
@@ -1742,9 +1749,9 @@ public class BattleView {
 
     private List<Node> buildElevationCards() {
         List<Node> cards = new ArrayList<>();
-        cards.add(createHotbarCard(createItemSwatch("#6fd66f", IconUtils.Icon.PLUS),
+        cards.add(createHotbarCard(createItemSwatch("#4CAF50", IconUtils.Icon.PLUS),
             "Raise", "Raise tiles by one level (max " + BattleGrid.MAX_ELEVATION + ")",
-            "+1", "#6fd66f", "elev:raise",
+            "+1", "#4CAF50", "elev:raise",
             () -> startElevationBrush(1, "elev:raise", "Raising tiles")));
         cards.add(createHotbarCard(createItemSwatch("#e6b23c", IconUtils.Icon.MINUS),
             "Lower", "Lower tiles by one level",
@@ -1806,14 +1813,11 @@ public class BattleView {
         Tooltip.install(card, tooltip);
 
         card.setOnMouseClicked(e -> onClick.run());
+        CardUtils.addCardHoverEffect(card);
         return card;
     }
 
     private void showAlert(Alert.AlertType type, String title, String content) {
-        Alert alert = new Alert(type);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(content);
-        alert.showAndWait();
+        DialogUtils.showAlert(type, title, content);
     }
 }

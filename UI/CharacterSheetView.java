@@ -37,6 +37,7 @@ public class CharacterSheetView {
     private VBox partyListBox;
     private StackPane displayPane;
     private VBox partyPopup;
+    private Region partyPopupScrim;
     private boolean partyPopupVisible = false;
 
     // Enemies browser (full-width mode)
@@ -74,6 +75,7 @@ public class CharacterSheetView {
 
         SplitPane charactersView = new SplitPane(partyScroll, displayPane);
         charactersView.setDividerPositions(0.25);
+        SplitPane.setResizableWithParent(partyScroll, false);
 
         // Enemies mode: full-width searchable/taggable card browser
         VBox enemiesView = createEnemyBrowser();
@@ -247,40 +249,44 @@ public class CharacterSheetView {
     
     private void showPartyPopup() {
         if (partyPopup != null) {
-            displayPane.getChildren().remove(partyPopup);
+            displayPane.getChildren().removeAll(partyPopupScrim, partyPopup);
         }
+        partyPopupScrim = new Region();
+        partyPopupScrim.setStyle("-fx-background-color: rgba(0, 0, 0, 0.5);");
+        partyPopupScrim.setOnMouseClicked(e -> hidePartyPopup());
         partyPopup = createPartyPopup();
-        displayPane.getChildren().add(partyPopup);
+        displayPane.getChildren().addAll(partyPopupScrim, partyPopup);
         partyPopupVisible = true;
     }
-    
+
     private void hidePartyPopup() {
         if (partyPopup != null) {
-            displayPane.getChildren().remove(partyPopup);
+            displayPane.getChildren().removeAll(partyPopupScrim, partyPopup);
             partyPopup = null;
+            partyPopupScrim = null;
         }
         partyPopupVisible = false;
     }
-    
+
     /**
      * Create the party management popup with drag-and-drop lists.
      */
     private VBox createPartyPopup() {
         VBox popup = new VBox(10);
-        popup.getStyleClass().add("card");
-        popup.setStyle("-fx-background-color: #2d2d30; -fx-border-color: #4CAF50; -fx-border-width: 2; -fx-border-radius: 8; -fx-background-radius: 8;");
+        popup.getStyleClass().addAll("card", "card-accent-success");
         popup.setPadding(new Insets(15));
+        popup.setPrefWidth(500);
         popup.setMaxWidth(500);
         popup.setMaxHeight(420);
         StackPane.setAlignment(popup, Pos.CENTER);
-        
+
         // Header with title and close button
         HBox header = new HBox(10);
         header.setAlignment(Pos.CENTER_LEFT);
-        
+
         Label titleLabel = new Label("Manage Party");
-        titleLabel.getStyleClass().add("label-title");
-        titleLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #4CAF50;");
+        titleLabel.getStyleClass().add("label-success");
+        titleLabel.setStyle("-fx-font-size: 18px;");
         HBox.setHgrow(titleLabel, Priority.ALWAYS);
         
         Button closeBtn = new Button();
@@ -328,11 +334,13 @@ public class CharacterSheetView {
         
         ListView<String> availableList = new ListView<>(availableItems);
         availableList.setPrefHeight(250);
-        availableList.setPrefWidth(150);
+        availableList.setMinWidth(120);
+        HBox.setHgrow(availableBox, Priority.ALWAYS);
+        VBox.setVgrow(availableList, Priority.ALWAYS);
         styleNameListView(availableList);
         setupDragSource(availableList);
         setupDragTarget(availableList, partyItems, availableItems, false);
-        
+
         availableBox.getChildren().addAll(availableLabel, availableList);
         
         // Party list
@@ -343,14 +351,17 @@ public class CharacterSheetView {
         
         ListView<String> partyList = new ListView<>(partyItems);
         partyList.setPrefHeight(250);
-        partyList.setPrefWidth(150);
+        partyList.setMinWidth(120);
+        partyList.setFixedCellSize(28);
+        HBox.setHgrow(partyBox, Priority.ALWAYS);
+        VBox.setVgrow(partyList, Priority.ALWAYS);
         styleNameListView(partyList);
         setupDragSource(partyList);
         setupDragTarget(partyList, availableItems, partyItems, true);
-        
+
         // Add reorder within party list
         setupReorderDrag(partyList, partyItems);
-        
+
         partyBox.getChildren().addAll(partyLabel, partyList);
         
         // Arrow buttons for moving items
@@ -487,8 +498,8 @@ public class CharacterSheetView {
                 // Calculate target index based on drop position
                 // Get the item we're dropping on
                 double y = event.getY();
-                int cellHeight = 24; // Approximate cell height
-                int dropIdx = Math.min((int)(y / cellHeight), items.size() - 1);
+                double cellHeight = listView.getFixedCellSize() > 0 ? listView.getFixedCellSize() : 24;
+                int dropIdx = Math.min((int) (y / cellHeight), items.size() - 1);
                 dropIdx = Math.max(0, dropIdx);
                 
                 if (draggedIdx != dropIdx) {
@@ -638,7 +649,7 @@ public class CharacterSheetView {
         dialog.setTitle("Add Tag");
         dialog.setHeaderText(null);
         dialog.setContentText("New tag name:");
-        dialog.getDialogPane().getStylesheets().add(new File("resources/styles/dark-theme.css").toURI().toString());
+        DialogUtils.theme(dialog);
         dialog.showAndWait().ifPresent(tag -> {
             String trimmed = tag.trim();
             if (!trimmed.isEmpty()) {
@@ -747,7 +758,8 @@ public class CharacterSheetView {
         confirm.setTitle("Delete Enemy");
         confirm.setHeaderText(null);
         confirm.setContentText("Delete " + enemy.getName() + "?");
-        
+        DialogUtils.theme(confirm);
+
         if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
             File file = new File("saves/entities/enemies/" + enemy.getName() + ".json");
             if (file.exists()) {
@@ -794,7 +806,7 @@ public class CharacterSheetView {
         ColorPicker colorPicker = new ColorPicker(Color.web(EntityRes.ColorUtils.fromLegacyIndex(0)));
         grid.add(colorPicker, 1, row++);
         Label colorHint = new Label("Colors are saved as hex values.");
-        colorHint.setStyle("-fx-text-fill: #888888; -fx-font-size: 10px;");
+        colorHint.getStyleClass().addAll("label-muted", "label-caption");
         grid.add(colorHint, 0, row++, 2, 1);
         
         // HP
@@ -832,7 +844,7 @@ public class CharacterSheetView {
         TextField chaField = new TextField("3");
         grid.add(chaField, 1, row++);
         Label statHint = new Label("Base stats are STR, DEX, CON, INT, WIS, CHA.");
-        statHint.setStyle("-fx-text-fill: #888888; -fx-font-size: 10px;");
+        statHint.getStyleClass().addAll("label-muted", "label-caption");
         grid.add(statHint, 0, row++, 2, 1);
         
         // Equipment
@@ -951,7 +963,7 @@ public class CharacterSheetView {
         dialogScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 
         Scene scene = new Scene(dialogScroll, 370, 620);
-        scene.getStylesheets().add(new java.io.File("resources/styles/dark-theme.css").toURI().toString());
+        StyleUtils.applyTheme(scene);
         
         dialog.setScene(scene);
         dialog.showAndWait();
@@ -985,21 +997,25 @@ public class CharacterSheetView {
         grid.add(new Label("Health:"), 0, row);
         Spinner<Integer> hpSpinner = new Spinner<>(1, 9999, existing != null ? existing.getMaxHealth() : 10);
         hpSpinner.setEditable(true);
+        FormUtils.styleSpinner(hpSpinner);
         grid.add(hpSpinner, 1, row++);
-        
+
         grid.add(new Label("Mobility:"), 0, row);
         Spinner<Integer> mobSpinner = new Spinner<>(1, 99, existing != null ? existing.getMovement() : 3);
         mobSpinner.setEditable(true);
+        FormUtils.styleSpinner(mobSpinner);
         grid.add(mobSpinner, 1, row++);
-        
+
         grid.add(new Label("Armor Class:"), 0, row);
         Spinner<Integer> acSpinner = new Spinner<>(0, 99, existing != null ? existing.getAC() : 10);
         acSpinner.setEditable(true);
+        FormUtils.styleSpinner(acSpinner);
         grid.add(acSpinner, 1, row++);
-        
+
         grid.add(new Label("Dexterity (Attack + Initiative):"), 0, row);
         Spinner<Integer> dexSpinner = new Spinner<>(-10, 99, existing != null ? existing.getDexterity() : 2);
         dexSpinner.setEditable(true);
+        FormUtils.styleSpinner(dexSpinner);
         grid.add(dexSpinner, 1, row++);
         
         // Get existing dice values
@@ -1027,7 +1043,7 @@ public class CharacterSheetView {
         ColorPicker colorPicker = new ColorPicker(Color.web(existing != null ? existing.getColor() : ColorUtils.fromLegacyIndex(0)));
         grid.add(colorPicker, 1, row++);
         Label enemyHint = new Label("Dexterity drives both enemy attack rolls and initiative.");
-        enemyHint.setStyle("-fx-text-fill: #888888; -fx-font-size: 10px;");
+        enemyHint.getStyleClass().addAll("label-muted", "label-caption");
         grid.add(enemyHint, 0, row++, 2, 1);
         
         // Sprite picker
@@ -1139,7 +1155,7 @@ public class CharacterSheetView {
         GridPane.setColumnSpan(btnBox, 2);
         
         Scene scene = new Scene(grid);
-        scene.getStylesheets().add(new java.io.File("resources/styles/dark-theme.css").toURI().toString());
+        StyleUtils.applyTheme(scene);
         dialog.setScene(scene);
         dialog.showAndWait();
     }
@@ -1157,10 +1173,6 @@ public class CharacterSheetView {
     }
 
     private void showAlert(Alert.AlertType type, String title, String content) {
-        Alert alert = new Alert(type);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(content);
-        alert.showAndWait();
+        DialogUtils.showAlert(type, title, content);
     }
 }

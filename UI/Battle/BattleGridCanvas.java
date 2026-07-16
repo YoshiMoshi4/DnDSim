@@ -2,6 +2,7 @@ package UI.Battle;
 
 import EntityRes.*;
 import Objects.*;
+import UI.DialogUtils;
 import UI.SpriteUtils;
 import javafx.animation.AnimationTimer;
 import javafx.animation.PauseTransition;
@@ -148,8 +149,7 @@ public class BattleGridCanvas extends Pane {
         setStyle("-fx-background-color: #1e1e20;");
 
         infoPopup.setPadding(new javafx.geometry.Insets(8, 10, 8, 10));
-        infoPopup.setStyle("-fx-background-color: #2d2d30; -fx-border-color: #505052; " +
-            "-fx-border-width: 1; -fx-background-radius: 6; -fx-border-radius: 6;");
+        infoPopup.getStyleClass().add("info-popup");
         infoPopup.setPrefWidth(160);
         infoPopup.setVisible(false);
         infoPopup.setManaged(false);
@@ -390,14 +390,13 @@ public class BattleGridCanvas extends Pane {
                 "MOB: " + mobility,
                 "DMG: " + diceText}) {
             Label l = new Label(line);
-            l.setStyle("-fx-text-fill: #cccccc; -fx-font-size: 11px;");
+            l.setStyle("-fx-text-fill: #dcdcdc; -fx-font-size: 11px;");
             infoPopup.getChildren().add(l);
         }
 
         if (pinned) {
             Button deleteBtn = new Button("Delete");
-            deleteBtn.getStyleClass().add("button");
-            deleteBtn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white; -fx-font-size: 11px;");
+            deleteBtn.getStyleClass().addAll("button", "button-danger");
             deleteBtn.setOnAction(ev -> deleteObject(obj));
             infoPopup.getChildren().add(deleteBtn);
         }
@@ -637,6 +636,7 @@ public class BattleGridCanvas extends Pane {
         ChoiceDialog<String> dialog = new ChoiceDialog<>(choices.get(0), choices);
         dialog.setTitle("Use Item");
         dialog.setHeaderText("Select an item to use:");
+        DialogUtils.theme(dialog);
         dialog.showAndWait().ifPresent(choice -> {
             int idx = choices.indexOf(choice);
             if (idx >= 0) {
@@ -666,10 +666,10 @@ public class BattleGridCanvas extends Pane {
         
         // Info about the item
         Label itemInfo = new Label("Base healing: " + consumable.getHealAmount() + " HP");
-        itemInfo.setStyle("-fx-font-size: 13px; -fx-text-fill: #e0e0e0;");
-        
+        itemInfo.setStyle("-fx-font-size: 13px; -fx-text-fill: #dcdcdc;");
+
         Label rollInfo = new Label("Roll determines efficacy (1=10%, 10=100%)");
-        rollInfo.setStyle("-fx-font-size: 11px; -fx-text-fill: #888;");
+        rollInfo.getStyleClass().add("label-muted");
         
         // Input field
         TextField rollInput = new TextField();
@@ -695,7 +695,7 @@ public class BattleGridCanvas extends Pane {
                     previewLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #4CAF50;");
                 } else {
                     previewLabel.setText("Enter 1-10");
-                    previewLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #F44336;");
+                    previewLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #d75f5f;");
                 }
             } catch (NumberFormatException e) {
                 previewLabel.setText("");
@@ -706,7 +706,8 @@ public class BattleGridCanvas extends Pane {
         
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        
+        DialogUtils.theme(dialog);
+
         // Disable OK until valid input
         Button okBtn = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
         okBtn.setDisable(true);
@@ -745,7 +746,7 @@ public class BattleGridCanvas extends Pane {
         if (consumable.getHealAmount() > 0) {
             int healAmount = (int) Math.ceil(consumable.getHealAmount() * efficacyPercent / 100.0);
             entity.getCharSheet().addCurrentHP(healAmount);
-            spawnFloatingText(entity, "+" + healAmount, Color.web("#6fd66f"));
+            spawnFloatingText(entity, "+" + healAmount, Color.web("#4CAF50"));
         }
         if (consumable.getEffect() != null) {
             entity.getCharSheet().addStatus(consumable.getEffect());
@@ -884,6 +885,120 @@ public class BattleGridCanvas extends Pane {
         return grid.getElevation(r, c) * cellSize * ELEV_LIFT;
     }
 
+    // White overlay per elevation level on tile tops, so height has a color
+    // signature even where no side face is visible (e.g. north-facing drops)
+    private static final double ELEV_TINT_PER_LEVEL = 0.04;
+    private static final Color[] ELEV_TINT = buildElevTints();
+
+    private static Color[] buildElevTints() {
+        Color[] tints = new Color[BattleGrid.MAX_ELEVATION + 1];
+        for (int i = 1; i < tints.length; i++) {
+            tints[i] = Color.rgb(255, 255, 255, ELEV_TINT_PER_LEVEL * i);
+        }
+        return tints;
+    }
+
+    // Cliff shadow bands on tiles bordering a higher neighbor, indexed by
+    // (clamped elevation diff - 1). Three overlapping rects per edge composite
+    // into a stepped ramp that suits the pixel-art look; colors are precomputed
+    // because redraw() runs per animation frame.
+    private static final Color[] CLIFF_SHADOW_STEP = {
+        Color.rgb(0, 0, 0, 0.11), Color.rgb(0, 0, 0, 0.14), Color.rgb(0, 0, 0, 0.17) };
+    private static final double SHADOW_W_BASE = 0.10;      // band width as fraction of a cell
+    private static final double SHADOW_W_PER_LEVEL = 0.05; // extra width per level of diff
+
+    /** Texture variant for a cell, from a position hash. */
+    private int variantFor(int r, int c) {
+        return (int) (((r * 73856093L) ^ (c * 19349663L)) >>> 1) % theme.floorVariants.length;
+    }
+
+    /** Texture + elevation tint + checker for one tile's top face at its (possibly lifted) rect. */
+    private void drawTileTop(GraphicsContext gc, int r, int c, double x0, double x1, double yTop, double yBottom) {
+        gc.drawImage(theme.floorVariants[variantFor(r, c)], x0, yTop, x1 - x0, yBottom - yTop);
+        int level = grid.getElevation(r, c);
+        if (level > 0) {
+            gc.setFill(ELEV_TINT[level]);
+            gc.fillRect(x0, yTop, x1 - x0, yBottom - yTop);
+        }
+        if (((r + c) & 1) == 1) {
+            gc.setFill(Color.rgb(0, 0, 0, 0.07));
+            gc.fillRect(x0, yTop, x1 - x0, yBottom - yTop);
+        }
+    }
+
+    /**
+     * Stepped ambient-occlusion bands on (r,c)'s top face along each edge shared
+     * with a higher neighbor, so drops read as depth in all four directions.
+     * Band anchors follow the on-screen shared edge, which for a raised south
+     * neighbor is that neighbor's lifted top edge, not the nominal grid line.
+     */
+    private void drawCliffShadows(GraphicsContext gc, int r, int c, double offsetX, double offsetY, double cellSize) {
+        int elev = grid.getElevation(r, c);
+        double lift = elev * cellSize * ELEV_LIFT;
+        double x0 = Math.round(offsetX + c * cellSize);
+        double x1 = Math.round(offsetX + (c + 1) * cellSize);
+        double yTop = Math.round(offsetY + r * cellSize - lift);
+        double yBot = Math.round(offsetY + (r + 1) * cellSize - lift);
+
+        // North neighbor higher: its wall ends exactly at this face's top edge
+        int diff = grid.getElevation(r - 1, c) - elev;
+        if (diff > 0) {
+            int d = Math.min(3, diff);
+            double h = bandWidth(cellSize, d);
+            gc.setFill(CLIFF_SHADOW_STEP[d - 1]);
+            gc.fillRect(x0, yTop, x1 - x0, h);
+            gc.fillRect(x0, yTop, x1 - x0, Math.round(h * 2.0 / 3));
+            gc.fillRect(x0, yTop, x1 - x0, Math.round(h / 3.0));
+        }
+
+        // South neighbor higher: its lifted top edge intrudes up into this face,
+        // so the band hangs upward from that edge (clamped to this face)
+        diff = grid.getElevation(r + 1, c) - elev;
+        if (diff > 0) {
+            int d = Math.min(3, diff);
+            double h = bandWidth(cellSize, d);
+            double yEdge = Math.round(offsetY + (r + 1) * cellSize - grid.getElevation(r + 1, c) * cellSize * ELEV_LIFT);
+            gc.setFill(CLIFF_SHADOW_STEP[d - 1]);
+            fillBandUp(gc, x0, x1, yTop, yEdge, h);
+            fillBandUp(gc, x0, x1, yTop, yEdge, Math.round(h * 2.0 / 3));
+            fillBandUp(gc, x0, x1, yTop, yEdge, Math.round(h / 3.0));
+        }
+
+        // East neighbor higher: vertical shared edge at x1, full face height
+        diff = grid.getElevation(r, c + 1) - elev;
+        if (diff > 0) {
+            int d = Math.min(3, diff);
+            double h = bandWidth(cellSize, d);
+            gc.setFill(CLIFF_SHADOW_STEP[d - 1]);
+            gc.fillRect(x1 - h, yTop, h, yBot - yTop);
+            gc.fillRect(x1 - Math.round(h * 2.0 / 3), yTop, Math.round(h * 2.0 / 3), yBot - yTop);
+            gc.fillRect(x1 - Math.round(h / 3.0), yTop, Math.round(h / 3.0), yBot - yTop);
+        }
+
+        // West neighbor higher: mirror of east
+        diff = grid.getElevation(r, c - 1) - elev;
+        if (diff > 0) {
+            int d = Math.min(3, diff);
+            double h = bandWidth(cellSize, d);
+            gc.setFill(CLIFF_SHADOW_STEP[d - 1]);
+            gc.fillRect(x0, yTop, h, yBot - yTop);
+            gc.fillRect(x0, yTop, Math.round(h * 2.0 / 3), yBot - yTop);
+            gc.fillRect(x0, yTop, Math.round(h / 3.0), yBot - yTop);
+        }
+    }
+
+    private static double bandWidth(double cellSize, int diff) {
+        return Math.max(3, Math.round(cellSize * (SHADOW_W_BASE + SHADOW_W_PER_LEVEL * diff)));
+    }
+
+    /** Fill a band of height h extending upward from yEdge, clamped to yTop. */
+    private static void fillBandUp(GraphicsContext gc, double x0, double x1, double yTop, double yEdge, double h) {
+        double top = Math.max(yTop, yEdge - h);
+        if (yEdge > top) {
+            gc.fillRect(x0, top, x1 - x0, yEdge - top);
+        }
+    }
+
     /**
      * Draw one elevated tile's visual: darkened side face down to the true grid line,
      * floor texture on the lifted top, lit leading edge, and an outline. Called once in
@@ -892,26 +1007,25 @@ public class BattleGridCanvas extends Pane {
      * whatever from the row behind it (row - 1) already got drawn, e.g. a unit standing there.
      */
     private void drawElevatedTileFace(GraphicsContext gc, int r, int c, double offsetX, double offsetY, double cellSize) {
-        int v = (int) (((r * 73856093L) ^ (c * 19349663L)) >>> 1) % theme.floorVariants.length;
         double x0 = Math.round(offsetX + c * cellSize);
         double x1 = Math.round(offsetX + (c + 1) * cellSize);
         double lift = liftFor(r, c, cellSize);
         double yBase = Math.round(offsetY + (r + 1) * cellSize);
         double yT0 = Math.round(offsetY + r * cellSize - lift);
         double yT1 = Math.round(offsetY + (r + 1) * cellSize - lift);
-        gc.drawImage(theme.floorVariants[v], x0, yT1, x1 - x0, yBase - yT1);
+        gc.drawImage(theme.floorVariants[variantFor(r, c)], x0, yT1, x1 - x0, yBase - yT1);
         gc.setFill(Color.rgb(0, 0, 0, 0.45));
         gc.fillRect(x0, yT1, x1 - x0, yBase - yT1);
-        gc.drawImage(theme.floorVariants[v], x0, yT0, x1 - x0, yT1 - yT0);
-        if (((r + c) & 1) == 1) {
-            gc.setFill(Color.rgb(0, 0, 0, 0.07));
-            gc.fillRect(x0, yT0, x1 - x0, yT1 - yT0);
+        drawTileTop(gc, r, c, x0, x1, yT0, yT1);
+        // Lit leading edge, except at the base of a taller cliff behind
+        if (grid.getElevation(r - 1, c) <= grid.getElevation(r, c)) {
+            gc.setFill(Color.rgb(255, 255, 255, 0.10));
+            gc.fillRect(x0, yT0, x1 - x0, Math.max(2, cellSize * 0.045));
         }
-        gc.setFill(Color.rgb(255, 255, 255, 0.10));
-        gc.fillRect(x0, yT0, x1 - x0, Math.max(2, cellSize * 0.045));
         gc.setStroke(Color.rgb(0, 0, 0, 0.35));
         gc.setLineWidth(1);
         gc.strokeRect(x0 + 0.5, yT0 + 0.5, x1 - x0 - 1, yT1 - yT0 - 1);
+        drawCliffShadows(gc, r, c, offsetX, offsetY, cellSize);
     }
 
     /** Draw a single floor pickup token at its lifted position. */
@@ -1314,10 +1428,10 @@ public class BattleGridCanvas extends Pane {
         gc.setFill(Color.rgb(0, 0, 0, 0.45));
         gc.fillRoundRect(offsetX - frame + 4, offsetY - frame + 6,
             gridWidth + frame * 2, gridHeight + frame * 2, 12, 12);
-        gc.setFill(Color.web("#26262b"));
+        gc.setFill(Color.web("#252528"));
         gc.fillRoundRect(offsetX - frame, offsetY - frame,
             gridWidth + frame * 2, gridHeight + frame * 2, 12, 12);
-        gc.setStroke(Color.web("#4a4a52"));
+        gc.setStroke(Color.web("#505052"));
         gc.setLineWidth(1.5);
         gc.strokeRoundRect(offsetX - frame, offsetY - frame,
             gridWidth + frame * 2, gridHeight + frame * 2, 12, 12);
@@ -1327,18 +1441,25 @@ public class BattleGridCanvas extends Pane {
         // fractional cell widths can't leave seams.
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
-                int v = (int) (((r * 73856093L) ^ (c * 19349663L)) >>> 1) % theme.floorVariants.length;
-                double x0 = Math.round(offsetX + c * cellSize);
-                double x1 = Math.round(offsetX + (c + 1) * cellSize);
-                double lift = liftFor(r, c, cellSize);
-                if (lift == 0) {
+                if (!grid.isEnabled(r, c)) {
+                    // Outside the battle's shape: repaint with the backdrop color so
+                    // it reads as a void hole in the panel, not an undecorated tile
+                    double x0 = Math.round(offsetX + c * cellSize);
+                    double x1 = Math.round(offsetX + (c + 1) * cellSize);
                     double y0 = Math.round(offsetY + r * cellSize);
                     double y1 = Math.round(offsetY + (r + 1) * cellSize);
-                    gc.drawImage(theme.floorVariants[v], x0, y0, x1 - x0, y1 - y0);
-                    if (((r + c) & 1) == 1) {
-                        gc.setFill(Color.rgb(0, 0, 0, 0.07));
-                        gc.fillRect(x0, y0, x1 - x0, y1 - y0);
-                    }
+                    gc.setFill(theme.backdropBase);
+                    gc.fillRect(x0, y0, x1 - x0, y1 - y0);
+                    continue;
+                }
+                double lift = liftFor(r, c, cellSize);
+                if (lift == 0) {
+                    double x0 = Math.round(offsetX + c * cellSize);
+                    double x1 = Math.round(offsetX + (c + 1) * cellSize);
+                    double y0 = Math.round(offsetY + r * cellSize);
+                    double y1 = Math.round(offsetY + (r + 1) * cellSize);
+                    drawTileTop(gc, r, c, x0, x1, y0, y1);
+                    drawCliffShadows(gc, r, c, offsetX, offsetY, cellSize);
                 } else {
                     drawElevatedTileFace(gc, r, c, offsetX, offsetY, cellSize);
                 }
@@ -1479,6 +1600,7 @@ public class BattleGridCanvas extends Pane {
             // occlude - whatever from the row above already got drawn (e.g. a unit
             // standing there), before drawing this row's own terrain/units on top.
             for (int c = 0; c < cols; c++) {
+                if (!grid.isEnabled(r, c)) continue;
                 if (grid.getElevation(r, c) > 0) {
                     drawElevatedTileFace(gc, r, c, offsetX, offsetY, cellSize);
                     Pickup pickupHere = grid.getPickupAt(r, c);
@@ -1541,10 +1663,10 @@ public class BattleGridCanvas extends Pane {
         double textW = measure.getLayoutBounds().getWidth();
         double padX = 14, padY = 8;
 
-        gc.setFill(Color.rgb(20, 20, 24, 0.85));
+        gc.setFill(Color.web("#1e1e20", 0.85));
         gc.fillRoundRect(centerX - textW / 2 - padX, centerY - 12 - padY / 2,
             textW + padX * 2, 24 + padY, 10, 10);
-        gc.setStroke(Color.web("#4a4a52"));
+        gc.setStroke(Color.web("#505052"));
         gc.setLineWidth(1);
         gc.strokeRoundRect(centerX - textW / 2 - padX, centerY - 12 - padY / 2,
             textW + padX * 2, 24 + padY, 10, 10);
@@ -1552,7 +1674,7 @@ public class BattleGridCanvas extends Pane {
         gc.setTextAlign(TextAlignment.CENTER);
         gc.setTextBaseline(VPos.CENTER);
         gc.setFont(font);
-        gc.setFill(Color.web("#e8e8ec"));
+        gc.setFill(Color.web("#dcdcdc"));
         gc.fillText(msg, centerX, centerY);
     }
 
@@ -1717,10 +1839,6 @@ public class BattleGridCanvas extends Pane {
     }
 
     private void showAlert(Alert.AlertType type, String title, String content) {
-        Alert alert = new Alert(type);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(content);
-        alert.showAndWait();
+        DialogUtils.showAlert(type, title, content);
     }
 }

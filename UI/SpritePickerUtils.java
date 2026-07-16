@@ -6,6 +6,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
@@ -68,46 +69,34 @@ public class SpritePickerUtils {
         container.setAlignment(Pos.CENTER);
         container.setPadding(new Insets(10));
         container.setMinWidth(100);
-        container.setStyle(
-            "-fx-background-color: #252528; " +
-            "-fx-background-radius: 8; " +
-            "-fx-border-color: #404042; " +
-            "-fx-border-radius: 8; " +
-            "-fx-border-width: 1;"
-        );
-        
+        container.getStyleClass().add("sprite-picker");
+
         // Sprite preview container
         StackPane previewContainer = new StackPane();
         previewContainer.setMinSize(64, 64);
         previewContainer.setMaxSize(64, 64);
-        String borderColor = isParty ? "#4CAF50" : "#d75f5f";
-        previewContainer.setStyle(
-            "-fx-background-color: #1e1e20; " +
-            "-fx-background-radius: 6; " +
-            "-fx-border-color: " + borderColor + "; " +
-            "-fx-border-radius: 6; " +
-            "-fx-border-width: 2;"
-        );
-        
+        previewContainer.getStyleClass().addAll("sprite-preview", isParty ? "sprite-preview-party" : "sprite-preview-enemy");
+
         // Initial preview
         updatePreview(previewContainer, currentPath, colorHex, isParty);
-        
+
         // Label
         Label spriteLabel = new Label("Sprite");
-        spriteLabel.setStyle("-fx-text-fill: #808080; -fx-font-size: 10px;");
-        
+        spriteLabel.getStyleClass().addAll("label-muted", "label-caption");
+
         // Path display (read-only, truncated)
         TextField pathField = new TextField();
         pathField.setPromptText("No sprite");
         pathField.setPrefWidth(90);
-        pathField.setStyle("-fx-font-size: 9px;");
         pathField.setEditable(false);
         if (currentPath != null && !currentPath.isEmpty()) {
             pathField.setText(getDisplayName(currentPath));
+            Tooltip.install(pathField, new Tooltip(currentPath));
         }
-        
+
         // Browse button
         Button browseBtn = new Button("Browse");
+        browseBtn.getStyleClass().add("button");
         browseBtn.setStyle("-fx-font-size: 10px; -fx-padding: 3 8;");
         browseBtn.setOnAction(e -> {
             FileChooser fileChooser = new FileChooser();
@@ -131,16 +120,18 @@ public class SpritePickerUtils {
                 String newPath = handleFileSelection(selectedFile, subdirectory);
                 if (newPath != null) {
                     pathField.setText(getDisplayName(newPath));
+                    Tooltip.install(pathField, new Tooltip(newPath));
                     updatePreview(previewContainer, newPath, colorHex, isParty);
                     SpriteUtils.clearCache(); // Clear cache to reload new sprite
                     onPathChanged.accept(newPath);
                 }
             }
         });
-        
+
         // Clear button
         Button clearBtn = new Button();
-        clearBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.CLOSE, 10, "#ff6b6b"));
+        clearBtn.getStyleClass().add("button");
+        clearBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.CLOSE, 10, "#d75f5f"));
         clearBtn.setStyle("-fx-padding: 3 6;");
         clearBtn.setOnAction(e -> {
             pathField.setText("");
@@ -295,16 +286,10 @@ public class SpritePickerUtils {
         StackPane previewContainer = new StackPane();
         previewContainer.setMinSize(32, 32);
         previewContainer.setMaxSize(32, 32);
-        String borderColor = isParty ? "#4CAF50" : "#d75f5f";
-        previewContainer.setStyle(
-            "-fx-background-color: #1e1e20; " +
-            "-fx-background-radius: 4; " +
-            "-fx-border-color: " + borderColor + "; " +
-            "-fx-border-radius: 4; " +
-            "-fx-border-width: 1;"
-        );
+        previewContainer.setStyle("-fx-border-width: 1;");
+        previewContainer.getStyleClass().addAll("sprite-preview", isParty ? "sprite-preview-party" : "sprite-preview-enemy");
         updateCompactPreview(previewContainer, currentPath, colorHex, isParty);
-        
+
         // Path field
         TextField pathField = new TextField();
         pathField.setPromptText("No sprite");
@@ -312,10 +297,12 @@ public class SpritePickerUtils {
         pathField.setEditable(false);
         if (currentPath != null && !currentPath.isEmpty()) {
             pathField.setText(getDisplayName(currentPath));
+            Tooltip.install(pathField, new Tooltip(currentPath));
         }
-        
+
         // Browse button
         Button browseBtn = new Button("...");
+        browseBtn.getStyleClass().add("button");
         browseBtn.setStyle("-fx-padding: 2 6;");
         browseBtn.setOnAction(e -> {
             FileChooser fileChooser = new FileChooser();
@@ -336,16 +323,18 @@ public class SpritePickerUtils {
                 String newPath = handleFileSelection(selectedFile, subdirectory);
                 if (newPath != null) {
                     pathField.setText(getDisplayName(newPath));
+                    Tooltip.install(pathField, new Tooltip(newPath));
                     updateCompactPreview(previewContainer, newPath, colorHex, isParty);
                     SpriteUtils.clearCache();
                     onPathChanged.accept(newPath);
                 }
             }
         });
-        
+
         // Clear button
         Button clearBtn = new Button();
-        clearBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.CLOSE, 10, "#ff6b6b"));
+        clearBtn.getStyleClass().add("button");
+        clearBtn.setGraphic(IconUtils.createIcon(IconUtils.Icon.CLOSE, 10, "#d75f5f"));
         clearBtn.setStyle("-fx-padding: 2 4;");
         clearBtn.setOnAction(e -> {
             pathField.setText("");
